@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, PanResponder } from 'react-native';
+import { View, StyleSheet, PanResponder, Platform } from 'react-native';
 
 interface InactivityTrackerProps {
-  inactivityTimeoutMs?: number; // Defaults to 30000 (30 seconds)
+  inactivityTimeoutMs?: number;
   onInactivity: () => void;
   onReset?: () => void;
   children: React.ReactNode;
@@ -17,36 +17,47 @@ export const InactivityTracker: React.FC<InactivityTrackerProps> = ({
   enabled = true,
 }) => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onInactivityRef = useRef(onInactivity);
+  const onResetRef = useRef(onReset);
+  const enabledRef = useRef(enabled);
+
+  useEffect(() => { onInactivityRef.current = onInactivity; }, [onInactivity]);
+  useEffect(() => { onResetRef.current = onReset; }, [onReset]);
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
   const resetInactivityTimer = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-    if (onReset) {
-      onReset();
-    }
-    if (enabled) {
+    if (onResetRef.current) onResetRef.current();
+    if (enabledRef.current) {
       timerRef.current = setTimeout(() => {
-        onInactivity();
+        if (onInactivityRef.current) onInactivityRef.current();
       }, inactivityTimeoutMs);
     }
-  }, [inactivityTimeoutMs, onInactivity, onReset, enabled]);
+  }, [inactivityTimeoutMs]);
 
   useEffect(() => {
     resetInactivityTimer();
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [resetInactivityTimer, enabled]);
+  }, [inactivityTimeoutMs, enabled, resetInactivityTimer]);
 
-  // PanResponder to capture touch down / move events globally without blocking child interaction
+  // PanResponder captures touch events on touch-screen devices.
+  // On Android TV, remote D-pad events are NOT touch events, so PanResponder
+  // is not attached on TV to avoid interfering with D-pad focus navigation.
+  // TVEventHandler is intentionally NOT used here — it is unavailable in
+  // Expo Go and causes a fatal crash.
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponderCapture: () => {
         resetInactivityTimer();
-        return false; // Do NOT consume the touch event so children (buttons, inputs) work normally
+        return false;
       },
       onMoveShouldSetPanResponderCapture: () => {
         resetInactivityTimer();
@@ -55,15 +66,15 @@ export const InactivityTracker: React.FC<InactivityTrackerProps> = ({
     })
   ).current;
 
+  const touchHandlers = Platform.isTV ? {} : panResponder.panHandlers;
+
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container} {...touchHandlers}>
       {children}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
 });

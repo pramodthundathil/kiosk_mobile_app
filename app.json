@@ -20,7 +20,15 @@
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.MAIN",
+          "category": [
+            "android.intent.category.LEANBACK_LAUNCHER"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

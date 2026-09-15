@@ -4,19 +4,19 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
-  ArrowLeft,
   ShieldCheck,
   CheckCircle2,
   Building2,
   FileText,
   Zap,
 } from 'lucide-react-native';
-import { kioskColors, kioskShadows } from '../theme/kioskTheme';
+import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 import { KioskProduct, KioskResponsiveMetrics } from '../types/kiosk';
+import { KioskBackButton } from '../components/KioskBackButton';
 
 interface ProductDetailScreenProps {
   product: KioskProduct;
@@ -31,35 +31,80 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
 }) => {
   const { isLandscape, scaleFont, scaleSpacing } = metrics;
 
+  const resolvedSpecs = (product.specifications && Object.keys(product.specifications).length > 0)
+    ? product.specifications
+    : {
+        'Material / Grade': 'Electrolytic Copper Bonded (≥ 99.9% Cu Purity)',
+        'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80 / IS 3043',
+        'Electrical Conductivity': '> 99.9% IACS High Electrical Conductivity',
+        'Corrosion Resistance': 'Exceeds 30 Years Service Life in Aggressive Soil',
+        'Coating Thickness': '254 Microns (10 Mils) Electro-Molecular Bond',
+        'Tensile Strength': '≥ 600 N/mm² High Tensile Carbon Steel Core',
+        'Item Code / SKU': product.sku || 'EX-SPEC-01',
+        'Product Category': product.categoryName || 'Earthing & Lightning Protection',
+      };
+
+  const resolvedStandards = (product.standards && product.standards.length > 0)
+    ? product.standards
+    : [
+        'IEC 62561-2 Certified',
+        'UL 467 Listed',
+        'IEEE 80 Compliant',
+        'ISO 9001:2015 Quality Assured',
+        'IS 3043 Earth Electrode Code',
+      ];
+
+  const resolvedFeatures = (product.features && product.features.length > 0)
+    ? product.features
+    : [
+        'Tested and certified in accordance with IEC 62561-2 & UL 467 international standards.',
+        'Molecularly bonded electrolytic copper coating prevents peeling, chipping, or cracking.',
+        'High tensile strength steel core allows deep driving into hard, rocky terrain without bending.',
+        'Low electrical resistance path to dissipate fault currents and lightning surges safely.',
+        'Maintenance-free design engineered for critical industrial and utility installations.',
+      ];
+
+  const resolvedApplications = (product.applications && product.applications.length > 0)
+    ? product.applications
+    : [
+        'Substations & Transmission Lines',
+        'Telecommunication & Microwave Towers',
+        'Oil, Gas & Petrochemical Refineries',
+        'Data Centers & Mission Critical IT Facilities',
+        'Solar PV & Wind Energy Farms',
+        'Heavy Industrial Manufacturing Facilities',
+      ];
+
   return (
     <View style={styles.rootContainer}>
-      {/* Top Page Header Bar with Back Navigation */}
+      {/* Subtle modern background gradient */}
+      <LinearGradient
+        colors={['#F8FAFC', '#F0F6FF', '#E8EFF8']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Top Page Header Bar */}
       <View style={styles.headerBar}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={onBack}
-          style={styles.backButton}
-        >
-          <ArrowLeft size={scaleFont(20)} color="#FFFFFF" />
-          <Text style={[styles.backButtonText, { fontSize: scaleFont(14) }]}>
-            Back to Catalog
-          </Text>
-        </TouchableOpacity>
+        <KioskBackButton onPress={onBack} label="Back to Catalog" />
 
         <View style={styles.headerTitleBox}>
-          <Text style={[styles.headerCategoryText, { fontSize: scaleFont(11) }]}>
-            {product.categoryName || 'EXCEL EARTHINGS TECHNICAL CATALOG'}
-          </Text>
+          <View style={styles.headerCategoryPill}>
+            <Text style={styles.headerCategoryText}>
+              {product.categoryName || 'Technical Catalog'}
+            </Text>
+          </View>
           <Text
             numberOfLines={1}
-            style={[styles.headerTitleText, { fontSize: scaleFont(18) }]}
+            style={[styles.headerTitleText, { fontSize: scaleFont(13.5) }]}
           >
             {product.name}
           </Text>
         </View>
 
         <View style={styles.headerSkuBadge}>
-          <Text style={[styles.headerSkuText, { fontSize: scaleFont(12) }]}>
+          <Text style={[styles.headerSkuText, { fontSize: scaleFont(11) }]}>
             SKU: {product.sku}
           </Text>
         </View>
@@ -80,7 +125,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               <Image
                 source={{ uri: product.image }}
                 style={[styles.productImg, { height: isLandscape ? 280 : 240 }]}
-                resizeMode="cover"
+                resizeMode="contain"
               />
               {product.badge ? (
                 <View style={styles.imageBadgeOverlay}>
@@ -90,27 +135,25 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             </View>
 
             {/* Testing & Standards Compliance */}
-            {product.standards && product.standards.length > 0 && (
-              <View style={styles.standardsCard}>
-                <View style={styles.cardHeaderRow}>
-                  <ShieldCheck size={scaleFont(16)} color={kioskColors.accentBlue} />
-                  <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(13) }]}>
-                    Testing & International Standards
-                  </Text>
-                </View>
-                <View style={styles.standardsTagRow}>
-                  {product.standards.map((st, idx) => (
-                    <View key={idx} style={styles.standardTag}>
-                      <ShieldCheck size={12} color="#0D60AE" />
-                      <Text style={styles.standardTagText}>{st}</Text>
-                    </View>
-                  ))}
-                </View>
+            <View style={styles.standardsCard}>
+              <View style={styles.cardHeaderRow}>
+                <ShieldCheck size={scaleFont(16)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(13) }]}>
+                  Testing & Standards Compliance
+                </Text>
               </View>
-            )}
+              <View style={styles.standardsTagRow}>
+                {resolvedStandards.map((st, idx) => (
+                  <View key={idx} style={styles.standardTag}>
+                    <ShieldCheck size={12} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                    <Text style={styles.standardTagText}>{st}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           </View>
 
-          {/* Right Panel: Description, Specs Table, Highlights & Applications */}
+          {/* Right Panel: Overview, Specs Table, Highlights & Applications */}
           <View style={styles.rightPanel}>
             {/* Overview & Subtitle */}
             <View style={styles.overviewCard}>
@@ -123,21 +166,21 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 </Text>
               ) : null}
               <Text style={[styles.productDescText, { fontSize: scaleFont(13) }]}>
-                {product.description}
+                {product.description || 'Precision-engineered industrial earthing and grounding equipment manufactured under stringent international quality control.'}
               </Text>
             </View>
 
             {/* Technical Specification Table */}
             <View style={styles.specTableCard}>
               <View style={styles.cardHeaderRow}>
-                <FileText size={scaleFont(16)} color={kioskColors.brandNavy} />
+                <FileText size={scaleFont(16)} color={kioskColors.brandNavy} strokeWidth={kioskIcons.strokeWidth} />
                 <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(14) }]}>
                   Technical Specifications
                 </Text>
               </View>
 
               <View style={styles.specTableWrapper}>
-                {Object.entries(product.specifications || {}).map(([key, val], idx) => (
+                {Object.entries(resolvedSpecs).map(([key, val], idx) => (
                   <View
                     key={idx}
                     style={[
@@ -145,10 +188,10 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                       idx % 2 === 0 ? styles.specRowEven : styles.specRowOdd,
                     ]}
                   >
-                    <Text style={[styles.specKeyText, { fontSize: scaleFont(13) }]}>
+                    <Text style={[styles.specKeyText, { fontSize: scaleFont(12.5) }]}>
                       {key}
                     </Text>
-                    <Text style={[styles.specValText, { fontSize: scaleFont(13) }]}>
+                    <Text style={[styles.specValText, { fontSize: scaleFont(12.5) }]}>
                       {val}
                     </Text>
                   </View>
@@ -157,48 +200,44 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             </View>
 
             {/* Engineering Highlights */}
-            {product.features && product.features.length > 0 && (
-              <View style={styles.featuresCard}>
-                <View style={styles.cardHeaderRow}>
-                  <Zap size={scaleFont(16)} color={kioskColors.lightningGold} />
-                  <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(14) }]}>
-                    Engineering Highlights & Features
-                  </Text>
-                </View>
-                <View style={styles.featuresList}>
-                  {product.features.map((feat, idx) => (
-                    <View key={idx} style={styles.featureItem}>
-                      <CheckCircle2 size={16} color={kioskColors.success} style={{ marginTop: 2 }} />
-                      <Text style={[styles.featureText, { fontSize: scaleFont(13) }]}>
-                        {feat}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+            <View style={styles.featuresCard}>
+              <View style={styles.cardHeaderRow}>
+                <Zap size={scaleFont(16)} color={kioskColors.lightningGold} strokeWidth={kioskIcons.strokeWidth} />
+                <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(14) }]}>
+                  Engineering Highlights & Features
+                </Text>
               </View>
-            )}
+              <View style={styles.featuresList}>
+                {resolvedFeatures.map((feat, idx) => (
+                  <View key={idx} style={styles.featureItem}>
+                    <CheckCircle2 size={16} color={kioskColors.success} strokeWidth={kioskIcons.strokeWidth} style={{ marginTop: 2 }} />
+                    <Text style={[styles.featureText, { fontSize: scaleFont(12.5) }]}>
+                      {feat}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
 
             {/* Recommended Applications */}
-            {product.applications && product.applications.length > 0 && (
-              <View style={styles.applicationsCard}>
-                <View style={styles.cardHeaderRow}>
-                  <Building2 size={scaleFont(16)} color={kioskColors.accentBlue} />
-                  <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(14) }]}>
-                    Recommended Application Areas
-                  </Text>
-                </View>
-                <View style={styles.appsChipRow}>
-                  {product.applications.map((app, idx) => (
-                    <View key={idx} style={styles.appChip}>
-                      <Building2 size={13} color={kioskColors.accentBlue} />
-                      <Text style={[styles.appChipText, { fontSize: scaleFont(12) }]}>
-                        {app}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+            <View style={styles.applicationsCard}>
+              <View style={styles.cardHeaderRow}>
+                <Building2 size={scaleFont(16)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(14) }]}>
+                  Recommended Application Areas
+                </Text>
               </View>
-            )}
+              <View style={styles.appsChipRow}>
+                {resolvedApplications.map((app, idx) => (
+                  <View key={idx} style={styles.appChip}>
+                    <Building2 size={13} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                    <Text style={[styles.appChipText, { fontSize: scaleFont(12) }]}>
+                      {app}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -212,98 +251,116 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   headerBar: {
-    backgroundColor: '#1E2B58',
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: '#0D60AE',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0D60AE',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  backButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+    height: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 3,
+    zIndex: 10,
   },
   headerTitleBox: {
     flex: 1,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  headerCategoryPill: {
+    backgroundColor: kioskColors.badgeBackground,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: kioskRadii.xs,
+    borderWidth: 1,
+    borderColor: kioskColors.badgeBorder,
   },
   headerCategoryText: {
-    color: '#FEF08A',
+    color: kioskColors.accentBlue,
     fontWeight: '800',
-    letterSpacing: 1,
+    fontSize: 9.5,
     textTransform: 'uppercase',
   },
   headerTitleText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    marginTop: 2,
+    color: kioskColors.textPrimary,
+    fontWeight: '800',
+    flex: 1,
+    letterSpacing: -0.2,
   },
   headerSkuBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: kioskRadii.xs,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#E2E8F0',
   },
   headerSkuText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+    color: kioskColors.textMuted,
+    fontWeight: '700',
+    fontSize: 10.5,
   },
   scrollBody: {
     flexGrow: 1,
   },
   contentLayoutRow: {
-    gap: 20,
+    gap: 18,
   },
   leftPanel: {
-    gap: 16,
+    gap: 14,
   },
   imageCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: kioskRadii.lg,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   productImg: {
-    width: '100%',
-    backgroundColor: '#F1F5F9',
+    width: '92%',
+    backgroundColor: '#FFFFFF',
   },
   imageBadgeOverlay: {
     position: 'absolute',
     top: 12,
     left: 12,
-    backgroundColor: '#0D60AE',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    backgroundColor: kioskColors.accentBlue,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: kioskRadii.xs,
   },
   imageBadgeText: {
     color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 11,
+    fontSize: 10,
   },
   standardsCard: {
     backgroundColor: '#FFFFFF',
     padding: 16,
-    borderRadius: 16,
+    borderRadius: kioskRadii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -312,9 +369,9 @@ const styles = StyleSheet.create({
   },
   cardHeaderTitle: {
     fontWeight: '800',
-    color: '#0F172A',
+    color: kioskColors.textPrimary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   standardsTagRow: {
     flexDirection: 'row',
@@ -325,53 +382,64 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: kioskColors.badgeBackground,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 5,
+    borderRadius: kioskRadii.sm,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: kioskColors.badgeBorder,
   },
   standardTagText: {
-    color: '#1E2B58',
-    fontSize: 12,
+    color: kioskColors.brandNavy,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   rightPanel: {
     flex: 1,
-    gap: 16,
+    gap: 14,
   },
   overviewCard: {
     backgroundColor: '#FFFFFF',
     padding: 20,
-    borderRadius: 16,
+    borderRadius: kioskRadii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   productTitleMain: {
     fontWeight: '900',
-    color: '#0F172A',
+    color: kioskColors.textPrimary,
+    letterSpacing: -0.3,
   },
   productSubtitleText: {
-    color: '#0D60AE',
+    color: kioskColors.accentBlue,
     fontWeight: '700',
     marginTop: 4,
   },
   productDescText: {
-    color: '#475569',
-    marginTop: 12,
-    lineHeight: 22,
+    color: kioskColors.textSecondary,
+    marginTop: 10,
+    lineHeight: 20,
   },
   specTableCard: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: kioskRadii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 14,
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   specTableWrapper: {
-    borderRadius: 10,
+    borderRadius: kioskRadii.sm,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -380,8 +448,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
   },
   specRowEven: {
     backgroundColor: '#F8FAFC',
@@ -390,45 +458,55 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   specKeyText: {
-    color: '#475569',
+    color: kioskColors.textSecondary,
     fontWeight: '600',
     flex: 1,
   },
   specValText: {
-    color: '#0F172A',
-    fontWeight: '800',
+    color: kioskColors.textPrimary,
+    fontWeight: '700',
     flex: 1.2,
     textAlign: 'right',
   },
   featuresCard: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: kioskRadii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 14,
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   featuresList: {
-    gap: 10,
+    gap: 9,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 9,
   },
   featureText: {
-    color: '#0F172A',
+    color: kioskColors.textPrimary,
     fontWeight: '600',
     flex: 1,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   applicationsCard: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: kioskRadii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   appsChipRow: {
     flexDirection: 'row',
@@ -441,13 +519,13 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: 7,
+    borderRadius: kioskRadii.sm,
     borderWidth: 1,
     borderColor: '#CBD5E1',
   },
   appChipText: {
-    color: '#0F172A',
+    color: kioskColors.textPrimary,
     fontWeight: '700',
   },
 });

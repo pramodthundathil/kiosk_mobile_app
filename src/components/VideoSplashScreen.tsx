@@ -5,9 +5,12 @@ import {
   Animated,
   TouchableOpacity,
   Text,
+  Platform,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as SplashScreen from 'expo-splash-screen';
+
+const isTV = Platform.isTV;
 
 interface VideoSplashScreenProps {
   onFinish: () => void;
@@ -86,6 +89,9 @@ export const VideoSplashScreen: React.FC<VideoSplashScreenProps> = ({ onFinish }
         activeOpacity={1}
         onPress={finishSplashScreen}
         style={styles.touchArea}
+        hasTVPreferredFocus={isTV}
+        accessible={true}
+        accessibilityLabel={isTV ? 'Press OK to skip intro' : 'Tap to skip intro'}
       >
         {player ? (
           <VideoView
@@ -99,7 +105,9 @@ export const VideoSplashScreen: React.FC<VideoSplashScreenProps> = ({ onFinish }
         )}
 
         <View style={styles.skipContainer}>
-          <Text style={styles.skipText}>Tap to skip</Text>
+          <Text style={styles.skipText}>
+            {isTV ? 'Press OK to skip' : 'Tap to skip'}
+          </Text>
         </View>
       </TouchableOpacity>
     </Animated.View>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -49,13 +49,13 @@ export default function App() {
 
   return (
     <InactivityTracker
-      inactivityTimeoutMs={30000} // 30 seconds inactivity trigger
+      inactivityTimeoutMs={Platform.isTV ? 600000 : 30000} // TV: 10 min, Touch: 30 sec
       onInactivity={() => {
         if (!showSplash && !isCheckingAuth) {
           setIsScreensaverActive(true);
         }
       }}
-      enabled={!showSplash && !isCheckingAuth}
+      enabled={!showSplash && !isCheckingAuth && !Platform.isTV}
     >
       <View style={styles.container}>
         <StatusBar hidden style="light" />
@@ -77,7 +77,7 @@ export default function App() {
             <ActivityIndicator size="large" color="#00F0FF" />
           </View>
         ) : isAuthenticated ? (
-          <HomeScreen onLogout={handleLogout} />
+          <HomeScreen onLogout={handleLogout} isScreensaverActive={isScreensaverActive} />
         ) : (
           <KioskLoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />
         )}

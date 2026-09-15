@@ -20,6 +20,7 @@ export interface KioskCategory {
   icon: string;
   description?: string;
   color?: string;
+  image?: string; // Optional category image URL from backend
 }
 
 export interface ProductMediaAsset {

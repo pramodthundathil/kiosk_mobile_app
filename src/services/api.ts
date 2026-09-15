@@ -300,6 +300,7 @@ export async function fetchCatalogCategories(): Promise<KioskCategory[]> {
       code: c.code || 'CAT',
       icon: 'grid',
       description: c.description || '',
+      image: c.image_url ? sanitizeMediaUrl(c.image_url, cleanUrl) : undefined,
     }));
   } catch (err) {
     return [];

@@ -15,9 +15,10 @@ type KioskActiveTab = 'home' | 'products' | 'about';
 
 interface HomeScreenProps {
   onLogout?: () => void;
+  isScreensaverActive?: boolean;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverActive }) => {
   const responsiveMetrics = useKioskResponsive();
   const { isLandscape } = responsiveMetrics;
 
@@ -30,6 +31,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
   const [selectedProduct, setSelectedProduct] = useState<KioskProduct | null>(null);
   const [isAttractActive, setIsAttractActive] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Automatically dismiss modal/product and reset to catalog when screensaver activates
+  useEffect(() => {
+    if (isScreensaverActive) {
+      setSelectedProduct(null);
+      if (activePage !== 'catalog') {
+        setActivePage('catalog');
+      }
+    }
+  }, [isScreensaverActive, activePage]);
 
   // Dynamic Data Fetcher from Django Backend
   const loadDynamicCatalog = useCallback(async () => {
@@ -132,6 +143,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
           selectedCategory={selectedCategory}
           searchQuery={searchQuery}
           selectedProduct={selectedProduct}
+          isScreensaverActive={isScreensaverActive}
           onSelectCategory={handleSelectCategory}
           onSearchChange={setSearchQuery}
           onSelectProduct={(prod) => setSelectedProduct(prod)}
@@ -145,6 +157,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
           selectedCategory={selectedCategory}
           searchQuery={searchQuery}
           activeTab={activeTab}
+          isScreensaverActive={isScreensaverActive}
           onSelectCategory={handleSelectCategory}
           onSearchChange={setSearchQuery}
           onSelectProduct={handleOpenProductDetail}
