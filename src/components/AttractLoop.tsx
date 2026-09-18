@@ -91,15 +91,9 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
   const slidesRef = useRef(slides);
   slidesRef.current = slides;
 
-  // Animation values for Slot 0
+  // Smooth Crossfade Opacity Animations
   const opacity0 = useRef(new Animated.Value(1)).current;
-  const translateX0 = useRef(new Animated.Value(0)).current;
-  const scale0 = useRef(new Animated.Value(1)).current;
-
-  // Animation values for Slot 1
   const opacity1 = useRef(new Animated.Value(0)).current;
-  const translateX1 = useRef(new Animated.Value(0)).current;
-  const scale1 = useRef(new Animated.Value(1)).current;
 
   // Pulsing animation for bottom Touch/Remote prompt pill
   const pulseAnim = useRef(new Animated.Value(0.6)).current;
@@ -181,10 +175,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
     [failedUris, defaultFallback]
   );
 
-  // Transition handler with zero black gap:
-  // The current active slot stays at opacity 1 underneath.
-  // The incoming slot glides and fades in on top (higher zIndex).
-  // Once fully opaque, the incoming slot becomes active, and the old slot pre-loads the next slide in background.
+  // Smooth Crossfade Transition (zero black gap, fully fit to screen, no overflow, no contain)
   const triggerSlideTransition = useCallback(() => {
     const slideList = slidesRef.current;
     if (slideList.length <= 1 || isTransitioningRef.current) return;
@@ -197,50 +188,22 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
 
       // Prepare Slot 1 initial state before animation
       opacity1.setValue(0);
-      translateX1.setValue(35);
-      scale1.setValue(1.03);
-
-      translateX0.setValue(0);
       opacity0.setValue(1);
 
-      Animated.parallel([
-        // Incoming Slot 1 animation (Slide glide + Subtle Scale + Smooth Crossfade)
-        Animated.timing(opacity1, {
-          toValue: 1,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateX1, {
-          toValue: 0,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale1, {
-          toValue: 1.0,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        // Outgoing Slot 0 parallax motion (stays 100% visible beneath Slot 1)
-        Animated.timing(translateX0, {
-          toValue: -20,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Animation completed: Slot 1 is now fully opaque and visible
+      // Smooth Crossfade: Slot 1 fades in over Slot 0
+      Animated.timing(opacity1, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
         setActiveSlot(1);
         isTransitioningRef.current = false;
 
         // Reset Slot 0 behind Slot 1
         opacity0.setValue(0);
-        translateX0.setValue(0);
-        scale0.setValue(1.0);
 
-        // Advance Slot 0 to pre-decode the NEXT slide (has the entire duration of Slot 1 to decode)
+        // Pre-decode next slide in Slot 0 during the entire duration of Slot 1
         setSlideIdx0((slideIdx1 + 1) % slideList.length);
       });
     } else {
@@ -249,54 +212,26 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
 
       // Prepare Slot 0 initial state before animation
       opacity0.setValue(0);
-      translateX0.setValue(35);
-      scale0.setValue(1.03);
-
-      translateX1.setValue(0);
       opacity1.setValue(1);
 
-      Animated.parallel([
-        // Incoming Slot 0 animation (Slide glide + Subtle Scale + Smooth Crossfade)
-        Animated.timing(opacity0, {
-          toValue: 1,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateX0, {
-          toValue: 0,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale0, {
-          toValue: 1.0,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        // Outgoing Slot 1 parallax motion (stays 100% visible beneath Slot 0)
-        Animated.timing(translateX1, {
-          toValue: -20,
-          duration: 850,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Animation completed: Slot 0 is now fully opaque and visible
+      // Smooth Crossfade: Slot 0 fades in over Slot 1
+      Animated.timing(opacity0, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
         setActiveSlot(0);
         isTransitioningRef.current = false;
 
         // Reset Slot 1 behind Slot 0
         opacity1.setValue(0);
-        translateX1.setValue(0);
-        scale1.setValue(1.0);
 
-        // Advance Slot 1 to pre-decode the NEXT slide in the background
+        // Pre-decode next slide in Slot 1 during the entire duration of Slot 0
         setSlideIdx1((slideIdx0 + 1) % slideList.length);
       });
     }
-  }, [activeSlot, slideIdx0, slideIdx1, opacity0, translateX0, scale0, opacity1, translateX1, scale1]);
+  }, [activeSlot, slideIdx0, slideIdx1, opacity0, opacity1]);
 
   // Slideshow auto-advance timer:
   // Automatically triggers transition based on current active slide's duration_seconds (default 8-10s)
@@ -326,7 +261,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
   const uri0 = getUriForIndex(slideIdx0);
   const uri1 = getUriForIndex(slideIdx1);
 
-  // Slot views constructed with stable keys and fadeDuration={0} to bypass Android's 300ms decode delay
+  // Fully fit to screen with resizeMode="stretch" (no overflow, no contain/bars)
   const renderSlot0 = () => (
     <Animated.View
       key="buffer-slot-0"
@@ -334,7 +269,6 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
         styles.slotLayer,
         {
           opacity: opacity0,
-          transform: [{ translateX: translateX0 }, { scale: scale0 }],
           zIndex: topSlot === 0 ? 2 : 1,
           elevation: topSlot === 0 ? 2 : 1,
         },
@@ -344,7 +278,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
       <Image
         source={{ uri: uri0 }}
         style={styles.fullscreenImage}
-        resizeMode="cover"
+        resizeMode="stretch"
         fadeDuration={0}
         onError={() => {
           if (uri0) {
@@ -362,7 +296,6 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
         styles.slotLayer,
         {
           opacity: opacity1,
-          transform: [{ translateX: translateX1 }, { scale: scale1 }],
           zIndex: topSlot === 1 ? 2 : 1,
           elevation: topSlot === 1 ? 2 : 1,
         },
@@ -372,7 +305,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
       <Image
         source={{ uri: uri1 }}
         style={styles.fullscreenImage}
-        resizeMode="cover"
+        resizeMode="stretch"
         fadeDuration={0}
         onError={() => {
           if (uri1) {
@@ -402,10 +335,6 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
         accessibilityLabel="Press OK or touch to continue"
       >
         <View style={styles.imageWrapper}>
-          {/* 
-            Render in order of stacking:
-            Whichever slot is currently on top is rendered second in JSX for native Android ordering guarantee
-          */}
           {topSlot === 1 ? (
             <>
               {renderSlot0()}
@@ -441,10 +370,7 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   imageWrapper: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#000000',
   },
   slotLayer: {
@@ -453,6 +379,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   fullscreenImage: {
+    ...StyleSheet.absoluteFill,
     width: '100%',
     height: '100%',
   },
