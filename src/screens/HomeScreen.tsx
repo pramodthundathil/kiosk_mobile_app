@@ -5,10 +5,9 @@ import { PortraitKioskLayout } from '../components/PortraitKioskLayout';
 import { LandscapeKioskLayout } from '../components/LandscapeKioskLayout';
 import { ProductDetailScreen } from './ProductDetailScreen';
 import { CompanyInfoScreen } from './CompanyInfoScreen';
-import { AttractLoop } from '../components/AttractLoop';
 import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '../mock/kioskData';
 import { KioskProduct, KioskCategory } from '../types/kiosk';
-import { fetchCatalogProducts, fetchCatalogCategories } from '../services/api';
+import { fetchCatalogProducts, fetchCatalogCategories, getStoredKioskToken } from '../services/api';
 
 type KioskActivePage = 'catalog' | 'product-detail' | 'company-info';
 type KioskActiveTab = 'home' | 'products' | 'about';
@@ -29,7 +28,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
   const [products, setProducts] = useState<KioskProduct[]>(MOCK_PRODUCTS);
   const [categories, setCategories] = useState<KioskCategory[]>(MOCK_CATEGORIES);
   const [selectedProduct, setSelectedProduct] = useState<KioskProduct | null>(null);
-  const [isAttractActive, setIsAttractActive] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Automatically dismiss modal/product and reset to catalog when screensaver activates
@@ -51,12 +49,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
         fetchCatalogCategories(),
       ]);
 
+      console.log('[HomeScreen] liveProducts received count:', liveProducts?.length, liveProducts?.map((p: any) => ({ name: p.name, category: p.category, sku: p.sku })));
+      console.log('[HomeScreen] liveCategories count:', liveCategories?.length);
+
       if (liveProducts && liveProducts.length > 0) {
         setProducts(liveProducts);
-        // do not auto-select product on load
       } else {
-        setProducts(MOCK_PRODUCTS);
-        // do not auto-select product on load
+        const token = await getStoredKioskToken();
+        if (token) {
+          // Kiosk is authenticated: reflect the actual assigned products (even if empty)
+          setProducts(liveProducts || []);
+        } else {
+          setProducts(MOCK_PRODUCTS);
+        }
       }
 
       if (liveCategories && liveCategories.length > 0) {
@@ -103,7 +108,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
     }
   };
 
-  // Dedicated Full-Page View: Product Technical Details
+  // Dedicated Full-Page View: Product Detail
   if (activePage === 'product-detail' && selectedProduct) {
     return (
       <ProductDetailScreen
@@ -126,14 +131,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
 
   return (
     <View style={styles.rootContainer}>
-      {/* Full-screen Idle Attract Screensaver */}
-      {isAttractActive && (
-        <AttractLoop
-          metrics={responsiveMetrics}
-          onDismiss={() => setIsAttractActive(false)}
-        />
-      )}
-
       {/* Responsive Orientation Renderer matching User's Mockups */}
       {isLandscape ? (
         <LandscapeKioskLayout

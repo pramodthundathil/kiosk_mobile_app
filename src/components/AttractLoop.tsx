@@ -1,5 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, Text, Animated, Platform, Modal } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Text,
+  Animated,
+  Platform,
+  Modal,
+  BackHandler,
+  Easing,
+} from 'react-native';
 import { Touchpad, ArrowRight } from 'lucide-react-native';
 
 const isTV = Platform.isTV;
@@ -13,37 +24,86 @@ interface AttractLoopProps {
   screensavers?: KioskScreensaver[];
 }
 
-const DEFAULT_SCREENSAVERS: Partial<KioskScreensaver>[] = [
+const DEFAULT_LANDSCAPE_SCREENSAVERS: Partial<KioskScreensaver>[] = [
   {
-    id: 'default-1',
+    id: 'default-l-1',
     image_url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1920&q=80',
     duration_seconds: 8,
+    orientation: 'LANDSCAPE',
   },
   {
-    id: 'default-2',
+    id: 'default-l-2',
     image_url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1920&q=80',
     duration_seconds: 8,
+    orientation: 'LANDSCAPE',
   },
   {
-    id: 'default-3',
+    id: 'default-l-3',
     image_url: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=1920&q=80',
     duration_seconds: 8,
+    orientation: 'LANDSCAPE',
   },
 ];
 
-export const AttractLoop: React.FC<AttractLoopProps> = ({ metrics, onDismiss, screensavers: initialScreensavers }) => {
-  const { isLandscape } = metrics;
-  const [slides, setSlides] = useState<(KioskScreensaver | Partial<KioskScreensaver>)[]>(
-    initialScreensavers && initialScreensavers.length > 0 ? initialScreensavers : DEFAULT_SCREENSAVERS
-  );
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
-  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+const DEFAULT_PORTRAIT_SCREENSAVERS: Partial<KioskScreensaver>[] = [
+  {
+    id: 'default-p-1',
+    image_url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1080&h=1920&q=80',
+    duration_seconds: 8,
+    orientation: 'PORTRAIT',
+  },
+  {
+    id: 'default-p-2',
+    image_url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1080&h=1920&q=80',
+    duration_seconds: 8,
+    orientation: 'PORTRAIT',
+  },
+];
 
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+export const AttractLoop: React.FC<AttractLoopProps> = ({
+  metrics,
+  onDismiss,
+  screensavers: initialScreensavers,
+}) => {
+  const { isLandscape } = metrics;
+  const orientationParam = isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
+  const defaultFallback = isLandscape ? DEFAULT_LANDSCAPE_SCREENSAVERS : DEFAULT_PORTRAIT_SCREENSAVERS;
+
+  // Filter initial screensavers matching current orientation
+  const initialMatching = initialScreensavers?.filter(
+    (s) => !s.orientation || s.orientation === orientationParam || s.orientation === 'BOTH'
+  );
+
+  const [slides, setSlides] = useState<(KioskScreensaver | Partial<KioskScreensaver>)[]>(
+    initialMatching && initialMatching.length > 0 ? initialMatching : defaultFallback
+  );
+  const [failedUris, setFailedUris] = useState<Record<string, boolean>>({});
+
+  // ── DUAL PERSISTENT BUFFER SLOTS ──
+  // Slot 0 and Slot 1 ping-pong back and forth so the outgoing image NEVER unmounts
+  // or disappears before the incoming image is 100% rendered and opaque.
+  const [activeSlot, setActiveSlot] = useState<0 | 1>(0);
+  const [topSlot, setTopSlot] = useState<0 | 1>(0);
+  const [slideIdx0, setSlideIdx0] = useState<number>(0);
+  const [slideIdx1, setSlideIdx1] = useState<number>(slides.length > 1 ? 1 : 0);
+
+  const isTransitioningRef = useRef<boolean>(false);
+  const slidesRef = useRef(slides);
+  slidesRef.current = slides;
+
+  // Animation values for Slot 0
+  const opacity0 = useRef(new Animated.Value(1)).current;
+  const translateX0 = useRef(new Animated.Value(0)).current;
+  const scale0 = useRef(new Animated.Value(1)).current;
+
+  // Animation values for Slot 1
+  const opacity1 = useRef(new Animated.Value(0)).current;
+  const translateX1 = useRef(new Animated.Value(0)).current;
+  const scale1 = useRef(new Animated.Value(1)).current;
+
+  // Pulsing animation for bottom Touch/Remote prompt pill
   const pulseAnim = useRef(new Animated.Value(0.6)).current;
 
-  // Pulsing animation for bottom Touch Screen prompt
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
@@ -63,31 +123,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({ metrics, onDismiss, sc
     return () => pulse.stop();
   }, [pulseAnim]);
 
-  // Pre-fetch screensavers dynamically if not supplied via props
-  useEffect(() => {
-    let isMounted = true;
-    if (!initialScreensavers || initialScreensavers.length === 0) {
-      const orientationParam = isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
-      fetchScreensavers(orientationParam).then((fetched) => {
-        if (isMounted && fetched && fetched.length > 0) {
-          setFailedImages({});
-          setSlides(fetched);
-          setCurrentIndex(0);
-          setPreviousIndex(null);
-        }
-      });
-    } else {
-      setFailedImages({});
-      setSlides(initialScreensavers);
-      setCurrentIndex(0);
-      setPreviousIndex(null);
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [initialScreensavers, isLandscape]);
-
-  // Preload all image assets into memory cache
+  // Preload all image assets into disk cache immediately
   useEffect(() => {
     slides.forEach((s) => {
       const uri = s.image_url || s.image;
@@ -97,47 +133,255 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({ metrics, onDismiss, sc
     });
   }, [slides]);
 
-  // Transition handler with smooth cross-fade
-  const advanceToNextSlide = () => {
-    if (slides.length <= 1) return;
+  // Fetch latest screensavers from backend API matching orientation
+  useEffect(() => {
+    let isMounted = true;
+    const targetOri = isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
 
-    const nextIdx = (currentIndex + 1) % slides.length;
-    setPreviousIndex(currentIndex);
-    setCurrentIndex(nextIdx);
+    if (initialScreensavers && initialScreensavers.length > 0) {
+      const matching = initialScreensavers.filter(
+        (s) => !s.orientation || s.orientation === targetOri || s.orientation === 'BOTH'
+      );
+      if (matching.length > 0) {
+        setSlides(matching);
+        setSlideIdx0(0);
+        setSlideIdx1(matching.length > 1 ? 1 : 0);
+      }
+    }
 
-    fadeAnim.setValue(0);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start();
-  };
+    fetchScreensavers(targetOri).then((fetched) => {
+      if (isMounted && fetched && fetched.length > 0) {
+        setFailedUris({});
+        setSlides(fetched);
+        setSlideIdx0(0);
+        setSlideIdx1(fetched.length > 1 ? 1 : 0);
+      }
+    });
 
-  // Slideshow auto-advance timer
+    return () => {
+      isMounted = false;
+    };
+  }, [initialScreensavers, isLandscape]);
+
+  // Resolve a valid image URL for a given slide index with safety fallbacks
+  const getUriForIndex = useCallback(
+    (idx: number): string => {
+      const slideList = slidesRef.current;
+      if (!slideList || slideList.length === 0) {
+        return defaultFallback[0].image_url!;
+      }
+      const safeIdx = ((idx % slideList.length) + slideList.length) % slideList.length;
+      const slide = slideList[safeIdx];
+      const raw = slide?.image_url || slide?.image;
+      if (raw && !failedUris[raw]) {
+        return raw;
+      }
+      return defaultFallback[safeIdx % defaultFallback.length].image_url!;
+    },
+    [failedUris, defaultFallback]
+  );
+
+  // Transition handler with zero black gap:
+  // The current active slot stays at opacity 1 underneath.
+  // The incoming slot glides and fades in on top (higher zIndex).
+  // Once fully opaque, the incoming slot becomes active, and the old slot pre-loads the next slide in background.
+  const triggerSlideTransition = useCallback(() => {
+    const slideList = slidesRef.current;
+    if (slideList.length <= 1 || isTransitioningRef.current) return;
+
+    isTransitioningRef.current = true;
+
+    if (activeSlot === 0) {
+      // Transitioning: Slot 0 (outgoing) -> Slot 1 (incoming)
+      setTopSlot(1);
+
+      // Prepare Slot 1 initial state before animation
+      opacity1.setValue(0);
+      translateX1.setValue(35);
+      scale1.setValue(1.03);
+
+      translateX0.setValue(0);
+      opacity0.setValue(1);
+
+      Animated.parallel([
+        // Incoming Slot 1 animation (Slide glide + Subtle Scale + Smooth Crossfade)
+        Animated.timing(opacity1, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateX1, {
+          toValue: 0,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale1, {
+          toValue: 1.0,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        // Outgoing Slot 0 parallax motion (stays 100% visible beneath Slot 1)
+        Animated.timing(translateX0, {
+          toValue: -20,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Animation completed: Slot 1 is now fully opaque and visible
+        setActiveSlot(1);
+        isTransitioningRef.current = false;
+
+        // Reset Slot 0 behind Slot 1
+        opacity0.setValue(0);
+        translateX0.setValue(0);
+        scale0.setValue(1.0);
+
+        // Advance Slot 0 to pre-decode the NEXT slide (has the entire duration of Slot 1 to decode)
+        setSlideIdx0((slideIdx1 + 1) % slideList.length);
+      });
+    } else {
+      // Transitioning: Slot 1 (outgoing) -> Slot 0 (incoming)
+      setTopSlot(0);
+
+      // Prepare Slot 0 initial state before animation
+      opacity0.setValue(0);
+      translateX0.setValue(35);
+      scale0.setValue(1.03);
+
+      translateX1.setValue(0);
+      opacity1.setValue(1);
+
+      Animated.parallel([
+        // Incoming Slot 0 animation (Slide glide + Subtle Scale + Smooth Crossfade)
+        Animated.timing(opacity0, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateX0, {
+          toValue: 0,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale0, {
+          toValue: 1.0,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        // Outgoing Slot 1 parallax motion (stays 100% visible beneath Slot 0)
+        Animated.timing(translateX1, {
+          toValue: -20,
+          duration: 850,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Animation completed: Slot 0 is now fully opaque and visible
+        setActiveSlot(0);
+        isTransitioningRef.current = false;
+
+        // Reset Slot 1 behind Slot 0
+        opacity1.setValue(0);
+        translateX1.setValue(0);
+        scale1.setValue(1.0);
+
+        // Advance Slot 1 to pre-decode the NEXT slide in the background
+        setSlideIdx1((slideIdx0 + 1) % slideList.length);
+      });
+    }
+  }, [activeSlot, slideIdx0, slideIdx1, opacity0, translateX0, scale0, opacity1, translateX1, scale1]);
+
+  // Slideshow auto-advance timer:
+  // Automatically triggers transition based on current active slide's duration_seconds (default 8-10s)
   useEffect(() => {
     if (slides.length <= 1) return;
 
-    const currentSlide = slides[currentIndex];
-    const displayDurationMs = ((currentSlide?.duration_seconds || 10) * 1000);
+    const currentSlideIndex = activeSlot === 0 ? slideIdx0 : slideIdx1;
+    const currentSlide = slides[currentSlideIndex % slides.length];
+    const displayDurationMs = (currentSlide?.duration_seconds || 8) * 1000;
 
     const timer = setTimeout(() => {
-      advanceToNextSlide();
+      triggerSlideTransition();
     }, displayDurationMs);
 
     return () => clearTimeout(timer);
-  }, [currentIndex, slides]);
+  }, [activeSlot, slideIdx0, slideIdx1, slides, triggerSlideTransition]);
 
-  const activeSlide = slides[currentIndex] || slides[0] || DEFAULT_SCREENSAVERS[0];
-  const activeSlideId = activeSlide.id || `slide-${currentIndex}`;
-  const activeRawUri = activeSlide.image_url || activeSlide.image;
-  const isActiveFailed = failedImages[activeSlideId];
-  const activeUri = !isActiveFailed && activeRawUri ? activeRawUri : DEFAULT_SCREENSAVERS[currentIndex % DEFAULT_SCREENSAVERS.length].image_url!;
+  // Dismiss screensaver if hardware Back button is pressed on remote / device
+  useEffect(() => {
+    const backSub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onDismiss();
+      return true; // handled
+    });
+    return () => backSub.remove();
+  }, [onDismiss]);
 
-  const prevSlide = previousIndex !== null ? (slides[previousIndex] || slides[0]) : null;
-  const prevSlideId = prevSlide?.id || (previousIndex !== null ? `slide-${previousIndex}` : '');
-  const prevRawUri = prevSlide ? (prevSlide.image_url || prevSlide.image) : null;
-  const isPrevFailed = prevSlideId ? failedImages[prevSlideId] : false;
-  const prevUri = prevSlide && !isPrevFailed && prevRawUri ? prevRawUri : (previousIndex !== null ? DEFAULT_SCREENSAVERS[previousIndex % DEFAULT_SCREENSAVERS.length].image_url! : null);
+  const uri0 = getUriForIndex(slideIdx0);
+  const uri1 = getUriForIndex(slideIdx1);
+
+  // Slot views constructed with stable keys and fadeDuration={0} to bypass Android's 300ms decode delay
+  const renderSlot0 = () => (
+    <Animated.View
+      key="buffer-slot-0"
+      style={[
+        styles.slotLayer,
+        {
+          opacity: opacity0,
+          transform: [{ translateX: translateX0 }, { scale: scale0 }],
+          zIndex: topSlot === 0 ? 2 : 1,
+          elevation: topSlot === 0 ? 2 : 1,
+        },
+      ]}
+      pointerEvents="none"
+    >
+      <Image
+        source={{ uri: uri0 }}
+        style={styles.fullscreenImage}
+        resizeMode="cover"
+        fadeDuration={0}
+        onError={() => {
+          if (uri0) {
+            setFailedUris((prev) => ({ ...prev, [uri0]: true }));
+          }
+        }}
+      />
+    </Animated.View>
+  );
+
+  const renderSlot1 = () => (
+    <Animated.View
+      key="buffer-slot-1"
+      style={[
+        styles.slotLayer,
+        {
+          opacity: opacity1,
+          transform: [{ translateX: translateX1 }, { scale: scale1 }],
+          zIndex: topSlot === 1 ? 2 : 1,
+          elevation: topSlot === 1 ? 2 : 1,
+        },
+      ]}
+      pointerEvents="none"
+    >
+      <Image
+        source={{ uri: uri1 }}
+        style={styles.fullscreenImage}
+        resizeMode="cover"
+        fadeDuration={0}
+        onError={() => {
+          if (uri1) {
+            setFailedUris((prev) => ({ ...prev, [uri1]: true }));
+          }
+        }}
+      />
+    </Animated.View>
+  );
 
   return (
     <Modal
@@ -152,37 +396,30 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({ metrics, onDismiss, sc
         activeOpacity={1}
         onPress={onDismiss}
         style={styles.fullContainer}
-        hasTVPreferredFocus={isTV}
+        focusable={true}
+        hasTVPreferredFocus={true}
         accessible={true}
         accessibilityLabel="Press OK or touch to continue"
       >
         <View style={styles.imageWrapper}>
-          {/* Layer 1: Previous Slide */}
-          {prevUri && (
-            <Image
-              key={`prev-${previousIndex}`}
-              source={{ uri: prevUri }}
-              style={styles.fullscreenImage}
-              resizeMode="stretch"
-            />
+          {/* 
+            Render in order of stacking:
+            Whichever slot is currently on top is rendered second in JSX for native Android ordering guarantee
+          */}
+          {topSlot === 1 ? (
+            <>
+              {renderSlot0()}
+              {renderSlot1()}
+            </>
+          ) : (
+            <>
+              {renderSlot1()}
+              {renderSlot0()}
+            </>
           )}
-
-          {/* Layer 2: Active Incoming Slide */}
-          <Animated.View style={[styles.activeLayer, { opacity: fadeAnim }]}>
-            <Image
-              key={`active-${currentIndex}`}
-              source={{ uri: activeUri }}
-              style={styles.fullscreenImage}
-              resizeMode="stretch"
-              onError={(e) => {
-                console.warn(`Screensaver image error [${activeSlideId}]:`, activeUri, e.nativeEvent?.error);
-                setFailedImages((prev) => ({ ...prev, [activeSlideId]: true }));
-              }}
-            />
-          </Animated.View>
         </View>
 
-        {/* Modern Frosted Glass Floating Touch Prompt Pill */}
+        {/* Modern Frosted Glass Floating Touch / TV Remote Prompt Pill */}
         <View style={styles.floatingPromptContainer} pointerEvents="none">
           <Animated.View style={[styles.floatingPromptPill, { opacity: pulseAnim }]}>
             <Touchpad size={15} color="#FFFFFF" strokeWidth={kioskIcons.strokeWidth} />
@@ -207,24 +444,21 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
     backgroundColor: '#000000',
+  },
+  slotLayer: {
+    ...StyleSheet.absoluteFill,
+    width: '100%',
+    height: '100%',
   },
   fullscreenImage: {
     width: '100%',
     height: '100%',
   },
-  activeLayer: {
-    ...StyleSheet.absoluteFill,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   floatingPromptContainer: {
     position: 'absolute',
-    bottom: 22,
+    bottom: 24,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -236,8 +470,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderRadius: kioskRadii.full,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.22)',
@@ -249,7 +483,7 @@ const styles = StyleSheet.create({
   },
   floatingPromptText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.8,
   },

@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Image,
+  ImageBackground,
+  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -16,10 +18,12 @@ import {
   Phone,
   Mail,
   Cpu,
+  Edit3,
 } from 'lucide-react-native';
 import { kioskColors, kioskIcons, kioskRadii } from '../theme/kioskTheme';
 import { KioskResponsiveMetrics } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
+import { WhiteboardModal } from '../components/WhiteboardModal';
 
 interface CompanyInfoScreenProps {
   metrics: KioskResponsiveMetrics;
@@ -31,6 +35,7 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
   onBack,
 }) => {
   const { isLandscape, scaleFont, scaleSpacing } = metrics;
+  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
   return (
     <View style={styles.rootContainer}>
@@ -41,6 +46,35 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+
+      {/* Interactive Digital Whiteboard Modal */}
+      <WhiteboardModal visible={isWhiteboardOpen} onClose={() => setIsWhiteboardOpen(false)} />
+
+      {/* Top Earth Header Background in Portrait Mode */}
+      {!isLandscape && (
+        <ImageBackground
+          source={require('../../assets/portrait_earth_header.png')}
+          style={[styles.portraitHeaderBg, { minHeight: scaleSpacing(110) }]}
+          imageStyle={styles.portraitHeaderBgImage}
+          resizeMode="cover"
+        >
+          <View style={styles.portraitHeaderTopRow}>
+            <Image
+              source={require('../../assets/excel_logo_white.png')}
+              style={styles.portraitLogoImg}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setIsWhiteboardOpen(true)}
+              style={styles.portraitHeaderWhiteboardBtn}
+            >
+              <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+              <Text style={[styles.portraitHeaderWhiteboardBtnText, { fontSize: scaleFont(12) }]}>Whiteboard</Text>
+            </TouchableOpacity>
+          </View>
+        </ImageBackground>
+      )}
 
       {/* Top Page Header Bar */}
       <View style={styles.headerBar}>
@@ -181,6 +215,17 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
           </View>
         </View>
       </ScrollView>
+
+      {/* Fixed Bottom Ad Banner in Portrait Mode */}
+      {!isLandscape && (
+        <View style={styles.fixedBottomAdWrapper}>
+          <Image
+            source={require('../../assets/portrait_nature_footer.png')}
+            style={[styles.fixedBottomAdImg, { height: Math.max(68, scaleSpacing(72)) }]}
+            resizeMode="cover"
+          />
+        </View>
+      )}
     </View>
   );
 };
@@ -189,6 +234,65 @@ const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  portraitHeaderBg: {
+    width: '100%',
+    minHeight: 110,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: '#020D22',
+  },
+  portraitHeaderBgImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  portraitHeaderTopRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
+  },
+  portraitLogoImg: {
+    width: 175,
+    height: 48,
+  },
+  portraitHeaderWhiteboardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    height: 38,
+    borderRadius: kioskRadii.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  portraitHeaderWhiteboardBtnText: {
+    color: kioskColors.textPrimary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  fixedBottomAdWrapper: {
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  fixedBottomAdImg: {
+    width: '100%',
+    height: 68,
   },
   headerBar: {
     backgroundColor: '#FFFFFF',
@@ -224,14 +328,16 @@ const styles = StyleSheet.create({
   headerCategoryText: {
     color: kioskColors.accentBlue,
     fontWeight: '800',
-    fontSize: 9.5,
+    fontSize: 12,
     textTransform: 'uppercase',
+    includeFontPadding: false,
   },
   headerTitleText: {
     color: kioskColors.textPrimary,
     fontWeight: '800',
     flex: 1,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   isoBadge: {
     flexDirection: 'row',
@@ -247,7 +353,8 @@ const styles = StyleSheet.create({
   isoBadgeText: {
     color: kioskColors.accentBlue,
     fontWeight: '800',
-    fontSize: 10.5,
+    fontSize: 12,
+    includeFontPadding: false,
   },
   scrollBody: {
     flexGrow: 1,
@@ -369,8 +476,9 @@ const styles = StyleSheet.create({
   },
   contactItemLabel: {
     color: kioskColors.textMuted,
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '600',
+    includeFontPadding: false,
   },
   contactItemVal: {
     color: kioskColors.textPrimary,

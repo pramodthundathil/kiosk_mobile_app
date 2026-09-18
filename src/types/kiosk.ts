@@ -9,8 +9,14 @@ export interface KioskResponsiveMetrics {
   aspectRatio: number;
   kioskType: KioskHardwareType;
   gridColumns: number;
-  scaleFont: (size: number) => number;
+  scaleFont: (size: number, minSize?: number) => number;
   scaleSpacing: (size: number) => number;
+  is4K: boolean;
+  pixelRatio: number;
+  crispTextProps: {
+    includeFontPadding: boolean;
+    textBreakStrategy: 'simple';
+  };
 }
 
 export interface KioskCategory {
@@ -38,6 +44,8 @@ export interface KioskProduct {
   sku: string;
   subtitle?: string;
   category: string;
+  categoryId?: string;
+  categoryCode?: string;
   categoryName?: string;
   description: string;
   image: string;
@@ -47,6 +55,7 @@ export interface KioskProduct {
   standards?: string[];
   badge?: string;
   price?: number; // Optional reference price if provided by API
+  stock?: number;
   mediaAssets?: ProductMediaAsset[];
   brochureUrl?: string;
   techSheetUrl?: string;

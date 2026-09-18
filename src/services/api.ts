@@ -232,45 +232,239 @@ export async function loginWithLocalStorageSession(
   return { success: true, data: sessionData };
 }
 
-export async function fetchCatalogProducts(): Promise<KioskProduct[]> {
+function safeBase64Decode(str: string): string {
+  if (typeof atob === 'function') {
+    try {
+      return atob(str);
+    } catch (e) {}
+  }
+  const b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let o1: number, o2: number, o3: number, h1: number, h2: number, h3: number, h4: number, bits: number;
+  let i = 0, ac = 0;
+  const tmp_arr: string[] = [];
+  if (!str) return '';
+  do {
+    h1 = b64.indexOf(str.charAt(i++));
+    h2 = b64.indexOf(str.charAt(i++));
+    h3 = b64.indexOf(str.charAt(i++));
+    h4 = b64.indexOf(str.charAt(i++));
+    bits = (h1 << 18) | (h2 << 12) | (h3 << 6) | h4;
+    o1 = (bits >> 16) & 0xff;
+    o2 = (bits >> 8) & 0xff;
+    o3 = bits & 0xff;
+    if (h3 === 64) {
+      tmp_arr[ac++] = String.fromCharCode(o1);
+    } else if (h4 === 64) {
+      tmp_arr[ac++] = String.fromCharCode(o1, o2);
+    } else {
+      tmp_arr[ac++] = String.fromCharCode(o1, o2, o3);
+    }
+  } while (i < str.length);
+  return tmp_arr.join('');
+}
+
+export function parseJwtPayload(token: string): any {
+  try {
+    if (!token || !token.includes('.')) return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    const decoded = safeBase64Decode(base64);
+    if (!decoded) return null;
+    return JSON.parse(decoded);
+  } catch (e) {
+    return null;
+  }
+}
+
+export interface ActiveKioskIdentity {
+  kiosk_id?: string;
+  device_id?: string;
+  name?: string;
+}
+
+export async function getActiveKioskIdentity(): Promise<ActiveKioskIdentity> {
+  const identity: ActiveKioskIdentity = {};
+
+  try {
+    const raw = await storageGetItem(KIOSK_INFO_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.kiosk_id) identity.kiosk_id = parsed.kiosk_id;
+      if (parsed.device_id) identity.device_id = parsed.device_id;
+      if (parsed.name) identity.name = parsed.name;
+    }
+  } catch (e) {}
+
+  // Fallback: decode claims from JWT access token payload
+  if (!identity.kiosk_id || !identity.device_id) {
+    try {
+      const token = await getStoredKioskToken();
+      if (token) {
+        const payload = parseJwtPayload(token);
+        if (payload) {
+          if (payload.kiosk_id && !identity.kiosk_id) identity.kiosk_id = payload.kiosk_id;
+          if (payload.device_id && !identity.device_id) identity.device_id = payload.device_id;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return identity;
+}
+
+export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceId?: string): Promise<KioskProduct[]> {
   try {
     const serverUrl = await getSavedServerUrl();
     const token = await getStoredKioskToken();
     const cleanUrl = serverUrl.replace(/\/+$/, '');
-    const endpoint = `${cleanUrl}/api/products/`;
+
+    // Resolve kiosk identification for device-specific product filtering
+    let kioskId = targetKioskId;
+    let deviceId = targetDeviceId;
+
+    if (!kioskId || !deviceId) {
+      const activeIdentity = await getActiveKioskIdentity();
+      if (!kioskId && activeIdentity.kiosk_id) kioskId = activeIdentity.kiosk_id;
+      if (!deviceId && activeIdentity.device_id) deviceId = activeIdentity.device_id;
+    }
+
+    const queryParams: string[] = [];
+    if (kioskId) queryParams.push(`kiosk_id=${encodeURIComponent(kioskId)}`);
+    if (deviceId) queryParams.push(`device_id=${encodeURIComponent(deviceId)}`);
+    const qs = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+    const endpoint = `${cleanUrl}/api/products/${qs}`;
+
+    console.log('[fetchCatalogProducts] Resolved kioskId:', kioskId, 'deviceId:', deviceId);
+    console.log('[fetchCatalogProducts] Request endpoint:', endpoint, 'Token exists:', !!token);
 
     const headers: Record<string, string> = {
       'Accept': 'application/json',
     };
+
+    // Check if token is expired before sending to prevent 403 Token is expired errors
+    let canSendToken = false;
     if (token) {
+      const payload = parseJwtPayload(token);
+      if (payload && payload.exp) {
+        const isExpired = Date.now() >= payload.exp * 1000;
+        if (!isExpired) {
+          canSendToken = true;
+        } else {
+          console.log('[fetchCatalogProducts] Stored JWT token has expired, proceeding with kiosk_id query parameter');
+        }
+      } else {
+        canSendToken = true;
+      }
+    }
+
+    if (canSendToken && token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const response = await fetch(endpoint, { headers, signal: controller.signal });
+    let response = await fetch(endpoint, { headers, signal: controller.signal });
     clearTimeout(timeoutId);
 
-    if (!response.ok) return [];
+    console.log('[fetchCatalogProducts] Initial response status:', response.status, response.ok);
+
+    // If server rejected the Kiosk JWT token (401 or 403), retry without Authorization header using query params
+    if ((response.status === 401 || response.status === 403) && headers['Authorization']) {
+      console.log(`[fetchCatalogProducts] HTTP ${response.status} auth rejection received, retrying without Authorization header...`);
+      const retryController = new AbortController();
+      const retryTimeout = setTimeout(() => retryController.abort(), 8000);
+      response = await fetch(endpoint, {
+        headers: { 'Accept': 'application/json' },
+        signal: retryController.signal,
+      });
+      clearTimeout(retryTimeout);
+      console.log('[fetchCatalogProducts] Retry response status:', response.status, response.ok);
+    }
+
+    if (!response.ok) {
+      console.warn('[fetchCatalogProducts] Response not OK, returning empty array');
+      return [];
+    }
 
     const json = await response.json();
+    console.log('[fetchCatalogProducts] Parsed JSON is array:', Array.isArray(json), 'Count:', Array.isArray(json) ? json.length : json);
     if (!Array.isArray(json)) return [];
 
-    return json.map((p: any) => ({
-      id: String(p.id || Math.random()),
-      name: p.name || 'Excel Product',
-      sku: p.sku || 'EX-ITEM',
-      subtitle: p.description ? p.description.slice(0, 80) : 'Industrial Earthing Product',
-      category: p.category?.code ? p.category.code.toLowerCase() : 'all',
-      categoryName: p.category?.name || 'General Product',
-      description: p.description || '',
-      image: p.image_url || p.image || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-      specifications: p.specifications && typeof p.specifications === 'object' ? p.specifications : {},
-      price: parseFloat(p.price) || 0,
-      badge: p.sku?.startsWith('EX-CBR') ? 'BESTSELLER' : 'HIGH CONDUCTIVITY',
-      mediaAssets: p.media_assets || [],
-    }));
+    return json.map((p: any) => {
+      const rawImg = p.image_url || p.image || '';
+      const fixedImg = rawImg ? sanitizeMediaUrl(rawImg, cleanUrl) : '';
+
+      // Parse specifications safely if provided as JSON string or object
+      let specs: Record<string, string> = {};
+      if (typeof p.specifications === 'string') {
+        try {
+          specs = JSON.parse(p.specifications);
+        } catch (e) {}
+      } else if (p.specifications && typeof p.specifications === 'object') {
+        specs = p.specifications;
+      }
+
+      // Map media assets and sanitize URLs
+      const mappedAssets = Array.isArray(p.media_assets)
+        ? p.media_assets.map((m: any) => ({
+            id: String(m.id || Math.random()),
+            title: m.title || 'Media Asset',
+            asset_type: m.asset_type || 'IMAGE',
+            asset_type_display: m.asset_type_display || '',
+            file_url: m.file_url
+              ? sanitizeMediaUrl(m.file_url, cleanUrl)
+              : m.file
+              ? sanitizeMediaUrl(m.file, cleanUrl)
+              : m.external_url || '',
+            description: m.description || '',
+          }))
+        : [];
+
+      // Extract brochure and tech sheet URLs
+      const brochureAsset = mappedAssets.find((a: any) => a.asset_type === 'PDF_BROCHURE');
+      const techSheetAsset = mappedAssets.find((a: any) => a.asset_type === 'TECH_SHEET');
+
+      // Category extraction
+      const catCode = p.category?.code ? p.category.code.toLowerCase() : '';
+      const catId = p.category?.id ? String(p.category.id) : '';
+      const catName = p.category?.name || 'General Product';
+      const categoryKey = catCode || catId || 'all';
+
+      // Fallback image if product image is empty
+      const finalImage =
+        fixedImg ||
+        (p.category?.image_url
+          ? sanitizeMediaUrl(p.category.image_url, cleanUrl)
+          : 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80');
+
+      return {
+        id: String(p.id || Math.random()),
+        name: p.name || 'Excel Product',
+        sku: p.sku || 'EX-ITEM',
+        subtitle: p.description
+          ? p.description.length > 80
+            ? p.description.slice(0, 80) + '...'
+            : p.description
+          : 'Industrial Earthing Product',
+        category: categoryKey,
+        categoryId: catId,
+        categoryCode: p.category?.code || '',
+        categoryName: catName,
+        description: p.description || '',
+        image: finalImage,
+        specifications: specs,
+        price: parseFloat(p.price) || 0,
+        stock: typeof p.stock === 'number' ? p.stock : 100,
+        mediaAssets: mappedAssets,
+        brochureUrl: brochureAsset?.file_url,
+        techSheetUrl: techSheetAsset?.file_url,
+      };
+    });
   } catch (err) {
     console.warn('Failed fetching live products from backend:', err);
     return [];
@@ -323,16 +517,26 @@ export async function logoutKioskDevice(): Promise<void> {
   } catch (e) {}
 }
 
-export async function getCachedScreensavers(): Promise<KioskScreensaver[]> {
+export async function getCachedScreensavers(orientation?: string): Promise<KioskScreensaver[]> {
   try {
-    const raw = await storageGetItem(KIOSK_SCREENSAVERS_CACHE_KEY);
+    const targetOri = orientation ? orientation.toUpperCase() : '';
+    const orientationCacheKey = targetOri
+      ? `${KIOSK_SCREENSAVERS_CACHE_KEY}_${targetOri}`
+      : KIOSK_SCREENSAVERS_CACHE_KEY;
+
+    let raw = await storageGetItem(orientationCacheKey);
+    // If specific orientation cache is empty, check general cache
+    if (!raw && targetOri) {
+      raw = await storageGetItem(KIOSK_SCREENSAVERS_CACHE_KEY);
+    }
+
     const candidateUrls = await getCandidateServerUrls();
     const activeBaseUrl = candidateUrls[0] || DEFAULT_SERVER_URL;
 
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item: any) => {
+        let items: KioskScreensaver[] = parsed.map((item: any) => {
           const rawImg = item.image_url || item.image || '';
           const fixedImg = sanitizeMediaUrl(rawImg, activeBaseUrl);
           return {
@@ -341,6 +545,16 @@ export async function getCachedScreensavers(): Promise<KioskScreensaver[]> {
             image_url: fixedImg,
           };
         });
+
+        if (targetOri) {
+          const filtered = items.filter(
+            (s) => !s.orientation || s.orientation === targetOri || s.orientation === 'BOTH'
+          );
+          if (filtered.length > 0) {
+            items = filtered;
+          }
+        }
+        return items;
       }
     }
   } catch (e) {}
@@ -348,41 +562,27 @@ export async function getCachedScreensavers(): Promise<KioskScreensaver[]> {
 }
 
 export const KIOSK_SCREENSAVERS_LAST_FETCHED_KEY = '@kiosk_screensavers_last_fetched_time';
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000; // 2 Hours in milliseconds
 
-export async function fetchScreensavers(orientation?: string, forceRefresh: boolean = false): Promise<KioskScreensaver[]> {
-  const now = Date.now();
-  const lastFetchedRaw = await storageGetItem(KIOSK_SCREENSAVERS_LAST_FETCHED_KEY);
-  const lastFetchedTime = lastFetchedRaw ? parseInt(lastFetchedRaw, 10) : 0;
+export async function fetchScreensavers(orientation?: string): Promise<KioskScreensaver[]> {
+  const targetOri = orientation ? orientation.toUpperCase() : '';
+  const orientationCacheKey = targetOri
+    ? `${KIOSK_SCREENSAVERS_CACHE_KEY}_${targetOri}`
+    : KIOSK_SCREENSAVERS_CACHE_KEY;
 
-  let cached: KioskScreensaver[] = await getCachedScreensavers();
-
-  // Filter cached items by orientation if specified
-  if (orientation && cached.length > 0) {
-    const targetOri = orientation.toUpperCase();
-    const filteredCached = cached.filter(
-      (s) => s.orientation === targetOri || s.orientation === 'BOTH'
-    );
-    if (filteredCached.length > 0) {
-      cached = filteredCached;
-    }
-  }
-
-  // If cache exists and less than 2 hours have passed since last API fetch, use cached list directly
-  if (!forceRefresh && cached.length > 0 && lastFetchedTime > 0 && (now - lastFetchedTime) < TWO_HOURS_MS) {
-    return cached;
-  }
+  // Retrieve cached screensavers as instant fallback if network is unreachable
+  const cached: KioskScreensaver[] = await getCachedScreensavers(targetOri);
 
   const candidateUrls = await getCandidateServerUrls();
-  const orientationQuery = orientation ? `?orientation=${encodeURIComponent(orientation)}` : '';
+  const orientationQuery = targetOri ? `?orientation=${encodeURIComponent(targetOri)}` : '';
 
+  // Always download screensavers as per orientation from backend
   for (const baseUrl of candidateUrls) {
     const primaryEndpoint = `${baseUrl}/api/kiosk/screensavers/${orientationQuery}`;
     const fallbackEndpoint = `${baseUrl}/api/kiosk/screensavers/`;
     
     for (const endpoint of [primaryEndpoint, fallbackEndpoint]) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       try {
         const response = await fetch(endpoint, { signal: controller.signal });
@@ -392,10 +592,9 @@ export async function fetchScreensavers(orientation?: string, forceRefresh: bool
           const json = await response.json();
           const screensaversList = json.screensavers || json;
           if (Array.isArray(screensaversList) && screensaversList.length > 0) {
-            // Save working server URL
             await storageSetItem(KIOSK_SERVER_URL_KEY, baseUrl);
 
-            const mapped: KioskScreensaver[] = screensaversList.map((item: any) => {
+            let mapped: KioskScreensaver[] = screensaversList.map((item: any) => {
               const rawImg = item.image_url || item.image || '';
               const fixedImg = sanitizeMediaUrl(rawImg, baseUrl);
               return {
@@ -403,7 +602,7 @@ export async function fetchScreensavers(orientation?: string, forceRefresh: bool
                 title: item.title || 'Excel Earthing Showcase',
                 image: fixedImg,
                 image_url: fixedImg,
-                orientation: item.orientation || 'BOTH',
+                orientation: (item.orientation || 'BOTH') as 'LANDSCAPE' | 'PORTRAIT' | 'BOTH',
                 orientation_display: item.orientation_display || '',
                 duration_seconds: item.duration_seconds || 10,
                 display_order: item.display_order || 0,
@@ -413,9 +612,21 @@ export async function fetchScreensavers(orientation?: string, forceRefresh: bool
               };
             });
 
-            // Store to local storage for future offline access and update 2-hour timestamp
+            // If fallback endpoint was used, filter in memory by orientation
+            if (targetOri && endpoint === fallbackEndpoint) {
+              const filtered = mapped.filter(
+                (s) => !s.orientation || s.orientation === targetOri || s.orientation === 'BOTH'
+              );
+              if (filtered.length > 0) {
+                mapped = filtered;
+              }
+            }
+
+            // Always persist latest downloaded screensavers to orientation-specific cache and general cache
+            await storageSetItem(orientationCacheKey, JSON.stringify(mapped));
             await storageSetItem(KIOSK_SCREENSAVERS_CACHE_KEY, JSON.stringify(mapped));
-            await storageSetItem(KIOSK_SCREENSAVERS_LAST_FETCHED_KEY, String(now));
+            await storageSetItem(KIOSK_SCREENSAVERS_LAST_FETCHED_KEY, String(Date.now()));
+
             return mapped;
           }
         }
@@ -425,5 +636,6 @@ export async function fetchScreensavers(orientation?: string, forceRefresh: bool
     }
   }
 
+  // Network fetch failed or device is offline: return cached screensavers for this orientation
   return cached;
 }

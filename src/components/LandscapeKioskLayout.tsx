@@ -29,6 +29,7 @@ import {
 import { KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/kiosk';
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
+import { useInactivityTimer } from './InactivityTracker';
 import { getColorCombo } from '../constants/colorCombos';
 import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 
@@ -147,6 +148,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   onSelectProduct,
   onOpenFullDetail,
 }) => {
+  const { scaleFont, scaleSpacing, is4K, crispTextProps } = metrics;
+  const { resetTimer } = useInactivityTimer();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
   // Active category for home → product list navigation
@@ -252,12 +255,25 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
 
   // Filter products based on active category and search
   const filteredProducts = products.filter((p) => {
-    const targetCat = activeCategory || selectedCategory;
-    const matchesCat =
-      !targetCat ||
-      targetCat === 'all' ||
-      p.category === targetCat ||
-      p.categoryName?.toLowerCase().includes(targetCat.toLowerCase());
+    const rawTarget = activeCategory || selectedCategory || 'all';
+    const targetCat = rawTarget.trim().toLowerCase();
+    
+    let matchesCat = !targetCat || targetCat === 'all';
+    if (!matchesCat) {
+      const activeCatObj = categories.find(
+        (c) => c.id.toLowerCase() === targetCat || c.code.toLowerCase() === targetCat
+      );
+      const activeCatName = activeCatObj?.name?.toLowerCase() || '';
+
+      matchesCat = Boolean(
+        p.category?.toLowerCase() === targetCat ||
+        p.categoryId?.toLowerCase() === targetCat ||
+        p.categoryCode?.toLowerCase() === targetCat ||
+        (activeCatName && p.categoryName?.toLowerCase() === activeCatName) ||
+        (p.categoryName && p.categoryName.toLowerCase().includes(targetCat)) ||
+        (activeCatName && p.categoryName && activeCatName.includes(p.categoryName.toLowerCase()))
+      );
+    }
 
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
@@ -338,17 +354,17 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
 
             {/* Standardized Search Bar */}
             <View style={styles.searchContainer}>
-              <Search size={14} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
+              <Search size={scaleFont(14)} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
               <TextInput
                 value={searchQuery}
                 onChangeText={onSearchChange}
                 placeholder="Search products or SKUs..."
                 placeholderTextColor={kioskColors.textLightMuted}
-                style={styles.searchInput}
+                style={[styles.searchInput, { fontSize: scaleFont(13) }]}
               />
               {searchQuery ? (
                 <TouchableOpacity onPress={() => onSearchChange('')} style={styles.clearBtn}>
-                  <X size={13} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
+                  <X size={scaleFont(13)} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -359,8 +375,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
               onPress={() => setIsWhiteboardOpen(true)}
               style={styles.whiteboardBtn}
             >
-              <Edit3 size={14} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={styles.whiteboardBtnText}>Whiteboard</Text>
+              <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+              <Text style={[styles.whiteboardBtnText, { fontSize: scaleFont(13) }]} {...crispTextProps}>Whiteboard</Text>
             </AnimatedButton>
           </View>
         </ImageBackground>
@@ -391,18 +407,37 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
           />
 
           {/* ── VIEW 1: CATEGORY SELECTION SCREEN ── */}
-          {!activeCategory ? (
+          {!activeCategory && !searchQuery.trim() ? (
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.categoryHomeContent}
             >
               <View style={styles.sectionHeadRow}>
-                <Text style={styles.sectionTitle}>Product Categories</Text>
-                <View style={styles.sectionBadge}>
-                  <Text style={styles.sectionBadgeText}>
-                    {displayCategories.length} Categories
-                  </Text>
+                <View style={styles.sectionHeadLeft}>
+                  <Text style={[styles.sectionTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>Product Categories</Text>
+                  <View style={styles.sectionBadge}>
+                    <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                      {displayCategories.length} Categories
+                    </Text>
+                  </View>
                 </View>
+
+                {products.length > 0 && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setActiveCategory('all');
+                      onSelectCategory('all');
+                    }}
+                    style={styles.viewAllAssignedBtn}
+                  >
+                    <Zap size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                    <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
+                      All Products ({products.length})
+                    </Text>
+                    <ChevronRight size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.categoryGrid}>
@@ -432,18 +467,19 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                           />
                         ) : (
                           <View style={styles.fallbackIconCircle}>
-                            <Zap size={28} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
+                            <Zap size={scaleFont(28)} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
                           </View>
                         )}
                         <View style={[styles.chevronBadge, { backgroundColor: combo.arrowBg }]}>
-                          <ChevronRight size={12} color="#FFFFFF" strokeWidth={2.6} />
+                          <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.6} />
                         </View>
                       </View>
 
                       <View style={styles.categoryCardFooter}>
                         <Text
                           numberOfLines={1}
-                          style={[styles.categoryCardTitle, { color: combo.textColor }]}
+                          style={[styles.categoryCardTitle, { color: combo.textColor, fontSize: scaleFont(13.5) }]}
+                          {...crispTextProps}
                         >
                           {cat.name}
                         </Text>
@@ -468,11 +504,11 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 <View style={styles.subHeaderDivider} />
 
                 <View style={styles.productSubHeaderInfo}>
-                  <Text style={styles.productSubHeaderTitle}>
+                  <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
                     {activeCategoryObj?.name || 'All Products'}
                   </Text>
                   <View style={styles.productCountPill}>
-                    <Text style={styles.productCountPillText}>
+                    <Text style={[styles.productCountPillText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
                       {filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'}
                     </Text>
                   </View>
@@ -506,26 +542,21 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                             />
                           ) : (
                             <View style={styles.fallbackIconCircle}>
-                              <Zap size={26} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
+                              <Zap size={scaleFont(26)} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
                             </View>
                           )}
-                          {item.badge ? (
-                            <View style={styles.productBadgePill}>
-                              <Text style={styles.productBadgeText}>{item.badge}</Text>
-                            </View>
-                          ) : null}
                         </View>
                         <View style={styles.productCardFooter}>
                           <View style={styles.productCardTextCol}>
-                            <Text numberOfLines={1} style={[styles.productCardTitle, { color: combo.textColor }]}>
+                            <Text numberOfLines={1} style={[styles.productCardTitle, { color: combo.textColor, fontSize: scaleFont(13.5) }]} {...crispTextProps}>
                               {item.name}
                             </Text>
-                            <Text numberOfLines={1} style={styles.productCardSku}>
+                            <Text numberOfLines={1} style={[styles.productCardSku, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
                               {item.sku}
                             </Text>
                           </View>
                           <View style={[styles.arrowCircle, { backgroundColor: combo.arrowBg }]}>
-                            <ChevronRight size={12} color="#FFFFFF" strokeWidth={2.6} />
+                            <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.6} />
                           </View>
                         </View>
                       </AnimatedPressableCard>
@@ -533,7 +564,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                   })}
                   {filteredProducts.length === 0 && (
                     <View style={styles.emptyState}>
-                      <Text style={styles.emptyStateText}>No products found matching this filter</Text>
+                      <Text style={[styles.emptyStateText, { fontSize: scaleFont(14) }]} {...crispTextProps}>No products found matching this filter</Text>
                     </View>
                   )}
                 </View>
@@ -545,15 +576,15 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
         {/* BOTTOM FOOTER */}
         <View style={styles.bottomFooter}>
           <TouchableOpacity style={styles.languageBtn} activeOpacity={0.8}>
-            <Globe size={13} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
-            <Text style={styles.languageBtnText}>English</Text>
-            <ChevronDown size={11} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
+            <Globe size={scaleFont(13)} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
+            <Text style={[styles.languageBtnText, { fontSize: scaleFont(12) }]} {...crispTextProps}>English</Text>
+            <ChevronDown size={scaleFont(11)} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
           </TouchableOpacity>
 
           <View style={styles.clockSection}>
-            <Text style={styles.clockTime}>{currentTime}</Text>
+            <Text style={[styles.clockTime, { fontSize: scaleFont(13) }]} {...crispTextProps}>{currentTime}</Text>
             <View style={styles.clockDivider} />
-            <Text style={styles.clockDate}>{currentDate}</Text>
+            <Text style={[styles.clockDate, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>{currentDate}</Text>
           </View>
         </View>
 
@@ -591,23 +622,23 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 <View style={styles.sideDrawerHeader}>
                   <View style={styles.sideDrawerHeaderLeft}>
                     <View style={styles.drawerCategoryBadge}>
-                      <Text style={styles.drawerCategoryBadgeText}>
+                      <Text style={[styles.drawerCategoryBadgeText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
                         {activeCategoryObj?.name || selectedProductDetail.categoryName || 'Catalog'}
                       </Text>
                     </View>
-                    <Text numberOfLines={1} style={styles.drawerHeaderTitle}>
+                    <Text numberOfLines={1} style={[styles.drawerHeaderTitle, { fontSize: scaleFont(15) }]} {...crispTextProps}>
                       {selectedProductDetail.name}
                     </Text>
                   </View>
 
                   <View style={styles.sideDrawerHeaderRight}>
                     <View style={styles.drawerSkuPill}>
-                      <Text numberOfLines={1} style={styles.drawerSkuBadge}>
+                      <Text numberOfLines={1} style={[styles.drawerSkuBadge, { fontSize: scaleFont(12) }]} {...crispTextProps}>
                         {selectedProductDetail.sku}
                       </Text>
                     </View>
                     <AnimatedButton onPress={closeSideDrawer} style={styles.drawerCloseCircle}>
-                      <X size={15} color={kioskColors.textSecondary} strokeWidth={2.4} />
+                      <X size={scaleFont(15)} color={kioskColors.textSecondary} strokeWidth={2.4} />
                     </AnimatedButton>
                   </View>
                 </View>
@@ -626,20 +657,13 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         style={styles.drawerMainImg}
                         resizeMode="contain"
                       />
-                      {selectedProductDetail.badge ? (
-                        <View style={styles.drawerImgBadge}>
-                          <Text style={styles.drawerImgBadgeText}>
-                            {selectedProductDetail.badge}
-                          </Text>
-                        </View>
-                      ) : null}
                     </View>
 
                     <View style={styles.drawerQuickInfoBox}>
-                      <Text numberOfLines={1} style={styles.drawerProductSubtitle}>
+                      <Text numberOfLines={1} style={[styles.drawerProductSubtitle, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
                         {selectedProductDetail.subtitle || 'Industrial Grade Component'}
                       </Text>
-                      <Text numberOfLines={3} style={styles.drawerProductDesc}>
+                      <Text numberOfLines={3} style={[styles.drawerProductDesc, { fontSize: scaleFont(12.5), lineHeight: scaleFont(17.5) }]} {...crispTextProps}>
                         {selectedProductDetail.description || 'Certified earthing component engineered for maximum safety, durability, and conductivity.'}
                       </Text>
 
@@ -649,8 +673,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                           onPress={() => handleOpenFullDetail(selectedProductDetail)}
                           activeOpacity={0.85}
                         >
-                          <FileText size={13} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-                          <Text style={styles.drawerPdfBtnText}>Data Sheet</Text>
+                          <FileText size={scaleFont(13)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                          <Text style={[styles.drawerPdfBtnText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>Data Sheet</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -659,8 +683,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                   {/* Technical Specifications Grid */}
                   <View style={styles.drawerSpecsCard}>
                     <View style={styles.drawerSpecsHeaderRow}>
-                      <Info size={14} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-                      <Text style={styles.drawerSpecsTitle}>Technical Specifications</Text>
+                      <Info size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                      <Text style={[styles.drawerSpecsTitle, { fontSize: scaleFont(14) }]} {...crispTextProps}>Technical Specifications</Text>
                     </View>
                     {Object.entries(getProductSpecs(selectedProductDetail))
                       .slice(0, 8)
@@ -672,8 +696,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                             idx % 2 === 0 ? styles.drawerSpecRowEven : styles.drawerSpecRowOdd,
                           ]}
                         >
-                          <Text style={styles.drawerSpecKey}>{key}</Text>
-                          <Text style={styles.drawerSpecVal}>{val}</Text>
+                          <Text style={[styles.drawerSpecKey, { fontSize: scaleFont(12) }]} {...crispTextProps}>{key}</Text>
+                          <Text style={[styles.drawerSpecVal, { fontSize: scaleFont(12) }]} {...crispTextProps}>{val}</Text>
                         </View>
                       ))}
                   </View>
@@ -681,7 +705,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
 
                 {/* Side Drawer Footer */}
                 <View style={styles.sideDrawerFooter}>
-                  <Text numberOfLines={1} style={styles.drawerFooterHint}>
+                  <Text numberOfLines={1} style={[styles.drawerFooterHint, { fontSize: scaleFont(12) }]} {...crispTextProps}>
                     Detailed electrical & mechanical ratings
                   </Text>
                   <AnimatedButton
@@ -689,8 +713,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                     onPress={() => handleOpenFullDetail(selectedProductDetail)}
                     style={styles.drawerFullDetailBtn}
                   >
-                    <Text style={styles.drawerFullDetailBtnText}>Full Specifications</Text>
-                    <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
+                    <Text style={[styles.drawerFullDetailBtnText, { fontSize: scaleFont(13) }]} {...crispTextProps}>Full Specifications</Text>
+                    <ChevronRight size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
                   </AnimatedButton>
                 </View>
               </View>
@@ -789,8 +813,9 @@ const styles = StyleSheet.create({
     flex: 1,
     color: kioskColors.textPrimary,
     fontWeight: '600',
-    fontSize: 11.5,
+    fontSize: 13,
     marginLeft: 6,
+    includeFontPadding: false,
   },
   clearBtn: {
     padding: 3,
@@ -811,8 +836,9 @@ const styles = StyleSheet.create({
   },
   whiteboardBtnText: {
     color: kioskColors.textPrimary,
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '700',
+    includeFontPadding: false,
   },
 
   contentArea: {
@@ -830,29 +856,56 @@ const styles = StyleSheet.create({
   sectionHeadRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: 14,
-    gap: 10,
     width: '100%',
+    paddingHorizontal: 20,
+  },
+  sectionHeadLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  viewAllAssignedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0D60AE',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: kioskRadii.full,
+    shadowColor: '#0D60AE',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  viewAllAssignedBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+    includeFontPadding: false,
   },
   sectionTitle: {
     fontWeight: '800',
-    fontSize: 13.5,
+    fontSize: 16,
     color: kioskColors.textPrimary,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   sectionBadge: {
     backgroundColor: kioskColors.badgeBackground,
     borderRadius: kioskRadii.full,
     paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingVertical: 3.5,
     borderWidth: 1,
     borderColor: kioskColors.badgeBorder,
   },
   sectionBadgeText: {
     color: kioskColors.accentBlue,
     fontWeight: '700',
-    fontSize: 10,
+    fontSize: 12,
+    includeFontPadding: false,
   },
   categoryGrid: {
     flexDirection: 'row',
@@ -862,55 +915,49 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   categoryCard: {
-    width: 165,
+    width: 155,
     backgroundColor: '#FFFFFF',
     borderRadius: kioskRadii.md,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    minHeight: 155,
+    minHeight: 145,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
+    justifyContent: 'space-between',
   },
   categoryImgContainer: {
-    width: '100%',
-    height: 112,
-    position: 'relative',
-    overflow: 'hidden',
+    height: 105,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 6,
+    padding: 8,
+    position: 'relative',
   },
   categoryImg: {
-    width: '90%',
-    height: '90%',
+    width: '88%',
+    height: '88%',
   },
   fallbackIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   chevronBadge: {
     position: 'absolute',
-    bottom: 6,
+    top: 6,
     right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.18,
-    shadowRadius: 2,
-    elevation: 2,
   },
   categoryCardFooter: {
     paddingHorizontal: 10,
@@ -921,10 +968,11 @@ const styles = StyleSheet.create({
   },
   categoryCardTitle: {
     fontWeight: '700',
-    fontSize: 11,
+    fontSize: 13,
     color: kioskColors.textPrimary,
-    lineHeight: 15,
+    lineHeight: 17,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
 
   // ── PRODUCT LIST VIEW ──
@@ -959,9 +1007,10 @@ const styles = StyleSheet.create({
   },
   productSubHeaderTitle: {
     fontWeight: '800',
-    fontSize: 13.5,
+    fontSize: 16,
     color: kioskColors.textPrimary,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   productCountPill: {
     backgroundColor: kioskColors.badgeBackground,
@@ -974,7 +1023,8 @@ const styles = StyleSheet.create({
   productCountPillText: {
     color: kioskColors.accentBlue,
     fontWeight: '700',
-    fontSize: 10,
+    fontSize: 12,
+    includeFontPadding: false,
   },
   productHomeContent: {
     padding: 14,
@@ -1029,7 +1079,8 @@ const styles = StyleSheet.create({
   productBadgeText: {
     color: '#854D0E',
     fontWeight: '800',
-    fontSize: 8,
+    fontSize: 11,
+    includeFontPadding: false,
   },
   productCardFooter: {
     flexDirection: 'row',
@@ -1049,16 +1100,18 @@ const styles = StyleSheet.create({
   },
   productCardTitle: {
     fontWeight: '700',
-    fontSize: 10.5,
+    fontSize: 13,
     color: kioskColors.textPrimary,
-    lineHeight: 14,
+    lineHeight: 16,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   productCardSku: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '600',
     color: kioskColors.textMuted,
     marginTop: 1,
+    includeFontPadding: false,
   },
   arrowCircle: {
     width: 24,
@@ -1081,7 +1134,8 @@ const styles = StyleSheet.create({
   emptyStateText: {
     color: kioskColors.textLightMuted,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13.5,
+    includeFontPadding: false,
   },
 
   // ── BOTTOM FOOTER ──
@@ -1093,7 +1147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    height: 28,
+    height: 32,
   },
   languageBtn: {
     flexDirection: 'row',
@@ -1103,13 +1157,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: kioskRadii.xs,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   languageBtnText: {
     color: kioskColors.textSecondary,
     fontWeight: '600',
-    fontSize: 9.5,
+    fontSize: 12,
+    includeFontPadding: false,
   },
   clockSection: {
     flexDirection: 'row',
@@ -1118,8 +1173,9 @@ const styles = StyleSheet.create({
   },
   clockTime: {
     fontWeight: '700',
-    fontSize: 11,
+    fontSize: 13,
     color: kioskColors.textPrimary,
+    includeFontPadding: false,
   },
   clockDivider: {
     width: 1,
@@ -1128,8 +1184,9 @@ const styles = StyleSheet.create({
   },
   clockDate: {
     fontWeight: '600',
-    fontSize: 11,
+    fontSize: 12.5,
     color: kioskColors.textMuted,
+    includeFontPadding: false,
   },
 
   // ── PRODUCT DETAIL SIDE DRAWER MODAL ──
@@ -1144,8 +1201,8 @@ const styles = StyleSheet.create({
     backgroundColor: kioskColors.overlay,
   },
   sideDrawer: {
-    width: 490,
-    maxWidth: '66%',
+    width: 520,
+    maxWidth: '68%',
     height: '100%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: kioskRadii.lg,
@@ -1166,13 +1223,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
     borderTopLeftRadius: kioskRadii.lg,
-    minHeight: 46,
+    minHeight: 50,
   },
   sideDrawerHeaderLeft: {
     flexDirection: 'row',
@@ -1183,24 +1240,26 @@ const styles = StyleSheet.create({
   },
   drawerCategoryBadge: {
     backgroundColor: kioskColors.badgeBackground,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: kioskRadii.xs,
     borderWidth: 1,
     borderColor: kioskColors.badgeBorder,
   },
   drawerCategoryBadgeText: {
     color: kioskColors.accentBlue,
-    fontSize: 9.5,
+    fontSize: 11.5,
     fontWeight: '800',
     textTransform: 'uppercase',
+    includeFontPadding: false,
   },
   drawerHeaderTitle: {
-    fontSize: 12.5,
+    fontSize: 15,
     fontWeight: '800',
     color: kioskColors.textPrimary,
     flex: 1,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   sideDrawerHeaderRight: {
     flexDirection: 'row',
@@ -1209,21 +1268,22 @@ const styles = StyleSheet.create({
   },
   drawerSkuPill: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: kioskRadii.xs,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   drawerSkuBadge: {
-    fontSize: 9.5,
+    fontSize: 11.5,
     fontWeight: '700',
     color: kioskColors.textMuted,
+    includeFontPadding: false,
   },
   drawerCloseCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -1239,22 +1299,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sideDrawerContent: {
-    padding: 12,
-    gap: 10,
-    paddingBottom: 16,
+    padding: 14,
+    gap: 12,
+    paddingBottom: 18,
   },
   drawerTopMediaRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     backgroundColor: '#FFFFFF',
-    padding: 8,
+    padding: 10,
     borderRadius: kioskRadii.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   drawerMainImgCard: {
-    width: 130,
-    height: 120,
+    width: 140,
+    height: 130,
     backgroundColor: '#F8FAFC',
     borderRadius: kioskRadii.sm,
     borderWidth: 1,
@@ -1282,7 +1342,8 @@ const styles = StyleSheet.create({
   drawerImgBadgeText: {
     color: '#854D0E',
     fontWeight: '800',
-    fontSize: 8.5,
+    fontSize: 10.5,
+    includeFontPadding: false,
   },
   drawerQuickInfoBox: {
     flex: 1,
@@ -1290,16 +1351,18 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   drawerProductSubtitle: {
-    fontSize: 11,
+    fontSize: 13,
     color: kioskColors.accentBlue,
     fontWeight: '700',
     letterSpacing: -0.1,
+    includeFontPadding: false,
   },
   drawerProductDesc: {
     color: kioskColors.textSecondary,
-    fontSize: 10.5,
-    lineHeight: 14.5,
-    marginTop: 3,
+    fontSize: 12.5,
+    lineHeight: 17,
+    marginTop: 4,
+    includeFontPadding: false,
   },
   drawerMediaActions: {
     flexDirection: 'row',
@@ -1311,9 +1374,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    height: 32,
-    paddingHorizontal: 12,
+    gap: 5,
+    height: 34,
+    paddingHorizontal: 14,
     borderRadius: kioskRadii.sm,
     borderWidth: 1.5,
     borderColor: kioskColors.accentBlue,
@@ -1322,15 +1385,16 @@ const styles = StyleSheet.create({
   drawerPdfBtnText: {
     color: kioskColors.accentBlue,
     fontWeight: '800',
-    fontSize: 10,
+    fontSize: 12,
+    includeFontPadding: false,
   },
   drawerSpecsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: kioskRadii.md,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 3,
+    gap: 4,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
@@ -1341,22 +1405,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
-    paddingBottom: 4,
+    marginBottom: 6,
+    paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   drawerSpecsTitle: {
     fontWeight: '800',
-    fontSize: 11.5,
+    fontSize: 14,
     color: kioskColors.textPrimary,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   drawerSpecRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-    paddingHorizontal: 7,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
     borderRadius: 5,
   },
   drawerSpecRowEven: {
@@ -1367,21 +1432,23 @@ const styles = StyleSheet.create({
   },
   drawerSpecKey: {
     color: kioskColors.textMuted,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     flex: 1,
+    includeFontPadding: false,
   },
   drawerSpecVal: {
     color: kioskColors.textPrimary,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     flex: 1.3,
     textAlign: 'right',
+    includeFontPadding: false,
   },
   sideDrawerFooter: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    minHeight: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 46,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
@@ -1390,20 +1457,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   drawerFooterHint: {
-    fontSize: 9.5,
+    fontSize: 11.5,
     fontWeight: '600',
     color: kioskColors.textMuted,
     flex: 1,
     marginRight: 8,
+    includeFontPadding: false,
   },
   drawerFullDetailBtn: {
     backgroundColor: kioskColors.accentBlue,
     borderRadius: kioskRadii.full,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    height: 30,
-    paddingHorizontal: 12,
+    gap: 5,
+    height: 34,
+    paddingHorizontal: 14,
     shadowColor: kioskColors.accentBlue,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
@@ -1413,7 +1481,8 @@ const styles = StyleSheet.create({
   drawerFullDetailBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 10.5,
+    fontSize: 12.5,
     letterSpacing: -0.1,
+    includeFontPadding: false,
   },
 });

@@ -25,6 +25,7 @@ import {
 import { KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/kiosk';
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
+import { useInactivityTimer } from './InactivityTracker';
 import {
   KIOSK_COLOR_COMBOS,
   getColorCombo,
@@ -32,45 +33,23 @@ import {
 } from '../constants/colorCombos';
 import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 
-// ── Interactive Spring Card Component ──
+// ── Interactive Crisp Touch Card Component ──
 const AnimatedCard: React.FC<{
   onPress: () => void;
   style?: any;
   children: React.ReactNode;
   activeOpacity?: number;
-}> = ({ onPress, style, children, activeOpacity = 0.88 }) => {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      speed: 26,
-      bounciness: 4,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 22,
-      bounciness: 6,
-    }).start();
-  };
-
+}> = ({ onPress, style, children, activeOpacity = 0.82 }) => {
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, style]}>
-      <TouchableOpacity
-        activeOpacity={activeOpacity}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.cardTouchInner}
-      >
+    <TouchableOpacity
+      activeOpacity={activeOpacity}
+      onPress={onPress}
+      style={[style, { overflow: 'hidden' }]}
+    >
+      <View style={styles.cardTouchInner}>
         {children}
-      </TouchableOpacity>
-    </Animated.View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -103,6 +82,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   onSearchChange,
   onSelectProduct,
 }) => {
+  const { resetTimer } = useInactivityTimer();
+  const { scaleFont, scaleSpacing, width: screenWidth, height: screenHeight, crispTextProps } = metrics;
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -150,12 +131,25 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
 
   // Filter products by category and search
   const filteredProducts = products.filter((p) => {
-    const targetCat = activeCategory || selectedCategory;
-    const matchesCat =
-      !targetCat ||
-      targetCat === 'all' ||
-      p.category === targetCat ||
-      p.categoryName?.toLowerCase().includes(targetCat.toLowerCase());
+    const rawTarget = activeCategory || selectedCategory || 'all';
+    const targetCat = rawTarget.trim().toLowerCase();
+
+    let matchesCat = !targetCat || targetCat === 'all';
+    if (!matchesCat) {
+      const activeCatObj = categories.find(
+        (c) => c.id.toLowerCase() === targetCat || c.code.toLowerCase() === targetCat
+      );
+      const activeCatName = activeCatObj?.name?.toLowerCase() || '';
+
+      matchesCat = Boolean(
+        p.category?.toLowerCase() === targetCat ||
+        p.categoryId?.toLowerCase() === targetCat ||
+        p.categoryCode?.toLowerCase() === targetCat ||
+        (activeCatName && p.categoryName?.toLowerCase() === activeCatName) ||
+        (p.categoryName && p.categoryName.toLowerCase().includes(targetCat)) ||
+        (activeCatName && p.categoryName && activeCatName.includes(p.categoryName.toLowerCase()))
+      );
+    }
 
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
@@ -213,7 +207,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
       {/* ── EXPANDED HEADER WITH EARTH BACKGROUND IMAGE ── */}
       <ImageBackground
         source={require('../../assets/portrait_earth_header.png')}
-        style={styles.expandedHeaderBg}
+        style={[styles.expandedHeaderBg, { minHeight: scaleSpacing(110) }]}
         imageStyle={styles.expandedHeaderBgImage}
         resizeMode="cover"
       >
@@ -231,8 +225,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
               onPress={() => setIsSearchOpen((prev) => !prev)}
               style={styles.headerPillBtn}
             >
-              <Search size={14} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={styles.headerPillBtnText}>Search</Text>
+              <Search size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+              <Text style={[styles.headerPillBtnText, { fontSize: scaleFont(12) }]}>Search</Text>
             </TouchableOpacity>
 
             {/* Standardized Whiteboard Button */}
@@ -241,8 +235,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
               onPress={() => setIsWhiteboardOpen(true)}
               style={styles.headerPillBtn}
             >
-              <Edit3 size={14} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={styles.headerPillBtnText}>Whiteboard</Text>
+              <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+              <Text style={[styles.headerPillBtnText, { fontSize: scaleFont(12) }]}>Whiteboard</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -271,7 +265,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
       )}
 
       {/* ── VIEW 1: DYNAMIC CATEGORY SELECTION SCREEN ── */}
-      {!activeCategory ? (
+      {!activeCategory && !searchQuery.trim() ? (
         <ScrollView
           showsVerticalScrollIndicator={isCatScrollable}
           bounces={true}
@@ -283,6 +277,25 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
           onLayout={(e) => setCatScrollHeight(e.nativeEvent.layout.height)}
           onContentSizeChange={(_w, h) => setCatContentHeight(h)}
         >
+          {products.length > 0 && (
+            <View style={styles.portraitTopActionRow}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  setActiveCategory('all');
+                  onSelectCategory('all');
+                }}
+                style={styles.portraitAllProductsBtn}
+              >
+                <Zap size={13} color="#FFFFFF" strokeWidth={2.4} />
+                <Text style={styles.portraitAllProductsBtnText}>
+                  All Products ({products.length})
+                </Text>
+                <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.cardGrid}>
             {displayCategories.map((cat, idx) => {
               const combo = getColorCombo(cat.id || cat.name, idx);
@@ -316,11 +329,11 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
 
                   {/* Card Footer */}
                   <View style={styles.cardFooterRow}>
-                    <Text numberOfLines={1} style={styles.cardTitleText}>
+                    <Text numberOfLines={1} style={[styles.cardTitleText, { fontSize: scaleFont(14.5) }]}>
                       {cat.name}
                     </Text>
                     <View style={[styles.arrowCircleBtn, { backgroundColor: combo.arrowBg }]}>
-                      <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.6} />
+                      <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
                     </View>
                   </View>
                 </AnimatedCard>
@@ -342,22 +355,13 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
             />
 
             <View style={styles.catSubHeaderInfo}>
-              <Text numberOfLines={1} style={styles.catHeaderTitle}>
+              <Text numberOfLines={1} style={[styles.catHeaderTitle, { fontSize: scaleFont(17) }]}>
                 {activeCategoryObj?.name || 'Products'}
               </Text>
               <View style={styles.productCountPill}>
-                <Text style={styles.productCountPillText}>{filteredProducts.length}</Text>
+                <Text style={[styles.productCountPillText, { fontSize: scaleFont(12) }]}>{filteredProducts.length}</Text>
               </View>
             </View>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setIsWhiteboardOpen(true)}
-              style={styles.headerPillBtnCompact}
-            >
-              <Edit3 size={13} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={styles.headerPillBtnCompactText}>Whiteboard</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Product Cards Grid */}
@@ -392,31 +396,27 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                           source={{ uri: prod.image }}
                           style={styles.cardImg}
                           resizeMode="contain"
+                          fadeDuration={0}
                         />
                       ) : (
                         <View style={styles.fallbackIconCircle}>
-                          <Zap size={26} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
+                          <Zap size={scaleFont(28)} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
                         </View>
                       )}
-                      {prod.badge ? (
-                        <View style={styles.productBadgePill}>
-                          <Text style={styles.productBadgeText}>{prod.badge}</Text>
-                        </View>
-                      ) : null}
                     </View>
 
                     {/* Card Footer */}
                     <View style={styles.cardFooterRow}>
                       <View style={styles.cardFooterTextCol}>
-                        <Text numberOfLines={1} style={styles.cardTitleText}>
+                        <Text numberOfLines={1} style={[styles.cardTitleText, { fontSize: scaleFont(14) }]}>
                           {prod.name}
                         </Text>
-                        <Text numberOfLines={1} style={styles.productSkuText}>
+                        <Text numberOfLines={1} style={[styles.productSkuText, { fontSize: scaleFont(11.5) }]}>
                           {prod.sku}
                         </Text>
                       </View>
                       <View style={[styles.arrowCircleBtn, { backgroundColor: combo.arrowBg }]}>
-                        <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.6} />
+                        <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
                       </View>
                     </View>
                   </AnimatedCard>
@@ -424,7 +424,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
               })}
               {filteredProducts.length === 0 && (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateText}>No products found matching this filter</Text>
+                  <Text style={[styles.emptyStateText, { fontSize: scaleFont(13) }]}>No products found matching this filter</Text>
                 </View>
               )}
             </View>
@@ -436,7 +436,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
       <View style={styles.fixedBottomAdWrapper}>
         <Image
           source={require('../../assets/portrait_nature_footer.png')}
-          style={styles.fixedBottomAdImg}
+          style={[styles.fixedBottomAdImg, { height: Math.max(68, scaleSpacing(72)) }]}
           resizeMode="cover"
         />
       </View>
@@ -477,18 +477,18 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                 />
               </View>
 
-              <Text style={styles.sheetProductTitle}>
+              <Text style={[styles.sheetProductTitle, { fontSize: scaleFont(20) }]}>
                 {selectedProductDetail.name}
               </Text>
-              <Text style={styles.sheetProductDesc}>
+              <Text style={[styles.sheetProductDesc, { fontSize: scaleFont(13), lineHeight: scaleFont(18) }]}>
                 {selectedProductDetail.description || selectedProductDetail.subtitle || 'Industrial Grade Component'}
               </Text>
 
               {/* Technical Specifications Table */}
               <View style={styles.keySpecsContainer}>
                 <View style={styles.keySpecsHeaderRow}>
-                  <Info size={14} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-                  <Text style={styles.keySpecsHeader}>Technical Specifications</Text>
+                  <Info size={scaleFont(15)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                  <Text style={[styles.keySpecsHeader, { fontSize: scaleFont(14.5) }]}>Technical Specifications</Text>
                 </View>
                 {Object.entries(getProductSpecs(selectedProductDetail))
                   .slice(0, 8)
@@ -500,8 +500,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                         idx % 2 === 0 ? styles.specRowEven : styles.specRowOdd,
                       ]}
                     >
-                      <Text style={styles.specKey}>{key}</Text>
-                      <Text style={styles.specVal}>{val}</Text>
+                      <Text style={[styles.specKey, { fontSize: scaleFont(12.5) }]}>{key}</Text>
+                      <Text style={[styles.specVal, { fontSize: scaleFont(12.5) }]}>{val}</Text>
                     </View>
                   ))}
               </View>
@@ -511,7 +511,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
           {/* Bottom Action Footer */}
           {selectedProductDetail && (
             <View style={styles.sheetFooter}>
-              <Text numberOfLines={1} style={styles.sheetFooterHint}>
+              <Text numberOfLines={1} style={[styles.sheetFooterHint, { fontSize: scaleFont(12) }]}>
                 Detailed electrical ratings & diagrams
               </Text>
               <TouchableOpacity
@@ -523,8 +523,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                 }}
                 style={styles.fullDetailBtn}
               >
-                <Text style={styles.fullDetailBtnText}>Full Specifications</Text>
-                <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
+                <Text style={[styles.fullDetailBtnText, { fontSize: scaleFont(12.5) }]}>Full Specifications</Text>
+                <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.4} />
               </TouchableOpacity>
             </View>
           )}
@@ -538,6 +538,32 @@ const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  portraitTopActionRow: {
+    width: '100%',
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  portraitAllProductsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0D60AE',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: kioskRadii.full,
+    shadowColor: '#0D60AE',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  portraitAllProductsBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13.5,
+    includeFontPadding: false,
   },
   categoryScrollView: {
     flex: 1,
@@ -579,17 +605,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 26,
+    paddingTop: 24,
     paddingBottom: 16,
   },
   officialWhiteLogoImg: {
-    width: 165,
-    height: 46,
+    width: 175,
+    height: 48,
   },
   headerActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   headerPillBtn: {
     flexDirection: 'row',
@@ -597,24 +623,25 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
-    height: 36,
+    height: 38,
     borderRadius: kioskRadii.full,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   headerPillBtnText: {
     color: kioskColors.textPrimary,
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
+    includeFontPadding: false,
   },
 
   // ── Search Bar ──
   searchBarWrapper: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
@@ -626,18 +653,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: kioskRadii.md,
-    paddingHorizontal: 12,
-    height: 36,
+    paddingHorizontal: 14,
+    height: 42,
   },
   searchInput: {
     flex: 1,
     color: kioskColors.textPrimary,
     fontWeight: '600',
-    fontSize: 11.5,
-    marginLeft: 6,
+    fontSize: 14,
+    marginLeft: 8,
+    includeFontPadding: false,
   },
   clearBtn: {
-    padding: 4,
+    padding: 6,
   },
 
   // ── Card Grid ──
@@ -646,48 +674,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
     gap: 12,
-    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   kioskCard: {
-    width: '46%',
-    minWidth: 150,
-    maxWidth: 240,
+    width: '46.5%',
+    minWidth: 155,
+    maxWidth: 380,
     alignSelf: 'center',
     borderRadius: kioskRadii.md,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
     overflow: 'hidden',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   cardTouchInner: {
-    height: 140,
+    minHeight: 170,
     justifyContent: 'space-between',
   },
   cardImgContainer: {
     flex: 1,
     width: '100%',
+    minHeight: 115,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    padding: 6,
     backgroundColor: '#FFFFFF',
   },
   cardImg: {
-    width: '90%',
-    height: '90%',
+    width: '92%',
+    height: '92%',
   },
   fallbackIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -695,29 +721,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.04)',
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
   },
   cardTitleText: {
     flex: 1,
-    fontWeight: '700',
-    fontSize: 11,
+    fontWeight: '800',
+    fontSize: 14,
     color: kioskColors.textPrimary,
     letterSpacing: -0.2,
-    marginRight: 4,
+    marginRight: 6,
+    includeFontPadding: false,
   },
   cardFooterTextCol: {
     flex: 1,
-    marginRight: 4,
+    marginRight: 6,
   },
   productSkuText: {
-    fontSize: 9,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: kioskColors.textMuted,
-    marginTop: 1,
+    marginTop: 2,
+    includeFontPadding: false,
   },
   arrowCircleBtn: {
     width: 24,
@@ -758,9 +786,10 @@ const styles = StyleSheet.create({
   },
   catHeaderTitle: {
     fontWeight: '800',
-    fontSize: 13,
+    fontSize: 15,
     color: kioskColors.textPrimary,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   productCountPill: {
     backgroundColor: kioskColors.badgeBackground,
@@ -771,9 +800,10 @@ const styles = StyleSheet.create({
     borderColor: kioskColors.badgeBorder,
   },
   productCountPillText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
     color: kioskColors.accentBlue,
+    includeFontPadding: false,
   },
   headerPillBtnCompact: {
     flexDirection: 'row',
@@ -788,8 +818,9 @@ const styles = StyleSheet.create({
   },
   headerPillBtnCompactText: {
     color: kioskColors.accentBlue,
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '700',
+    includeFontPadding: false,
   },
   productBadgePill: {
     position: 'absolute',
@@ -805,7 +836,8 @@ const styles = StyleSheet.create({
   productBadgeText: {
     color: '#854D0E',
     fontWeight: '800',
-    fontSize: 8,
+    fontSize: 11,
+    includeFontPadding: false,
   },
   emptyState: {
     padding: 40,
@@ -816,7 +848,8 @@ const styles = StyleSheet.create({
   emptyStateText: {
     color: kioskColors.textLightMuted,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13.5,
+    includeFontPadding: false,
   },
 
   // ── Fixed Bottom Ad Banner ──
@@ -845,12 +878,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: '82%',
+    maxHeight: '85%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: kioskRadii.xl,
     borderTopRightRadius: kioskRadii.xl,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 18,
+    paddingBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.18,
@@ -863,7 +896,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   dragHandleBar: {
-    width: 36,
+    width: 40,
     height: 4,
     backgroundColor: '#CBD5E1',
     borderRadius: 2,
@@ -872,20 +905,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   sheetScroll: {
-    gap: 10,
-    paddingBottom: 10,
+    gap: 12,
+    paddingBottom: 12,
   },
   sheetMainImgContainer: {
     width: '100%',
-    height: 140,
+    height: 190,
     backgroundColor: '#FFFFFF',
     borderRadius: kioskRadii.md,
     alignItems: 'center',
@@ -894,45 +927,41 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   sheetMainImg: {
-    width: '85%',
-    height: '85%',
+    width: '90%',
+    height: '90%',
   },
   sheetProductTitle: {
     fontWeight: '800',
-    fontSize: 14,
     color: kioskColors.textPrimary,
   },
   sheetProductDesc: {
     color: kioskColors.textSecondary,
-    fontSize: 10.5,
-    lineHeight: 15,
   },
   keySpecsContainer: {
     backgroundColor: '#F8FAFC',
     borderRadius: kioskRadii.sm,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 4,
+    gap: 5,
     marginTop: 2,
   },
   keySpecsHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 6,
   },
   keySpecsHeader: {
     fontWeight: '800',
     color: kioskColors.textPrimary,
-    fontSize: 11.5,
   },
   specRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderRadius: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 6,
   },
   specRowEven: {
     backgroundColor: '#FFFFFF',
@@ -942,20 +971,18 @@ const styles = StyleSheet.create({
   },
   specKey: {
     color: kioskColors.textMuted,
-    fontSize: 10,
     fontWeight: '600',
     flex: 1,
   },
   specVal: {
     color: kioskColors.textPrimary,
-    fontSize: 10,
     fontWeight: '700',
     flex: 1.2,
     textAlign: 'right',
   },
   sheetFooter: {
-    paddingTop: 8,
-    paddingBottom: 2,
+    paddingTop: 10,
+    paddingBottom: 4,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     flexDirection: 'row',
@@ -963,7 +990,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sheetFooterHint: {
-    fontSize: 9.5,
     fontWeight: '600',
     color: kioskColors.textMuted,
     flex: 1,
@@ -974,18 +1000,17 @@ const styles = StyleSheet.create({
     borderRadius: kioskRadii.full,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    height: 30,
-    paddingHorizontal: 12,
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 16,
     shadowColor: kioskColors.accentBlue,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
   },
   fullDetailBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 10.5,
+    fontWeight: '800',
   },
 });

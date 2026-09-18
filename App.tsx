@@ -11,9 +11,6 @@ import { useKioskResponsive } from './src/hooks/useKioskResponsive';
 import { KioskScreensaver } from './src/types/kiosk';
 import { getStoredKioskToken, logoutKioskDevice, fetchScreensavers } from './src/services/api';
 
-// Allow native splash screen to hide when React mounts
-SplashScreen.hideAsync().catch(() => {});
-
 export default function App() {
   const responsiveMetrics = useKioskResponsive();
   const [showSplash, setShowSplash] = useState(true);
@@ -49,13 +46,19 @@ export default function App() {
 
   return (
     <InactivityTracker
-      inactivityTimeoutMs={Platform.isTV ? 600000 : 30000} // TV: 10 min, Touch: 30 sec
+      inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers attract screensaver/ads across all devices (TV & Touch)
       onInactivity={() => {
         if (!showSplash && !isCheckingAuth) {
+          const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
+          fetchScreensavers(currentOrientation).then((fetched) => {
+            if (fetched && fetched.length > 0) {
+              setScreensavers(fetched);
+            }
+          });
           setIsScreensaverActive(true);
         }
       }}
-      enabled={!showSplash && !isCheckingAuth && !Platform.isTV}
+      enabled={!showSplash && !isCheckingAuth}
     >
       <View style={styles.container}>
         <StatusBar hidden style="light" />

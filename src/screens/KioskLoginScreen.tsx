@@ -103,64 +103,7 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
     onLoginSuccess(result.data);
   };
 
-  // Android TV: auto-login with local session — no keyboard needed
-  const handleTVLogin = async () => {
-    setIsLoading(true);
-    const result = await loginWithLocalStorageSession(macAddress, 'tv_local_session');
-    setIsLoading(false);
-    onLoginSuccess(result.data);
-  };
-
-  // ─── Android TV Layout ───────────────────────────────────────────────────────
-  // TV devices use D-pad remote. Show a simple focused button instead of a form.
-  if (isTV) {
-    return (
-      <View style={styles.tvContainer}>
-        <Image
-          source={require('../../assets/excel logo_blue.png')}
-          style={styles.tvLogoImg}
-          resizeMode="contain"
-        />
-        <Text style={styles.tvTitle}>Kiosk TV Mode</Text>
-        <Text style={styles.tvSubtitle}>Device ID: {getDisplayMacAddress(macAddress)}</Text>
-
-        {errorMessage ? (
-          <View style={styles.tvErrorBox}>
-            <AlertTriangle size={18} color="#DC2626" />
-            <Text style={styles.tvErrorText}>{errorMessage}</Text>
-          </View>
-        ) : null}
-
-        <TouchableOpacity
-          style={styles.tvPrimaryBtn}
-          onPress={handleTVLogin}
-          disabled={isLoading}
-          hasTVPreferredFocus={true}
-          accessible={true}
-          accessibilityLabel="Enter Kiosk TV Mode"
-        >
-          <LinearGradient
-            colors={['#1E3A8A', '#0D60AE']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.tvBtnGradient}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <>
-                <ShieldCheck size={22} color="#FFC107" />
-                <Text style={styles.tvBtnText}>Enter Kiosk  (TV Mode)</Text>
-                <ArrowRight size={22} color="#FFFFFF" />
-              </>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <Text style={styles.tvHintText}>Press OK on remote to launch</Text>
-      </View>
-    );
-  }
+  // ─── Standard Multi-Device Layout (Mobile, Tablet, Kiosk, Android TV) ─────
 
   // ─── Touch Screen Layout ────────────────────────────────────────────────────
   return (
@@ -265,10 +208,18 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
+                      returnKeyType="go"
+                      onSubmitEditing={handleLogin}
+                      focusable={true}
+                      accessible={true}
+                      accessibilityLabel="Device Secret Password"
                       style={[styles.textInput, { fontSize: scaleFont(14) }]}
                     />
                     <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
+                      focusable={true}
+                      accessible={true}
+                      accessibilityLabel="Toggle password visibility"
                       style={styles.eyeBtnCompact}
                     >
                       {showPassword ? (
@@ -284,6 +235,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => setShowServerConfig(!showServerConfig)}
+                  focusable={true}
+                  accessible={true}
+                  accessibilityLabel="Toggle backend server endpoint settings"
                   style={styles.serverToggleCompact}
                 >
                   <Server size={12} color={kioskColors.textMuted} />
@@ -301,6 +255,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                       placeholder="https://excel.byteboot.in"
                       placeholderTextColor={kioskColors.textMuted}
                       autoCapitalize="none"
+                      focusable={true}
+                      accessible={true}
+                      accessibilityLabel="Backend Endpoint URL"
                       style={styles.serverInputCompact}
                     />
                   </View>
@@ -311,6 +268,10 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                   activeOpacity={0.85}
                   onPress={handleLogin}
                   disabled={isLoading}
+                  focusable={true}
+                  hasTVPreferredFocus={isTV}
+                  accessible={true}
+                  accessibilityLabel="Register and Open Kiosk"
                   style={[styles.submitButton, kioskShadows.glowBlue]}
                 >
                   <LinearGradient
@@ -337,6 +298,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                   activeOpacity={0.8}
                   onPress={handleLocalStorageLogin}
                   disabled={isLoading}
+                  focusable={true}
+                  accessible={true}
+                  accessibilityLabel="Use Local Storage Session"
                   style={styles.localStorageBtnCompact}
                 >
                   <ShieldCheck size={14} color={kioskColors.accentBlue} />
@@ -423,10 +387,18 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    returnKeyType="go"
+                    onSubmitEditing={handleLogin}
+                    focusable={true}
+                    accessible={true}
+                    accessibilityLabel="Device Secret Password"
                     style={[styles.textInput, { fontSize: scaleFont(16) }]}
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
+                    focusable={true}
+                    accessible={true}
+                    accessibilityLabel="Toggle password visibility"
                     style={styles.eyeBtn}
                   >
                     {showPassword ? (
@@ -442,6 +414,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setShowServerConfig(!showServerConfig)}
+                focusable={true}
+                accessible={true}
+                accessibilityLabel="Toggle backend server endpoint settings"
                 style={styles.serverToggle}
               >
                 <Server size={14} color={kioskColors.textMuted} />
@@ -456,9 +431,12 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                   <TextInput
                     value={serverUrl}
                     onChangeText={setServerUrl}
-                    placeholder="http://192.168.29.102:8000"
+                    placeholder="https://excel.byteboot.in"
                     placeholderTextColor={kioskColors.textMuted}
                     autoCapitalize="none"
+                    focusable={true}
+                    accessible={true}
+                    accessibilityLabel="Backend Endpoint URL"
                     style={styles.serverInput}
                   />
                 </View>
@@ -469,6 +447,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                 activeOpacity={0.85}
                 onPress={handleLogin}
                 disabled={isLoading}
+                focusable={true}
+                accessible={true}
+                accessibilityLabel="Register and Open Kiosk"
                 style={[styles.submitButton, kioskShadows.glowBlue]}
               >
                 <LinearGradient
@@ -495,6 +476,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                 activeOpacity={0.8}
                 onPress={handleLocalStorageLogin}
                 disabled={isLoading}
+                focusable={true}
+                accessible={true}
+                accessibilityLabel="Use Local Storage Session"
                 style={styles.localStorageBtn}
               >
                 <ShieldCheck size={16} color={kioskColors.accentBlue} />
@@ -851,78 +835,6 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'Montserrat',
     color: '#FFFFFF',
     fontWeight: '900',
-    letterSpacing: 1,
-  },
-
-  // ─── Android TV Styles ─────────────────────────────────────────────────────
-  // Designed for 10-foot viewing: large text, big button, dark background
-  tvContainer: {
-    flex: 1,
-    backgroundColor: '#070A11',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 80,
-  },
-  tvLogoImg: {
-    width: 320,
-    height: 90,
-    marginBottom: 24,
-  },
-  tvTitle: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    marginBottom: 10,
-  },
-  tvSubtitle: {
-    fontSize: 18,
-    color: '#94A3B8',
-    marginBottom: 40,
-    letterSpacing: 1,
-  },
-  tvErrorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(220,38,38,0.15)',
-    borderWidth: 1,
-    borderColor: '#DC2626',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 24,
-  },
-  tvErrorText: {
-    color: '#FCA5A5',
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-  },
-  tvPrimaryBtn: {
-    width: 480,
-    borderRadius: 16,
-    overflow: 'hidden',
-    // TV focus ring is shown by the OS — no manual border needed
-  },
-  tvBtnGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    paddingVertical: 22,
-    paddingHorizontal: 40,
-  },
-  tvBtnText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 1.5,
-  },
-  tvHintText: {
-    marginTop: 20,
-    fontSize: 14,
-    color: '#475569',
     letterSpacing: 1,
   },
 });

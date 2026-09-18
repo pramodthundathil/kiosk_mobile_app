@@ -40,16 +40,11 @@ export const VideoSplashScreen: React.FC<VideoSplashScreenProps> = ({ onFinish }
   };
 
   // Modern Expo SDK 57 expo-video player
-  let player: any = null;
-  try {
-    player = useVideoPlayer(SPLASH_VIDEO_SOURCE, (p) => {
-      p.loop = false;
-      p.muted = true;
-      p.play();
-    });
-  } catch (e) {
-    console.warn('Video player initialization notice:', e);
-  }
+  const player = useVideoPlayer(SPLASH_VIDEO_SOURCE, (p) => {
+    p.loop = false;
+    p.muted = true;
+    p.play();
+  });
 
   useEffect(() => {
     if (!player) {

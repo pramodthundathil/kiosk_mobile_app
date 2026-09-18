@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,16 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { Trash2, Edit3, Eraser, Check, Undo } from 'lucide-react-native';
+import { Trash2, Edit3, Eraser, Check, Undo, X } from 'lucide-react-native';
 import { kioskColors, kioskIcons, kioskRadii } from '../theme/kioskTheme';
+import { useKioskResponsive } from '../hooks/useKioskResponsive';
 
 interface WhiteboardModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-interface PathData {
+export interface PathData {
   d: string;
   color: string;
   strokeWidth: number;
@@ -34,15 +35,55 @@ const COLORS = [
 
 const BRUSH_SIZES = [2, 4, 8, 14];
 
+// Global persistent in-memory storage preserved across both orientations (Portrait & Landscape)
+let globalWhiteboardMemory: PathData[] = [];
+
+/**
+ * Retrieves the current drawing memory (useful for testing or external access)
+ */
+export function getWhiteboardMemory(): PathData[] {
+  return [...globalWhiteboardMemory];
+}
+
+/**
+ * Erases the whiteboard memory explicitly
+ */
+export function clearWhiteboardMemory(): void {
+  globalWhiteboardMemory = [];
+}
+
 export const WhiteboardModal: React.FC<WhiteboardModalProps> = ({ visible, onClose }) => {
-  const [paths, setPaths] = useState<PathData[]>([]);
+  const metrics = useKioskResponsive();
+  const { isLandscape, scaleFont, scaleSpacing, crispTextProps } = metrics;
+
+  // Initialize paths from global persistent memory
+  const [paths, setPaths] = useState<PathData[]>(() => [...globalWhiteboardMemory]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('#0D60AE');
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [isEraser, setIsEraser] = useState<boolean>(false);
 
+  // Synchronize with global memory whenever modal becomes visible or orientation shifts
+  useEffect(() => {
+    if (visible) {
+      setPaths([...globalWhiteboardMemory]);
+    }
+  }, [visible, isLandscape]);
+
   const activeColor = isEraser ? '#FFFFFF' : selectedColor;
   const activeWidth = isEraser ? strokeWidth * 3 : strokeWidth;
+
+  // Mutable refs to prevent stale closures in PanResponder callbacks
+  const currentPathRef = useRef<string>('');
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const activeColorRef = useRef<string>(activeColor);
+  const activeWidthRef = useRef<number>(activeWidth);
+
+  // Keep refs synchronized with active tools
+  useEffect(() => {
+    activeColorRef.current = isEraser ? '#FFFFFF' : selectedColor;
+    activeWidthRef.current = isEraser ? strokeWidth * 3 : strokeWidth;
+  }, [isEraser, selectedColor, strokeWidth]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -50,54 +91,167 @@ export const WhiteboardModal: React.FC<WhiteboardModalProps> = ({ visible, onClo
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt: GestureResponderEvent) => {
         const { locationX, locationY } = evt.nativeEvent;
-        const newPath = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
-        setCurrentPath(newPath);
+        const startPoint = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
+        currentPathRef.current = startPoint;
+        lastPointRef.current = { x: locationX, y: locationY };
+        setCurrentPath(startPoint);
       },
       onPanResponderMove: (evt: GestureResponderEvent) => {
         const { locationX, locationY } = evt.nativeEvent;
-        setCurrentPath((prev) => `${prev} L ${locationX.toFixed(1)} ${locationY.toFixed(1)}`);
+        const nextSegment = ` L ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
+        currentPathRef.current += nextSegment;
+        lastPointRef.current = { x: locationX, y: locationY };
+        setCurrentPath(currentPathRef.current);
       },
       onPanResponderRelease: () => {
-        if (currentPath) {
-          setPaths((prev) => [
-            ...prev,
-            { d: currentPath, color: activeColor, strokeWidth: activeWidth },
-          ]);
-          setCurrentPath('');
+        let finalPath = currentPathRef.current;
+        // If user tapped without moving (e.g. dotting an 'i' or period '.'), add tiny segment to draw the dot
+        if (finalPath && !finalPath.includes('L') && lastPointRef.current) {
+          finalPath += ` L ${(lastPointRef.current.x + 0.2).toFixed(1)} ${(lastPointRef.current.y + 0.2).toFixed(1)}`;
         }
+        if (finalPath && finalPath.length > 0) {
+          const newStroke: PathData = {
+            d: finalPath,
+            color: activeColorRef.current,
+            strokeWidth: activeWidthRef.current,
+          };
+          setPaths((prev) => {
+            const updated = [...prev, newStroke];
+            globalWhiteboardMemory = updated;
+            return updated;
+          });
+        }
+        currentPathRef.current = '';
+        lastPointRef.current = null;
+        setCurrentPath('');
+      },
+      onPanResponderTerminate: () => {
+        let finalPath = currentPathRef.current;
+        if (finalPath && !finalPath.includes('L') && lastPointRef.current) {
+          finalPath += ` L ${(lastPointRef.current.x + 0.2).toFixed(1)} ${(lastPointRef.current.y + 0.2).toFixed(1)}`;
+        }
+        if (finalPath && finalPath.length > 0) {
+          const newStroke: PathData = {
+            d: finalPath,
+            color: activeColorRef.current,
+            strokeWidth: activeWidthRef.current,
+          };
+          setPaths((prev) => {
+            const updated = [...prev, newStroke];
+            globalWhiteboardMemory = updated;
+            return updated;
+          });
+        }
+        currentPathRef.current = '';
+        lastPointRef.current = null;
+        setCurrentPath('');
       },
     })
   ).current;
 
+  // Delete / Clear all drawings currently in memory
   const handleClear = () => {
+    globalWhiteboardMemory = [];
     setPaths([]);
     setCurrentPath('');
   };
 
+  // Undo the last stroke from memory
   const handleUndo = () => {
-    setPaths((prev) => prev.slice(0, -1));
+    setPaths((prev) => {
+      const updated = prev.slice(0, -1);
+      globalWhiteboardMemory = updated;
+      return updated;
+    });
+  };
+
+  /**
+   * When clicking Done:
+   * 1. Erase all drawing memory completely
+   * 2. Reset the canvas state
+   * 3. Close the modal
+   */
+  const handleDone = () => {
+    globalWhiteboardMemory = [];
+    setPaths([]);
+    setCurrentPath('');
+    onClose();
+  };
+
+  /**
+   * Close without erasing memory (allows resuming drawing later in both orientations)
+   */
+  const handleDismissKeepMemory = () => {
+    onClose();
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleDone}>
       <View style={styles.container}>
-        {/* Top Control Toolbar */}
-        <View style={styles.toolbar}>
-          {/* Left: Title */}
-          <View style={styles.titleWrapper}>
-            <Edit3 size={17} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-            <Text style={styles.titleText}>Digital Whiteboard</Text>
+        {/* Top Control Toolbar - Responsive across Portrait and Landscape */}
+        <View style={styles.toolbarWrapper}>
+          {/* Row 1: Header Title & Action Buttons (Undo, Delete All, Done) */}
+          <View style={styles.toolbarHeaderRow}>
+            <View style={styles.titleWrapper}>
+              <Edit3 size={scaleFont(18)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+              <Text style={[styles.titleText, { fontSize: scaleFont(15) }]} {...crispTextProps}>
+                Digital Whiteboard
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionGroup}>
+              <TouchableOpacity
+                onPress={handleUndo}
+                style={styles.actionIconBtn}
+                accessible={true}
+                accessibilityLabel="Undo last stroke"
+              >
+                <Undo size={scaleFont(16)} color={kioskColors.textSecondary} strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleClear}
+                style={styles.actionIconBtnDanger}
+                accessible={true}
+                accessibilityLabel="Delete all drawings"
+              >
+                <Trash2 size={scaleFont(15)} color={kioskColors.danger} strokeWidth={2.4} />
+                <Text style={[styles.clearText, { fontSize: scaleFont(12) }]} {...crispTextProps}>
+                  Delete All
+                </Text>
+              </TouchableOpacity>
+
+              {/* Done Button: Deletes all saved drawing and finishes */}
+              <TouchableOpacity
+                onPress={handleDone}
+                style={styles.doneBtn}
+                accessible={true}
+                accessibilityLabel="Done and delete all drawing"
+              >
+                <Check size={scaleFont(16)} color="#FFFFFF" strokeWidth={2.6} />
+                <Text style={[styles.doneBtnText, { fontSize: scaleFont(13) }]} {...crispTextProps}>
+                  Done
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Middle: Colors & Sizes */}
-          <View style={styles.toolsGroup}>
+          {/* Row 2: Drawing Tools (Eraser, Colors, Brush Sizes) */}
+          <View style={styles.toolsRow}>
             {/* Eraser Toggle */}
             <TouchableOpacity
               onPress={() => setIsEraser(!isEraser)}
               style={[styles.toolBtn, isEraser && styles.toolBtnActive]}
+              accessible={true}
+              accessibilityLabel="Eraser mode"
             >
-              <Eraser size={15} color={isEraser ? kioskColors.accentBlue : kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={[styles.toolBtnText, isEraser && styles.toolBtnTextActive]}>
+              <Eraser
+                size={scaleFont(16)}
+                color={isEraser ? kioskColors.accentBlue : kioskColors.textSecondary}
+                strokeWidth={kioskIcons.strokeWidth}
+              />
+              <Text style={[styles.toolBtnText, isEraser && styles.toolBtnTextActive, { fontSize: scaleFont(12) }]} {...crispTextProps}>
                 Eraser
               </Text>
             </TouchableOpacity>
@@ -111,6 +265,8 @@ export const WhiteboardModal: React.FC<WhiteboardModalProps> = ({ visible, onClo
                   <TouchableOpacity
                     key={c}
                     onPress={() => setSelectedColor(c)}
+                    accessible={true}
+                    accessibilityLabel={`Select color ${c}`}
                     style={[
                       styles.colorDot,
                       { backgroundColor: c },
@@ -129,6 +285,8 @@ export const WhiteboardModal: React.FC<WhiteboardModalProps> = ({ visible, onClo
                 <TouchableOpacity
                   key={s}
                   onPress={() => setStrokeWidth(s)}
+                  accessible={true}
+                  accessibilityLabel={`Brush size ${s}`}
                   style={[
                     styles.sizeDotContainer,
                     strokeWidth === s && styles.sizeDotSelected,
@@ -137,29 +295,12 @@ export const WhiteboardModal: React.FC<WhiteboardModalProps> = ({ visible, onClo
                   <View
                     style={[
                       styles.sizeDot,
-                      { width: s + 3, height: s + 3, backgroundColor: activeColor },
+                      { width: s + 4, height: s + 4, backgroundColor: activeColor },
                     ]}
                   />
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-
-          {/* Right: Actions (Undo, Clear, Done) */}
-          <View style={styles.actionGroup}>
-            <TouchableOpacity onPress={handleUndo} style={styles.actionIconBtn}>
-              <Undo size={15} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={handleClear} style={styles.actionIconBtnDanger}>
-              <Trash2 size={14} color={kioskColors.danger} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={styles.clearText}>Clear</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Check size={15} color="#FFFFFF" strokeWidth={2.4} />
-              <Text style={styles.closeBtnText}>Done</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -199,104 +340,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  toolbar: {
-    height: 48,
+  toolbarWrapper: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
+  },
+  toolbarHeaderRow: {
+    minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 3,
-    zIndex: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   titleWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
   },
   titleText: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontWeight: '800',
     color: kioskColors.textPrimary,
     letterSpacing: -0.2,
-  },
-  toolsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  toolBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    paddingHorizontal: 10,
-    height: 32,
-    borderRadius: kioskRadii.sm,
-  },
-  toolBtnActive: {
-    borderColor: kioskColors.accentBlue,
-    backgroundColor: kioskColors.badgeBackground,
-  },
-  toolBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: kioskColors.textSecondary,
-  },
-  toolBtnTextActive: {
-    color: kioskColors.accentBlue,
-  },
-  divider: {
-    width: 1,
-    height: 18,
-    backgroundColor: '#E2E8F0',
-  },
-  colorPalette: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  colorDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  colorDotSelected: {
-    borderColor: '#0F172A',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 3,
-    transform: [{ scale: 1.2 }],
-  },
-  sizePalette: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sizeDotContainer: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sizeDotSelected: {
-    backgroundColor: '#E2E8F0',
-  },
-  sizeDot: {
-    borderRadius: 10,
   },
   actionGroup: {
     flexDirection: 'row',
@@ -304,10 +379,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionIconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: kioskRadii.sm,
-    backgroundColor: '#FFFFFF',
+    width: 36,
+    height: 36,
+    borderRadius: kioskRadii.md,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#CBD5E1',
     alignItems: 'center',
@@ -316,37 +391,173 @@ const styles = StyleSheet.create({
   actionIconBtnDanger: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    height: 32,
-    paddingHorizontal: 9,
-    borderRadius: kioskRadii.sm,
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 11,
+    borderRadius: kioskRadii.md,
     backgroundColor: '#FEE2E2',
     borderWidth: 1,
     borderColor: '#FCA5A5',
   },
   clearText: {
-    fontSize: 11,
+    fontSize: 12,
     color: kioskColors.danger,
+    fontWeight: '800',
+  },
+  memoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: kioskRadii.full,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginLeft: 6,
+  },
+  memoryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#0D60AE',
+  },
+  memoryBadgeText: {
+    color: '#0D60AE',
     fontWeight: '700',
+    fontSize: 11,
+    includeFontPadding: false,
+  },
+  dismissBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: kioskRadii.md,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 15,
+    height: 36,
+    borderRadius: kioskRadii.md,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  doneBtnText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    includeFontPadding: false,
   },
   closeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     backgroundColor: kioskColors.accentBlue,
-    paddingHorizontal: 12,
-    height: 32,
-    borderRadius: kioskRadii.sm,
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: kioskRadii.md,
     shadowColor: kioskColors.accentBlue,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
   },
   closeBtnText: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: '#FFFFFF',
+    fontWeight: '800',
+    includeFontPadding: false,
+  },
+  toolsRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    gap: 12,
+    backgroundColor: '#FAFAFA',
+    flexWrap: 'wrap',
+  },
+  toolBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: kioskRadii.md,
+  },
+  toolBtnActive: {
+    borderColor: kioskColors.accentBlue,
+    backgroundColor: kioskColors.badgeBackground,
+  },
+  toolBtnText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: kioskColors.textSecondary,
+  },
+  toolBtnTextActive: {
+    color: kioskColors.accentBlue,
+  },
+  divider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#CBD5E1',
+  },
+  colorPalette: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  colorDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorDotSelected: {
+    borderColor: '#0F172A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    transform: [{ scale: 1.25 }],
+  },
+  sizePalette: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sizeDotContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sizeDotSelected: {
+    backgroundColor: '#E2E8F0',
+    borderColor: kioskColors.accentBlue,
+  },
+  sizeDot: {
+    borderRadius: 10,
   },
   canvasContainer: {
     flex: 1,

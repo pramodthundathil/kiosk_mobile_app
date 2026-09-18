@@ -1,5 +1,15 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, PanResponder, Platform } from 'react-native';
+import React, { useRef, useEffect, useCallback, createContext, useContext } from 'react';
+import { View, StyleSheet, PanResponder, BackHandler } from 'react-native';
+
+interface InactivityContextType {
+  resetTimer: () => void;
+}
+
+export const InactivityContext = createContext<InactivityContextType>({
+  resetTimer: () => {},
+});
+
+export const useInactivityTimer = () => useContext(InactivityContext);
 
 interface InactivityTrackerProps {
   inactivityTimeoutMs?: number;
@@ -48,11 +58,16 @@ export const InactivityTracker: React.FC<InactivityTrackerProps> = ({
     };
   }, [inactivityTimeoutMs, enabled, resetInactivityTimer]);
 
-  // PanResponder captures touch events on touch-screen devices.
-  // On Android TV, remote D-pad events are NOT touch events, so PanResponder
-  // is not attached on TV to avoid interfering with D-pad focus navigation.
-  // TVEventHandler is intentionally NOT used here — it is unavailable in
-  // Expo Go and causes a fatal crash.
+  // Listen for hardware remote Back button on Android / TV devices
+  useEffect(() => {
+    const backSub = BackHandler.addEventListener('hardwareBackPress', () => {
+      resetInactivityTimer();
+      return false; // Allow standard back action to continue
+    });
+    return () => backSub.remove();
+  }, [resetInactivityTimer]);
+
+  // PanResponder observes touch & pointer gestures without capturing them
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponderCapture: () => {
@@ -66,12 +81,19 @@ export const InactivityTracker: React.FC<InactivityTrackerProps> = ({
     })
   ).current;
 
-  const touchHandlers = Platform.isTV ? {} : panResponder.panHandlers;
-
   return (
-    <View style={styles.container} {...touchHandlers}>
-      {children}
-    </View>
+    <InactivityContext.Provider value={{ resetTimer: resetInactivityTimer }}>
+      <View
+        style={styles.container}
+        {...panResponder.panHandlers}
+        onStartShouldSetResponderCapture={() => {
+          resetInactivityTimer();
+          return false;
+        }}
+      >
+        {children}
+      </View>
+    </InactivityContext.Provider>
   );
 };
 

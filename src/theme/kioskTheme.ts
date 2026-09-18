@@ -103,43 +103,55 @@ export const kioskShadows = {
   },
 };
 
+export const crispLettering = {
+  includeFontPadding: false,
+  textBreakStrategy: 'simple' as const,
+};
+
 export const kioskTypography = {
   titleLg: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800' as const,
     color: kioskColors.textPrimary,
     letterSpacing: -0.3,
+    includeFontPadding: false,
   },
   sectionTitle: {
-    fontSize: 13.5,
+    fontSize: 16,
     fontWeight: '800' as const,
     color: kioskColors.textPrimary,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   cardTitle: {
-    fontSize: 11.5,
+    fontSize: 14,
     fontWeight: '700' as const,
     color: kioskColors.textPrimary,
     letterSpacing: -0.15,
+    includeFontPadding: false,
   },
   cardSubtext: {
-    fontSize: 9.5,
+    fontSize: 12,
     fontWeight: '600' as const,
     color: kioskColors.textMuted,
+    includeFontPadding: false,
   },
   badge: {
-    fontSize: 9.5,
+    fontSize: 11.5,
     fontWeight: '700' as const,
     letterSpacing: -0.1,
+    includeFontPadding: false,
   },
   body: {
-    fontSize: 11.5,
+    fontSize: 13.5,
     color: kioskColors.textSecondary,
-    lineHeight: 16,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   caption: {
-    fontSize: 10,
+    fontSize: 11.5,
     color: kioskColors.textMuted,
+    includeFontPadding: false,
   },
 };
 

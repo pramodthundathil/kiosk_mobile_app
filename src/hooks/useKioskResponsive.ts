@@ -1,11 +1,11 @@
-import { useWindowDimensions } from 'react-native';
+import { useWindowDimensions, PixelRatio, Dimensions } from 'react-native';
 import { useMemo, useState, useEffect } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { KioskOrientation, KioskHardwareType, KioskResponsiveMetrics } from '../types/kiosk';
 
-// Baseline reference dimensions
-const LANDSCAPE_BASELINE_WIDTH = 1920;
-const PORTRAIT_BASELINE_WIDTH = 1080;
+// Baseline reference dimensions in density-independent pixels (DP)
+const LANDSCAPE_BASELINE_WIDTH = 960;
+const PORTRAIT_BASELINE_WIDTH = 450;
 
 export function useKioskResponsive(): KioskResponsiveMetrics & {
   orientation: KioskOrientation;
@@ -65,6 +65,13 @@ export function useKioskResponsive(): KioskResponsiveMetrics & {
 
     const effectiveIsPortrait = !effectiveIsLandscape;
     const aspectRatio = effectiveWidth / effectiveHeight;
+    const pixelRatio = PixelRatio.get();
+
+    // Physical pixel dimension estimation to detect 4K / UHD screen panels
+    const physicalWidth = effectiveWidth * pixelRatio;
+    const physicalHeight = effectiveHeight * pixelRatio;
+    const maxPhysicalDimension = Math.max(physicalWidth, physicalHeight);
+    const is4K = maxPhysicalDimension >= 2560 || effectiveWidth >= 2000;
 
     // Categorize hardware size
     let kioskType: KioskHardwareType;
@@ -73,32 +80,41 @@ export function useKioskResponsive(): KioskResponsiveMetrics & {
     } else if (effectiveIsLandscape) {
       kioskType = effectiveWidth >= 900 ? 'LANDSCAPE_22' : 'DYNAMIC_TABLET';
     } else {
-      kioskType = effectiveHeight >= 900 ? 'PORTRAIT_43' : 'DYNAMIC_MOBILE';
+      kioskType = effectiveHeight >= 850 ? 'PORTRAIT_43' : 'DYNAMIC_MOBILE';
     }
 
     // Grid columns recommendation
-    let gridColumns = 3;
-    if (kioskType === 'LANDSCAPE_22') {
-      gridColumns = effectiveWidth > 1400 ? 4 : 3;
-    } else if (kioskType === 'PORTRAIT_43') {
-      gridColumns = 2;
-    } else if (effectiveIsLandscape) {
-      gridColumns = 3;
+    let gridColumns = 2;
+    if (effectiveIsLandscape) {
+      gridColumns = effectiveWidth > 1800 ? 5 : effectiveWidth > 1300 ? 4 : 3;
     } else {
-      gridColumns = 2;
+      gridColumns = effectiveWidth > 700 ? 3 : 2;
     }
 
-    // Font & spacing scaling formulas
+    // Dynamic scale factor for Ultra HD / 4K Kiosks (scales up to 4.0x on full 4K framebuffers)
     const baseline = effectiveIsLandscape ? LANDSCAPE_BASELINE_WIDTH : PORTRAIT_BASELINE_WIDTH;
-    const scaleFactor = Math.max(0.7, Math.min(1.4, effectiveWidth / baseline));
+    const rawScale = effectiveWidth / baseline;
+    const scaleFactor = Math.max(1.0, Math.min(4.0, rawScale));
 
-    const scaleFont = (baseSize: number) => {
-      // Ensure text is legible on large kiosk displays without becoming oversized
-      return Math.round(baseSize * scaleFactor);
+    /**
+     * Scales font size and strictly snaps it to the physical pixel grid using PixelRatio.roundToNearestPixel.
+     * Snapping eliminates subpixel interpolation blur, rendering razor-sharp lettering on 4K displays.
+     */
+    const scaleFont = (baseSize: number, minSize: number = 11): number => {
+      const scaled = Math.max(minSize, baseSize * scaleFactor);
+      return PixelRatio.roundToNearestPixel(scaled);
     };
 
-    const scaleSpacing = (baseSize: number) => {
-      return Math.round(baseSize * scaleFactor);
+    /**
+     * Scales spacing, padding, and margins aligned to nearest physical pixel.
+     */
+    const scaleSpacing = (baseSize: number): number => {
+      return PixelRatio.roundToNearestPixel(baseSize * scaleFactor);
+    };
+
+    const crispTextProps = {
+      includeFontPadding: false,
+      textBreakStrategy: 'simple' as const,
     };
 
     return {
@@ -111,6 +127,9 @@ export function useKioskResponsive(): KioskResponsiveMetrics & {
       gridColumns,
       scaleFont,
       scaleSpacing,
+      is4K,
+      pixelRatio,
+      crispTextProps,
     };
   }, [windowWidth, windowHeight, isPhysicalLandscape, simulatedType]);
 
