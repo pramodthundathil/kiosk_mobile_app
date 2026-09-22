@@ -3,6 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { KioskProduct, KioskCategory, KioskScreensaver } from '../types/kiosk';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
+import {
+  shouldIdentifyLocation,
+  identifyDeviceCoordinates,
+  saveRecordedLocation,
+  DeviceCoordinates,
+} from '../utils/locationService';
+
 
 
 // Production backend server endpoint
@@ -629,6 +636,8 @@ export interface KioskTelemetryPayload {
   app_running?: boolean;
   current_content_version?: string;
   last_error?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export async function sendKioskHeartbeat(
@@ -637,6 +646,19 @@ export async function sendKioskHeartbeat(
   try {
     const macAddress = await getDeviceMacAddress();
     const token = await getStoredKioskToken();
+
+    // Check if location coordinates need to be recorded:
+    // If not recorded yet: identify and record immediately (skips 24h check).
+    // If already recorded: only check and update once every 24 hours.
+    let locationToSend: DeviceCoordinates | null = null;
+    try {
+      const needLocation = await shouldIdentifyLocation();
+      if (needLocation) {
+        locationToSend = await identifyDeviceCoordinates();
+      }
+    } catch (locErr) {
+      console.warn('[Heartbeat] Location identification notice:', locErr);
+    }
 
     const serverUrl = await getSavedServerUrl();
     const cleanUrl = serverUrl.replace(/\/+$/, '');
@@ -655,6 +677,7 @@ export async function sendKioskHeartbeat(
       screen_on: true,
       app_running: true,
       current_content_version: '1',
+      ...(locationToSend ? { latitude: locationToSend.latitude, longitude: locationToSend.longitude } : {}),
       ...customData,
     };
 
@@ -682,6 +705,10 @@ export async function sendKioskHeartbeat(
 
     if (res.ok) {
       const data = await res.json();
+      // If coordinates were submitted, record timestamp to enforce the 24-hour gap
+      if (locationToSend) {
+        await saveRecordedLocation(locationToSend);
+      }
       return { success: true, data };
     } else {
       return { success: false };
@@ -690,6 +717,7 @@ export async function sendKioskHeartbeat(
     return { success: false };
   }
 }
+
 
 
 export function startHeartbeatRunner(intervalMs: number = 10000): void {
