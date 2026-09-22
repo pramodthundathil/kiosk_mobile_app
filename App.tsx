@@ -39,10 +39,12 @@ export default function App() {
       const token = await getStoredKioskToken();
       if (token) {
         setIsAuthenticated(true);
-        // Start 10-second heartbeat runner when logged in
-        startHeartbeatRunner(10000);
       }
       setIsCheckingAuth(false);
+
+      // Start 10-second hardware heartbeat runner immediately on device boot/launch
+      // Monitors hardware availability via MAC address even on dynamic IP networks
+      startHeartbeatRunner(10000);
     };
 
     initApp();
@@ -54,15 +56,17 @@ export default function App() {
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
-    // Start 10-second periodic heartbeat signal immediately
+    // Send immediate heartbeat update with authenticated state
     startHeartbeatRunner(10000);
   };
 
   const handleLogout = async () => {
-    stopHeartbeatRunner();
     await logoutKioskDevice();
     setIsAuthenticated(false);
+    // Continue heartbeat to indicate hardware is alive on the login screen
+    startHeartbeatRunner(10000);
   };
+
 
   return (
     <InactivityTracker

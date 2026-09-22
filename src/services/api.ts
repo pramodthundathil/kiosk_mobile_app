@@ -2,6 +2,8 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { KioskProduct, KioskCategory, KioskScreensaver } from '../types/kiosk';
+import { getDeviceMacAddress } from '../utils/deviceInfo';
+
 
 // Extract current Expo host IP dynamically (e.g. 192.168.29.102)
 const manifestHost = Constants.expoConfig?.hostUri?.split(':')[0];
@@ -647,6 +649,9 @@ export async function fetchScreensavers(orientation?: string): Promise<KioskScre
 let heartbeatTimerId: any = null;
 
 export interface KioskTelemetryPayload {
+  mac_address?: string;
+  device_id?: string;
+  is_authenticated?: boolean;
   app_version?: string;
   android_version?: string;
   device_model?: string;
@@ -663,36 +668,46 @@ export async function sendKioskHeartbeat(
   customData?: KioskTelemetryPayload
 ): Promise<{ success: boolean; data?: any }> {
   try {
+    const macAddress = await getDeviceMacAddress();
     const token = await getStoredKioskToken();
-    if (!token) return { success: false };
 
     const serverUrl = await getSavedServerUrl();
     const cleanUrl = serverUrl.replace(/\/+$/, '');
     const endpoint = `${cleanUrl}/api/kiosk/heartbeat/`;
 
     const payload: KioskTelemetryPayload = {
+      mac_address: macAddress,
+      device_id: macAddress,
+      is_authenticated: !!token,
       app_version: 'v1.0.0',
-      android_version: Platform.OS === 'android' ? 'Android TV / Tablet' : Platform.OS,
+      android_version: Platform.OS === 'android' ? 'Android TV / OS' : Platform.OS,
       device_model: Platform.OS === 'android' ? 'Android Kiosk Display' : 'Web Display',
       manufacturer: 'Excel Electronics',
       battery_percentage: 100,
-      network_type: 'WIFI',
+      network_type: 'WIFI (Dynamic DHCP)',
       screen_on: true,
       app_running: true,
       current_content_version: '1',
       ...customData,
     };
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-Device-MAC': macAddress,
+      'X-Device-Id': macAddress,
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -708,6 +723,7 @@ export async function sendKioskHeartbeat(
     return { success: false };
   }
 }
+
 
 export function startHeartbeatRunner(intervalMs: number = 10000): void {
   stopHeartbeatRunner();
