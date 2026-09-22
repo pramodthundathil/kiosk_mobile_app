@@ -5,10 +5,18 @@ import { PortraitKioskLayout } from '../components/PortraitKioskLayout';
 import { LandscapeKioskLayout } from '../components/LandscapeKioskLayout';
 import { ProductDetailScreen } from './ProductDetailScreen';
 import { CompanyInfoScreen } from './CompanyInfoScreen';
-import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '../mock/kioskData';
 import { KioskProduct, KioskCategory } from '../types/kiosk';
-import { fetchCatalogProducts, fetchCatalogCategories, getStoredKioskToken } from '../services/api';
+import { fetchCatalogProducts, fetchCatalogCategories } from '../services/api';
 import { analyticsService } from '../services/analyticsService';
+import { syncService } from '../services/syncService';
+
+const DEFAULT_CATEGORY: KioskCategory = {
+  id: 'all',
+  name: 'All Products',
+  code: 'ALL',
+  icon: 'grid',
+  color: '#0D60AE',
+};
 
 type KioskActivePage = 'catalog' | 'product-detail' | 'company-info';
 type KioskActiveTab = 'home' | 'products' | 'about';
@@ -26,8 +34,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
   const [activeTab, setActiveTab] = useState<KioskActiveTab>('home');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [products, setProducts] = useState<KioskProduct[]>(MOCK_PRODUCTS);
-  const [categories, setCategories] = useState<KioskCategory[]>(MOCK_CATEGORIES);
+  const [products, setProducts] = useState<KioskProduct[]>([]);
+  const [categories, setCategories] = useState<KioskCategory[]>([DEFAULT_CATEGORY]);
   const [selectedProduct, setSelectedProduct] = useState<KioskProduct | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
@@ -50,29 +58,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
         fetchCatalogCategories(),
       ]);
 
-      console.log('[HomeScreen] liveProducts received count:', liveProducts?.length, liveProducts?.map((p: any) => ({ name: p.name, category: p.category, sku: p.sku })));
+      console.log('[HomeScreen] liveProducts received count:', liveProducts?.length);
       console.log('[HomeScreen] liveCategories count:', liveCategories?.length);
 
       if (liveProducts && liveProducts.length > 0) {
         setProducts(liveProducts);
       } else {
-        const token = await getStoredKioskToken();
-        if (token) {
-          // Kiosk is authenticated: reflect the actual assigned products (even if empty)
-          setProducts(liveProducts || []);
-        } else {
-          setProducts(MOCK_PRODUCTS);
-        }
+        setProducts([]);
       }
 
       if (liveCategories && liveCategories.length > 0) {
-        const mergedCategories = [
-          { id: 'all', name: 'All Products', code: 'ALL', icon: 'grid', color: '#0D60AE' },
-          ...liveCategories,
-        ];
-        setCategories(mergedCategories);
+        setCategories([DEFAULT_CATEGORY, ...liveCategories]);
       } else {
-        setCategories(MOCK_CATEGORIES);
+        setCategories([DEFAULT_CATEGORY]);
       }
     } catch (e) {
       console.warn('Backend fetch notice:', e);
@@ -83,6 +81,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
 
   useEffect(() => {
     loadDynamicCatalog();
+  }, [loadDynamicCatalog]);
+
+  // Dynamically re-render assigned products and categories when background synchronization completes
+  useEffect(() => {
+    const unsubscribe = syncService.onContentSynced((targetVersion, stats) => {
+      console.log(`[HomeScreen] Synchronization completed (v${targetVersion}). Reloading catalog products...`);
+      loadDynamicCatalog();
+    });
+    return unsubscribe;
   }, [loadDynamicCatalog]);
 
   const handleOpenProductDetail = (product: KioskProduct) => {

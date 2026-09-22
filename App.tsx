@@ -15,7 +15,9 @@ import {
   fetchScreensavers,
   startHeartbeatRunner,
   stopHeartbeatRunner,
+  parseJwtPayload,
 } from './src/services/api';
+import { syncService } from './src/services/syncService';
 
 export default function App() {
   const responsiveMetrics = useKioskResponsive();
@@ -37,8 +39,21 @@ export default function App() {
       }
 
       const token = await getStoredKioskToken();
-      if (token) {
-        setIsAuthenticated(true);
+      if (token && !token.startsWith('local_session_')) {
+        const payload = parseJwtPayload(token);
+        if (payload && payload.exp && Date.now() >= payload.exp * 1000) {
+          // Token expired -> purge stored session and require fresh authentication
+          await logoutKioskDevice();
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(true);
+        }
+      } else {
+        // No valid token or legacy offline session -> clear and enforce login
+        if (token) {
+          await logoutKioskDevice();
+        }
+        setIsAuthenticated(false);
       }
       setIsCheckingAuth(false);
 
@@ -52,6 +67,19 @@ export default function App() {
     return () => {
       stopHeartbeatRunner();
     };
+  }, [responsiveMetrics.isLandscape]);
+
+  // Dynamically update screensavers when background synchronization completes
+  useEffect(() => {
+    const unsubscribe = syncService.onContentSynced(() => {
+      const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
+      fetchScreensavers(currentOrientation).then((fetched) => {
+        if (fetched && fetched.length > 0) {
+          setScreensavers(fetched);
+        }
+      });
+    });
+    return unsubscribe;
   }, [responsiveMetrics.isLandscape]);
 
   const handleLoginSuccess = () => {

@@ -30,11 +30,15 @@ export const KIOSK_REFRESH_KEY = '@kiosk_jwt_refresh';
 export const KIOSK_INFO_KEY = '@kiosk_device_info';
 export const KIOSK_SERVER_URL_KEY = '@kiosk_server_url';
 export const KIOSK_SCREENSAVERS_CACHE_KEY = '@kiosk_cached_screensavers';
+export const KIOSK_CONTENT_VERSION_KEY = '@kiosk_content_version';
+export const KIOSK_CACHED_PRODUCTS_KEY = '@kiosk_cached_products';
+export const KIOSK_CACHED_CATEGORIES_KEY = '@kiosk_cached_categories';
+export const KIOSK_LAST_SYNC_TIME_KEY = '@kiosk_last_sync_time';
 
 // Safe Storage abstraction to prevent "Native module is null" crashes on Web/Expo Go
 const memoryStorageCache: Record<string, string> = {};
 
-async function storageGetItem(key: string): Promise<string | null> {
+export async function storageGetItem(key: string): Promise<string | null> {
   try {
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       return window.localStorage.getItem(key);
@@ -49,7 +53,7 @@ async function storageGetItem(key: string): Promise<string | null> {
   }
 }
 
-async function storageSetItem(key: string, value: string): Promise<void> {
+export async function storageSetItem(key: string, value: string): Promise<void> {
   try {
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(key, value);
@@ -64,7 +68,7 @@ async function storageSetItem(key: string, value: string): Promise<void> {
   }
 }
 
-async function storageRemoveItem(key: string): Promise<void> {
+export async function storageRemoveItem(key: string): Promise<void> {
   try {
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.removeItem(key);
@@ -189,23 +193,16 @@ export async function loginKioskDevice(
   }
 }
 
-export async function loginWithLocalStorageSession(
-  macAddress: string,
-  deviceSecret: string
-): Promise<{ success: boolean; data: KioskAuthResponse }> {
-  const sessionData: KioskAuthResponse = {
-    access: `local_session_${Date.now()}`,
-    refresh: `local_refresh_${Date.now()}`,
-    device_id: macAddress,
-    name: 'Excel Local Station Session',
-  };
-
-  await storageSetItem(KIOSK_TOKEN_KEY, sessionData.access);
-  await storageSetItem(KIOSK_REFRESH_KEY, sessionData.refresh);
-  await storageSetItem(KIOSK_SERVER_URL_KEY, PRODUCTION_SERVER_URL);
-  await storageSetItem(KIOSK_INFO_KEY, JSON.stringify(sessionData));
-
-  return { success: true, data: sessionData };
+export async function getStoredKioskToken(): Promise<string | null> {
+  try {
+    const token = await storageGetItem(KIOSK_TOKEN_KEY);
+    if (token && token.startsWith('local_session_')) {
+      return null;
+    }
+    return token;
+  } catch (e) {
+    return null;
+  }
 }
 
 function safeBase64Decode(str: string): string {
@@ -292,6 +289,28 @@ export async function getActiveKioskIdentity(): Promise<ActiveKioskIdentity> {
   return identity;
 }
 
+export async function getCachedCatalogProducts(): Promise<KioskProduct[]> {
+  try {
+    const raw = await storageGetItem(KIOSK_CACHED_PRODUCTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+
+export async function getCachedCatalogCategories(): Promise<KioskCategory[]> {
+  try {
+    const raw = await storageGetItem(KIOSK_CACHED_CATEGORIES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+
 export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceId?: string): Promise<KioskProduct[]> {
   try {
     const serverUrl = await getSavedServerUrl();
@@ -363,15 +382,15 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
     }
 
     if (!response.ok) {
-      console.warn('[fetchCatalogProducts] Response not OK, returning empty array');
-      return [];
+      console.warn('[fetchCatalogProducts] Response not OK, falling back to cached products');
+      return await getCachedCatalogProducts();
     }
 
     const json = await response.json();
     console.log('[fetchCatalogProducts] Parsed JSON is array:', Array.isArray(json), 'Count:', Array.isArray(json) ? json.length : json);
-    if (!Array.isArray(json)) return [];
+    if (!Array.isArray(json)) return await getCachedCatalogProducts();
 
-    return json.map((p: any) => {
+    const mapped: KioskProduct[] = json.map((p: any) => {
       const rawImg = p.image_url || p.image || '';
       const fixedImg = rawImg ? sanitizeMediaUrl(rawImg, cleanUrl) : '';
 
@@ -441,9 +460,14 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
         techSheetUrl: techSheetAsset?.file_url,
       };
     });
+
+    if (mapped.length > 0) {
+      await storageSetItem(KIOSK_CACHED_PRODUCTS_KEY, JSON.stringify(mapped));
+    }
+    return mapped;
   } catch (err) {
-    console.warn('Failed fetching live products from backend:', err);
-    return [];
+    console.warn('Failed fetching live products from backend, falling back to cache:', err);
+    return await getCachedCatalogProducts();
   }
 }
 
@@ -459,12 +483,12 @@ export async function fetchCatalogCategories(): Promise<KioskCategory[]> {
     const response = await fetch(endpoint, { signal: controller.signal });
     clearTimeout(timeoutId);
 
-    if (!response.ok) return [];
+    if (!response.ok) return await getCachedCatalogCategories();
 
     const json = await response.json();
-    if (!Array.isArray(json)) return [];
+    if (!Array.isArray(json)) return await getCachedCatalogCategories();
 
-    return json.map((c: any) => ({
+    const mappedCats: KioskCategory[] = json.map((c: any) => ({
       id: c.code ? c.code.toLowerCase() : String(c.id),
       name: c.name || 'Category',
       code: c.code || 'CAT',
@@ -472,16 +496,13 @@ export async function fetchCatalogCategories(): Promise<KioskCategory[]> {
       description: c.description || '',
       image: c.image_url ? sanitizeMediaUrl(c.image_url, cleanUrl) : undefined,
     }));
-  } catch (err) {
-    return [];
-  }
-}
 
-export async function getStoredKioskToken(): Promise<string | null> {
-  try {
-    return await storageGetItem(KIOSK_TOKEN_KEY);
-  } catch (e) {
-    return null;
+    if (mappedCats.length > 0) {
+      await storageSetItem(KIOSK_CACHED_CATEGORIES_KEY, JSON.stringify(mappedCats));
+    }
+    return mappedCats;
+  } catch (err) {
+    return await getCachedCatalogCategories();
   }
 }
 
@@ -551,7 +572,11 @@ export async function fetchScreensavers(orientation?: string): Promise<KioskScre
   const cached: KioskScreensaver[] = await getCachedScreensavers(targetOri);
 
   const candidateUrls = await getCandidateServerUrls();
-  const orientationQuery = targetOri ? `?orientation=${encodeURIComponent(targetOri)}` : '';
+  const macAddress = await getDeviceMacAddress();
+  const queryParts: string[] = [];
+  if (targetOri) queryParts.push(`orientation=${encodeURIComponent(targetOri)}`);
+  if (macAddress) queryParts.push(`device_id=${encodeURIComponent(macAddress)}`);
+  const orientationQuery = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
 
   // Always download screensavers as per orientation from backend
   for (const baseUrl of candidateUrls) {
@@ -664,6 +689,13 @@ export async function sendKioskHeartbeat(
     const cleanUrl = serverUrl.replace(/\/+$/, '');
     const endpoint = `${cleanUrl}/api/kiosk/heartbeat/`;
 
+    // Retrieve active local content version
+    let currentVersion = '1';
+    try {
+      const storedVer = await storageGetItem(KIOSK_CONTENT_VERSION_KEY);
+      if (storedVer && storedVer.trim()) currentVersion = storedVer.trim();
+    } catch (e) {}
+
     const payload: KioskTelemetryPayload = {
       mac_address: macAddress,
       device_id: macAddress,
@@ -676,7 +708,7 @@ export async function sendKioskHeartbeat(
       network_type: 'WIFI (Dynamic DHCP)',
       screen_on: true,
       app_running: true,
-      current_content_version: '1',
+      current_content_version: currentVersion,
       ...(locationToSend ? { latitude: locationToSend.latitude, longitude: locationToSend.longitude } : {}),
       ...customData,
     };
@@ -709,6 +741,21 @@ export async function sendKioskHeartbeat(
       if (locationToSend) {
         await saveRecordedLocation(locationToSend);
       }
+
+      // Check if backend signaled a content synchronization requirement
+      const syncRequired = !!data.sync_required;
+      const desiredVer = data.desired_content_version ? String(data.desired_content_version).trim() : null;
+      const hasSyncCommand = Array.isArray(data.commands) && data.commands.some((c: any) => c.command === 'SYNC_CONTENT');
+
+      if ((syncRequired || hasSyncCommand || (desiredVer && desiredVer !== currentVersion)) && desiredVer) {
+        console.log(`[Heartbeat] Server requested sync: Target v${desiredVer}, Current v${currentVersion}`);
+        import('./syncService').then(({ syncService }) => {
+          syncService.performFullContentSync(desiredVer).catch((syncErr) => {
+            console.error('[Heartbeat] Content sync execution error:', syncErr);
+          });
+        });
+      }
+
       return { success: true, data };
     } else {
       return { success: false };
