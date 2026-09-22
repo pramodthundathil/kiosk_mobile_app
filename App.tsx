@@ -18,6 +18,7 @@ import {
   parseJwtPayload,
 } from './src/services/api';
 import { syncService } from './src/services/syncService';
+import { updateService } from './src/services/updateService';
 
 export default function App() {
   const responsiveMetrics = useKioskResponsive();
@@ -60,14 +61,19 @@ export default function App() {
       // Start 10-second hardware heartbeat runner immediately on device boot/launch
       // Monitors hardware availability via MAC address even on dynamic IP networks
       startHeartbeatRunner(10000);
+
+      // Initialize Remote App Update (OTA) engine with 30-minute check cycle and post-update status reporting
+      updateService.initUpdateService(30 * 60 * 1000);
     };
 
     initApp();
 
     return () => {
       stopHeartbeatRunner();
+      updateService.stopUpdateService();
     };
   }, [responsiveMetrics.isLandscape]);
+
 
   // Dynamically update screensavers when background synchronization completes
   useEffect(() => {

@@ -652,6 +652,8 @@ export interface KioskTelemetryPayload {
   device_id?: string;
   is_authenticated?: boolean;
   app_version?: string;
+  app_version_code?: number;
+  update_status?: string;
   android_version?: string;
   device_model?: string;
   manufacturer?: string;
@@ -696,11 +698,21 @@ export async function sendKioskHeartbeat(
       if (storedVer && storedVer.trim()) currentVersion = storedVer.trim();
     } catch (e) {}
 
+    let currentAppVersion = 'v1.0.1';
+    let currentAppCode = 2;
+    try {
+      const { updateService } = await import('./updateService');
+      const vInfo = await updateService.getAppVersionInfo();
+      currentAppVersion = `v${vInfo.versionName}`;
+      currentAppCode = vInfo.versionCode;
+    } catch (e) {}
+
     const payload: KioskTelemetryPayload = {
       mac_address: macAddress,
       device_id: macAddress,
       is_authenticated: !!token,
-      app_version: 'v1.0.0',
+      app_version: currentAppVersion,
+      app_version_code: currentAppCode,
       android_version: Platform.OS === 'android' ? 'Android TV / OS' : Platform.OS,
       device_model: Platform.OS === 'android' ? 'Android Kiosk Display' : 'Web Display',
       manufacturer: 'Excel Electronics',
@@ -756,7 +768,21 @@ export async function sendKioskHeartbeat(
         });
       }
 
+      // Check if backend signaled an App Update command
+      const hasUpdateCheck = Array.isArray(data.commands) && data.commands.some((c: any) => c.command === 'CHECK_APP_UPDATE');
+      const hasForceUpdate = Array.isArray(data.commands) && data.commands.some((c: any) => c.command === 'FORCE_APP_UPDATE');
+
+      if (hasUpdateCheck || hasForceUpdate) {
+        console.log(`[Heartbeat] Server requested remote app update check (force: ${hasForceUpdate})`);
+        import('./updateService').then(({ updateService }) => {
+          updateService.checkForUpdate(true).catch((upErr) => {
+            console.error('[Heartbeat] App update check error:', upErr);
+          });
+        });
+      }
+
       return { success: true, data };
+
     } else {
       return { success: false };
     }
