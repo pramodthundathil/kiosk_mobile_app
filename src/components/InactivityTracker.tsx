@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, createContext, useContext } from 'react';
 import { View, StyleSheet, PanResponder, BackHandler } from 'react-native';
+import { analyticsService } from '../services/analyticsService';
 
 interface InactivityContextType {
   resetTimer: () => void;
@@ -36,6 +37,9 @@ export const InactivityTracker: React.FC<InactivityTrackerProps> = ({
   useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
   const resetInactivityTimer = useCallback(() => {
+    // Notify analytics that user is active on the kiosk
+    analyticsService.onUserActivity();
+
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -43,6 +47,8 @@ export const InactivityTracker: React.FC<InactivityTrackerProps> = ({
     if (onResetRef.current) onResetRef.current();
     if (enabledRef.current) {
       timerRef.current = setTimeout(() => {
+        // Customer went idle - close session and trigger screensaver
+        analyticsService.endSession().catch(() => {});
         if (onInactivityRef.current) onInactivityRef.current();
       }, inactivityTimeoutMs);
     }

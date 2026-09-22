@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kios
 import { KioskProduct, KioskResponsiveMetrics } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
 import { WhiteboardModal } from '../components/WhiteboardModal';
+import { analyticsService } from '../services/analyticsService';
 
 interface ProductDetailScreenProps {
   product: KioskProduct;
@@ -35,6 +36,20 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
 }) => {
   const { isLandscape, scaleFont, scaleSpacing } = metrics;
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+
+  // Track dwell time spent exploring this product
+  useEffect(() => {
+    const entryTime = Date.now();
+    return () => {
+      const dwellSeconds = Math.max(1, Math.round((Date.now() - entryTime) / 1000));
+      analyticsService.trackProductClick(product, 'VIEW_DETAIL', { duration_seconds: dwellSeconds });
+    };
+  }, [product]);
+
+  const handleOpenWhiteboard = () => {
+    analyticsService.trackProductClick(product, 'WHITEBOARD_OPEN');
+    setIsWhiteboardOpen(true);
+  };
 
   const resolvedSpecs = (product.specifications && Object.keys(product.specifications).length > 0)
     ? product.specifications
@@ -109,7 +124,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             />
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => setIsWhiteboardOpen(true)}
+              onPress={handleOpenWhiteboard}
               style={styles.portraitHeaderWhiteboardBtn}
             >
               <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />

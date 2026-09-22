@@ -8,6 +8,7 @@ import { CompanyInfoScreen } from './CompanyInfoScreen';
 import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '../mock/kioskData';
 import { KioskProduct, KioskCategory } from '../types/kiosk';
 import { fetchCatalogProducts, fetchCatalogCategories, getStoredKioskToken } from '../services/api';
+import { analyticsService } from '../services/analyticsService';
 
 type KioskActivePage = 'catalog' | 'product-detail' | 'company-info';
 type KioskActiveTab = 'home' | 'products' | 'about';
@@ -85,8 +86,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
   }, [loadDynamicCatalog]);
 
   const handleOpenProductDetail = (product: KioskProduct) => {
+    analyticsService.trackProductClick(product, 'VIEW_DETAIL');
     setSelectedProduct(product);
     setActivePage('product-detail');
+  };
+
+  const handleSelectProduct = (product: KioskProduct | null) => {
+    if (product) {
+      analyticsService.trackProductClick(product, 'CLICK');
+    }
+    setSelectedProduct(product);
   };
 
   const handleBackToCatalog = () => {
@@ -94,11 +103,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
   };
 
   const handleSelectCategory = (catId: string) => {
+    const cat = categories.find((c) => c.id === catId || c.code === catId);
+    analyticsService.trackCategoryClick(cat ? cat.name : catId);
     setSelectedCategory(catId);
     setSelectedProduct(null);
   };
 
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim().length > 2) {
+      analyticsService.trackSearch(query);
+    }
+  };
+
   const handleSelectTab = (tab: KioskActiveTab) => {
+    analyticsService.onUserActivity();
     setActiveTab(tab);
     if (tab === 'about') {
       setActivePage('company-info');
@@ -142,8 +161,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
           selectedProduct={selectedProduct}
           isScreensaverActive={isScreensaverActive}
           onSelectCategory={handleSelectCategory}
-          onSearchChange={setSearchQuery}
-          onSelectProduct={(prod) => setSelectedProduct(prod)}
+          onSearchChange={handleSearchChange}
+          onSelectProduct={handleSelectProduct}
           onOpenFullDetail={handleOpenProductDetail}
         />
       ) : (
@@ -156,7 +175,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
           activeTab={activeTab}
           isScreensaverActive={isScreensaverActive}
           onSelectCategory={handleSelectCategory}
-          onSearchChange={setSearchQuery}
+          onSearchChange={handleSearchChange}
           onSelectProduct={handleOpenProductDetail}
           onSelectTab={handleSelectTab}
           onLogout={onLogout}
