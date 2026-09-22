@@ -96,14 +96,8 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
     }
   };
 
-  const handleLocalStorageLogin = async () => {
-    setIsLoading(true);
-    const result = await loginWithLocalStorageSession(macAddress, deviceSecret || 'local_secret');
-    setIsLoading(false);
-    onLoginSuccess(result.data);
-  };
-
   // ─── Standard Multi-Device Layout (Mobile, Tablet, Kiosk, Android TV) ─────
+
 
   // ─── Touch Screen Layout ────────────────────────────────────────────────────
   return (
@@ -292,24 +286,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
-
-                {/* Local Storage Session Login Button */}
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={handleLocalStorageLogin}
-                  disabled={isLoading}
-                  focusable={true}
-                  accessible={true}
-                  accessibilityLabel="Use Local Storage Session"
-                  style={styles.localStorageBtnCompact}
-                >
-                  <ShieldCheck size={14} color={kioskColors.accentBlue} />
-                  <Text style={styles.localStorageBtnTextCompact}>
-                    Use Local Storage Session (Offline Mode)
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
+
           ) : (
             /* Portrait Stacked Layout */
             <View style={styles.portraitCol}>
@@ -470,24 +449,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                   )}
                 </LinearGradient>
               </TouchableOpacity>
-
-              {/* Local Storage Session Login Button */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleLocalStorageLogin}
-                disabled={isLoading}
-                focusable={true}
-                accessible={true}
-                accessibilityLabel="Use Local Storage Session"
-                style={styles.localStorageBtn}
-              >
-                <ShieldCheck size={16} color={kioskColors.accentBlue} />
-                <Text style={styles.localStorageBtnText}>
-                  Use Local Storage Session (Offline Mode)
-                </Text>
-              </TouchableOpacity>
             </View>
           )}
+
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

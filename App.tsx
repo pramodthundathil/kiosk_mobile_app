@@ -9,7 +9,13 @@ import { AttractLoop } from './src/components/AttractLoop';
 import { InactivityTracker } from './src/components/InactivityTracker';
 import { useKioskResponsive } from './src/hooks/useKioskResponsive';
 import { KioskScreensaver } from './src/types/kiosk';
-import { getStoredKioskToken, logoutKioskDevice, fetchScreensavers } from './src/services/api';
+import {
+  getStoredKioskToken,
+  logoutKioskDevice,
+  fetchScreensavers,
+  startHeartbeatRunner,
+  stopHeartbeatRunner,
+} from './src/services/api';
 
 export default function App() {
   const responsiveMetrics = useKioskResponsive();
@@ -23,7 +29,7 @@ export default function App() {
     SplashScreen.hideAsync().catch(() => {});
 
     const initApp = async () => {
-      // Pre-fetch screensavers from backend and persist in local storage
+      // Pre-fetch screensavers from backend and persist in local storage (available on login & home)
       const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
       const fetched = await fetchScreensavers(currentOrientation);
       if (fetched && fetched.length > 0) {
@@ -33,20 +39,34 @@ export default function App() {
       const token = await getStoredKioskToken();
       if (token) {
         setIsAuthenticated(true);
+        // Start 10-second heartbeat runner when logged in
+        startHeartbeatRunner(10000);
       }
       setIsCheckingAuth(false);
     };
+
     initApp();
+
+    return () => {
+      stopHeartbeatRunner();
+    };
   }, [responsiveMetrics.isLandscape]);
 
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+    // Start 10-second periodic heartbeat signal immediately
+    startHeartbeatRunner(10000);
+  };
+
   const handleLogout = async () => {
+    stopHeartbeatRunner();
     await logoutKioskDevice();
     setIsAuthenticated(false);
   };
 
   return (
     <InactivityTracker
-      inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers attract screensaver/ads across all devices (TV & Touch)
+      inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers screensaver/ads even before login
       onInactivity={() => {
         if (!showSplash && !isCheckingAuth) {
           const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
@@ -63,7 +83,7 @@ export default function App() {
       <View style={styles.container}>
         <StatusBar hidden style="light" />
 
-        {/* Dynamic Backend Screensaver Overlay (Plays after 30s inactivity) */}
+        {/* Dynamic Screensaver Overlay (Plays after 30s inactivity even if not logged in) */}
         {isScreensaverActive && (
           <AttractLoop
             metrics={responsiveMetrics}
@@ -80,9 +100,11 @@ export default function App() {
             <ActivityIndicator size="large" color="#00F0FF" />
           </View>
         ) : isAuthenticated ? (
+          /* Product Details & Full Catalog: Accessible ONLY when authenticated/logged in */
           <HomeScreen onLogout={handleLogout} isScreensaverActive={isScreensaverActive} />
         ) : (
-          <KioskLoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />
+          /* Login Screen: Displayed when not authenticated */
+          <KioskLoginScreen onLoginSuccess={handleLoginSuccess} />
         )}
       </View>
     </InactivityTracker>

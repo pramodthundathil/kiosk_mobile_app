@@ -511,11 +511,13 @@ export async function getStoredKioskToken(): Promise<string | null> {
 
 export async function logoutKioskDevice(): Promise<void> {
   try {
+    stopHeartbeatRunner();
     await storageRemoveItem(KIOSK_TOKEN_KEY);
     await storageRemoveItem(KIOSK_REFRESH_KEY);
     await storageRemoveItem(KIOSK_INFO_KEY);
   } catch (e) {}
 }
+
 
 export async function getCachedScreensavers(orientation?: string): Promise<KioskScreensaver[]> {
   try {
@@ -639,3 +641,88 @@ export async function fetchScreensavers(orientation?: string): Promise<KioskScre
   // Network fetch failed or device is offline: return cached screensavers for this orientation
   return cached;
 }
+
+// ─── 10-Second Kiosk Heartbeat Runner ──────────────────────────────────────────
+
+let heartbeatTimerId: any = null;
+
+export interface KioskTelemetryPayload {
+  app_version?: string;
+  android_version?: string;
+  device_model?: string;
+  manufacturer?: string;
+  battery_percentage?: number | null;
+  network_type?: string;
+  screen_on?: boolean;
+  app_running?: boolean;
+  current_content_version?: string;
+  last_error?: string | null;
+}
+
+export async function sendKioskHeartbeat(
+  customData?: KioskTelemetryPayload
+): Promise<{ success: boolean; data?: any }> {
+  try {
+    const token = await getStoredKioskToken();
+    if (!token) return { success: false };
+
+    const serverUrl = await getSavedServerUrl();
+    const cleanUrl = serverUrl.replace(/\/+$/, '');
+    const endpoint = `${cleanUrl}/api/kiosk/heartbeat/`;
+
+    const payload: KioskTelemetryPayload = {
+      app_version: 'v1.0.0',
+      android_version: Platform.OS === 'android' ? 'Android TV / Tablet' : Platform.OS,
+      device_model: Platform.OS === 'android' ? 'Android Kiosk Display' : 'Web Display',
+      manufacturer: 'Excel Electronics',
+      battery_percentage: 100,
+      network_type: 'WIFI',
+      screen_on: true,
+      app_running: true,
+      current_content_version: '1',
+      ...customData,
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, data };
+    } else {
+      return { success: false };
+    }
+  } catch (e) {
+    return { success: false };
+  }
+}
+
+export function startHeartbeatRunner(intervalMs: number = 10000): void {
+  stopHeartbeatRunner();
+  // Fire once immediately
+  sendKioskHeartbeat().catch(() => {});
+  // Then periodically every 10 seconds (10,000 ms)
+  heartbeatTimerId = setInterval(() => {
+    sendKioskHeartbeat().catch(() => {});
+  }, intervalMs);
+}
+
+export function stopHeartbeatRunner(): void {
+  if (heartbeatTimerId) {
+    clearInterval(heartbeatTimerId);
+    heartbeatTimerId = null;
+  }
+}
+
