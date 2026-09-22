@@ -5,18 +5,12 @@ import { KioskProduct, KioskCategory, KioskScreensaver } from '../types/kiosk';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
 
 
-// Extract current Expo host IP dynamically (e.g. 192.168.29.102)
-const manifestHost = Constants.expoConfig?.hostUri?.split(':')[0];
-const lanHostIp = manifestHost || '192.168.29.102';
-
+// Production backend server endpoint
 export const PRODUCTION_SERVER_URL = 'https://excel.byteboot.in';
-
-export const DEFAULT_SERVER_URL =
-  Platform.OS === 'web'
-    ? PRODUCTION_SERVER_URL
-    : PRODUCTION_SERVER_URL;
+export const DEFAULT_SERVER_URL = PRODUCTION_SERVER_URL;
 
 export interface KioskAuthResponse {
+
   access: string;
   refresh: string;
   kiosk_id?: string;
@@ -79,42 +73,19 @@ async function storageRemoveItem(key: string): Promise<void> {
 }
 
 export async function getSavedServerUrl(): Promise<string> {
-  try {
-    const saved = await storageGetItem(KIOSK_SERVER_URL_KEY);
-    if (saved && (saved.includes('localhost') || saved.includes('127.0.0.1') || saved.includes('192.168.') || saved.includes('10.0.2.2'))) {
-      // Override stale local IP cache with production endpoint
-      await storageSetItem(KIOSK_SERVER_URL_KEY, PRODUCTION_SERVER_URL);
-      return PRODUCTION_SERVER_URL;
-    }
-    return saved || PRODUCTION_SERVER_URL;
-  } catch (e) {
-    return PRODUCTION_SERVER_URL;
-  }
+  return PRODUCTION_SERVER_URL;
 }
 
 export async function getCandidateServerUrls(): Promise<string[]> {
-  const saved = await getSavedServerUrl();
-  const candidates: string[] = [PRODUCTION_SERVER_URL];
-
-  if (saved && saved !== PRODUCTION_SERVER_URL && !saved.includes('localhost') && !saved.includes('127.0.0.1') && !saved.includes('192.168.') && !saved.includes('10.0.2.2')) {
-    candidates.push(saved);
-  }
-
-  const cleaned = candidates.map((u) => u.replace(/\/+$/, ''));
-  return Array.from(new Set(cleaned));
+  return [PRODUCTION_SERVER_URL];
 }
 
-function sanitizeMediaUrl(url: string, activeBaseUrl: string): string {
+function sanitizeMediaUrl(url: string, activeBaseUrl: string = PRODUCTION_SERVER_URL): string {
   if (!url) return '';
 
-  // Preserve Amazon S3 URLs or any remote absolute URL that is not local host
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    if (
-      url.includes('amazonaws.com') ||
-      (!url.includes('localhost') && !url.includes('127.0.0.1') && !url.includes('10.0.2.2'))
-    ) {
-      return url;
-    }
+  // Preserve Amazon S3 URLs or any remote absolute HTTPS URL
+  if (url.startsWith('https://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+    return url;
   }
 
   let path = url;
@@ -129,13 +100,9 @@ function sanitizeMediaUrl(url: string, activeBaseUrl: string): string {
     path = `/${path}`;
   }
 
-  let host = activeBaseUrl.replace(/\/+$/, '');
-  if (Platform.OS === 'android' && (host.includes('127.0.0.1') || host.includes('localhost'))) {
-    host = `http://${lanHostIp}:8000`;
-  }
-
-  return `${host}${path}`;
+  return `${PRODUCTION_SERVER_URL}${path}`;
 }
+
 
 
 async function tryFetchLogin(

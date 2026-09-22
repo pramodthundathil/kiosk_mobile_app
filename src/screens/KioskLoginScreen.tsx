@@ -26,7 +26,8 @@ import {
 import { kioskColors, kioskShadows, minTouchTarget } from '../theme/kioskTheme';
 import { useKioskResponsive } from '../hooks/useKioskResponsive';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
-import { loginKioskDevice, loginWithLocalStorageSession, getSavedServerUrl, DEFAULT_SERVER_URL } from '../services/api';
+import { loginKioskDevice, getSavedServerUrl, DEFAULT_SERVER_URL } from '../services/api';
+
 
 interface KioskLoginScreenProps {
   onLoginSuccess: (kioskData: any) => void;
