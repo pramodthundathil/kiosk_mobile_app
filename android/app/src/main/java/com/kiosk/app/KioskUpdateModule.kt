@@ -1,5 +1,6 @@
 package com.kiosk.app
 
+import android.app.Activity
 import android.app.ActivityManager
 import android.app.PendingIntent
 import android.app.admin.DevicePolicyManager
@@ -87,7 +88,7 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun startLockTask(promise: Promise) {
         try {
-            val activity = currentActivity
+            val activity = reactContext.currentActivity
             if (activity != null) {
                 activity.startLockTask()
                 promise.resolve(true)
@@ -102,7 +103,7 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopLockTask(promise: Promise) {
         try {
-            val activity = currentActivity
+            val activity = reactContext.currentActivity
             if (activity != null) {
                 activity.stopLockTask()
                 promise.resolve(true)

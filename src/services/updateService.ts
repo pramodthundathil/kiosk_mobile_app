@@ -73,8 +73,8 @@ class UpdateService {
       try {
         const info = await KioskUpdateModule.getAppVersionInfo();
         return {
-          versionName: info.versionName || '1.0.1',
-          versionCode: Number(info.versionCode) || 2,
+          versionName: info.versionName || '1.0.2',
+          versionCode: Number(info.versionCode) || 3,
           packageName: info.packageName || 'com.kiosk.app',
           isDeviceOwner: !!info.isDeviceOwner,
         };
@@ -83,8 +83,8 @@ class UpdateService {
       }
     }
     return {
-      versionName: '1.0.1',
-      versionCode: 2,
+      versionName: '1.0.2',
+      versionCode: 3,
       packageName: 'com.kiosk.app',
       isDeviceOwner: false,
     };
