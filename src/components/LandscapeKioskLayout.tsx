@@ -184,11 +184,34 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
     screenTransitionAnim.setValue(0);
     Animated.timing(screenTransitionAnim, {
       toValue: 1,
-      duration: 250,
+      duration: 260,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [activeCategory]);
+  }, [activeCategory, searchQuery]);
+
+  // Subtle ambient attention pulse on Kiosk interactive CTA
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.04,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, []);
 
   // Product Detail Side Drawer animations
   const sideDrawerAnim = useRef(new Animated.Value(650)).current;
@@ -393,7 +416,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 {
                   translateY: screenTransitionAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [8, 0],
+                    outputRange: [14, 0],
                   }),
                 },
               ],
@@ -425,26 +448,39 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 </View>
 
                 {products.length > 0 && (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      setActiveCategory('all');
-                      onSelectCategory('all');
-                    }}
-                    style={styles.viewAllAssignedBtn}
-                  >
-                    <Zap size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
-                    <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
-                      All Products ({products.length})
-                    </Text>
-                    <ChevronRight size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
-                  </TouchableOpacity>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setActiveCategory('all');
+                        onSelectCategory('all');
+                      }}
+                      style={styles.viewAllAssignedBtn}
+                    >
+                      <Zap size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                      <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
+                        All Products ({products.length})
+                      </Text>
+                      <ChevronRight size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                    </TouchableOpacity>
+                  </Animated.View>
                 )}
               </View>
 
               <View style={styles.categoryGrid}>
                 {displayCategories.map((cat, idx) => {
                   const combo = getColorCombo(cat.id || cat.name, idx);
+                  const catProdCount = products.filter((p) => {
+                    const catTarget = (cat.id || cat.code || cat.name).toLowerCase();
+                    return (
+                      p.category?.toLowerCase() === catTarget ||
+                      p.categoryId?.toLowerCase() === catTarget ||
+                      p.categoryCode?.toLowerCase() === catTarget ||
+                      (p.categoryName && p.categoryName.toLowerCase() === catTarget) ||
+                      (p.categoryName && cat.name && p.categoryName.toLowerCase().includes(cat.name.toLowerCase()))
+                    );
+                  }).length;
+
                   return (
                     <AnimatedPressableCard
                       key={cat.id || idx}
@@ -470,6 +506,13 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         ) : (
                           <View style={styles.fallbackIconCircle}>
                             <Zap size={scaleFont(28)} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
+                          </View>
+                        )}
+                        {catProdCount > 0 && (
+                          <View style={[styles.catCountBadge, { backgroundColor: combo.arrowBg }]}>
+                            <Text style={[styles.catCountBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
+                              {catProdCount} items
+                            </Text>
                           </View>
                         )}
                         <View style={[styles.chevronBadge, { backgroundColor: combo.arrowBg }]}>
@@ -515,6 +558,66 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                     </Text>
                   </View>
                 </View>
+              </View>
+
+              {/* Horizontal Quick Category Filter Strip for Fast Browsing in Landscape */}
+              <View style={styles.quickFilterStrip}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.quickFilterScroll}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.82}
+                    onPress={() => {
+                      setActiveCategory('all');
+                      onSelectCategory('all');
+                    }}
+                    style={[
+                      styles.quickFilterPill,
+                      (activeCategory === 'all' || !activeCategory) && styles.quickFilterPillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.quickFilterText,
+                        (activeCategory === 'all' || !activeCategory) && styles.quickFilterTextActive,
+                        { fontSize: scaleFont(12) },
+                      ]}
+                      {...crispTextProps}
+                    >
+                      All ({products.length})
+                    </Text>
+                  </TouchableOpacity>
+                  {displayCategories.map((c) => {
+                    const isSelected = activeCategory === c.id;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        activeOpacity={0.82}
+                        onPress={() => {
+                          setActiveCategory(c.id);
+                          onSelectCategory(c.id);
+                        }}
+                        style={[
+                          styles.quickFilterPill,
+                          isSelected && styles.quickFilterPillActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.quickFilterText,
+                            isSelected && styles.quickFilterTextActive,
+                            { fontSize: scaleFont(12) },
+                          ]}
+                          {...crispTextProps}
+                        >
+                          {c.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
               <ScrollView
@@ -583,17 +686,22 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
             <ChevronDown size={scaleFont(11)} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
           </TouchableOpacity>
 
-          {/* Muted App Version in Bottom Area */}
-          <View style={styles.footerVersionContainer}>
-            <Text style={[styles.footerVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
-              {appVersion.startsWith('v') ? appVersion : `v${appVersion}`}
-            </Text>
-          </View>
+          {/* Right side of screen: Live Clock + App Version */}
+          <View style={styles.footerRightRow}>
+            <View style={styles.clockSection}>
+              <Text style={[styles.clockTime, { fontSize: scaleFont(13) }]} {...crispTextProps}>{currentTime}</Text>
+              <View style={styles.clockDivider} />
+              <Text style={[styles.clockDate, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>{currentDate}</Text>
+            </View>
 
-          <View style={styles.clockSection}>
-            <Text style={[styles.clockTime, { fontSize: scaleFont(13) }]} {...crispTextProps}>{currentTime}</Text>
             <View style={styles.clockDivider} />
-            <Text style={[styles.clockDate, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>{currentDate}</Text>
+
+            {/* App Version on the Right Side of Screen */}
+            <View style={styles.footerVersionContainer}>
+              <Text style={[styles.footerVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
+                {appVersion.startsWith('v') ? appVersion : `v${appVersion}`}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -968,6 +1076,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  catCountBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: kioskRadii.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  catCountBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    includeFontPadding: false,
+  },
   categoryCardFooter: {
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -982,6 +1108,40 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     letterSpacing: -0.2,
     includeFontPadding: false,
+  },
+
+  // ── QUICK CATEGORY FILTER STRIP ──
+  quickFilterStrip: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingVertical: 7,
+  },
+  quickFilterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  quickFilterPill: {
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: kioskRadii.full,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quickFilterPillActive: {
+    backgroundColor: '#0D60AE',
+    borderColor: '#0D60AE',
+  },
+  quickFilterText: {
+    color: '#334155',
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  quickFilterTextActive: {
+    color: '#FFFFFF',
   },
 
   // ── PRODUCT LIST VIEW ──
@@ -1158,14 +1318,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 32,
   },
-  footerVersionContainer: {
-    flex: 1,
+  footerRightRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  footerVersionContainer: {
+    alignItems: 'flex-end',
     justifyContent: 'center',
   },
   footerVersionText: {
-    color: kioskColors.textMuted,
-    fontWeight: '500',
+    color: '#64748B',
+    fontWeight: '600',
     letterSpacing: 0.3,
     includeFontPadding: false,
   },

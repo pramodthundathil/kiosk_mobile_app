@@ -284,6 +284,30 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 ))}
               </View>
             </View>
+
+            {/* Quick Action Footer for Kiosk Touch Ergonomics */}
+            <View style={styles.detailActionFooter}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onBack}
+                style={styles.detailBackBtn}
+              >
+                <Text style={[styles.detailBackBtnText, { fontSize: scaleFont(13.5) }]}>
+                  ← Back to Catalog
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleOpenWhiteboard}
+                style={styles.detailWhiteboardBtn}
+              >
+                <Edit3 size={scaleFont(15)} color="#FFFFFF" strokeWidth={2.2} />
+                <Text style={[styles.detailWhiteboardBtnText, { fontSize: scaleFont(13.5) }]}>
+                  Open Whiteboard
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -668,6 +692,53 @@ const styles = StyleSheet.create({
     color: kioskColors.textMuted,
     fontWeight: '500',
     letterSpacing: 0.3,
+    includeFontPadding: false,
+  },
+  detailActionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  detailBackBtn: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#F1F5F9',
+    borderRadius: kioskRadii.md,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  detailBackBtnText: {
+    color: '#0F172A',
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  detailWhiteboardBtn: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#0D60AE',
+    borderRadius: kioskRadii.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    shadowColor: '#0D60AE',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  detailWhiteboardBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
     includeFontPadding: false,
   },
 });

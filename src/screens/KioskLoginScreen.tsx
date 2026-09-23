@@ -122,9 +122,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
           ]}
         >
           {isLandscape ? (
-            /* Landscape 2-Column Split Layout - Fits 100% on screen without scrolling */
+            /* Landscape 2-Column Split Layout - Clean and modern */
             <View style={styles.landscapeRow}>
-              {/* Left Column: Branding Logo & Stylized Tagline */}
+              {/* Left Column: Branding Logo & Terminal Registration */}
               <View style={styles.landscapeLeftCol}>
                 <Image
                   source={require('../../assets/excel logo_blue.png')}
@@ -132,14 +132,17 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                   resizeMode="contain"
                 />
                 <View style={styles.taglineWrapper}>
-                  <Text style={[styles.taglineCursiveText, { fontSize: scaleFont(15) }]}>
-                    Hardware Authentication & Terminal Registration Station
+                  <Text style={[styles.taglineCursiveText, { fontSize: scaleFont(14) }]}>
+                    Interactive Touch Terminal
+                  </Text>
+                  <Text style={[styles.taglineSubText, { fontSize: scaleFont(11) }]}>
+                    Authorized Hardware Access
                   </Text>
                 </View>
 
                 <View style={styles.securityBadge}>
-                  <ShieldCheck size={14} color={kioskColors.lightningGold} />
-                  <Text style={styles.securityBadgeText}>ISO 9001:2015 CERTIFIED TERMINAL</Text>
+                  <ShieldCheck size={14} color={kioskColors.lightningGold} strokeWidth={2.4} />
+                  <Text style={styles.securityBadgeText}>ISO 9001:2015 CERTIFIED</Text>
                 </View>
               </View>
 
@@ -147,17 +150,17 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               <View style={styles.landscapeRightCol}>
                 {errorMessage && (
                   <View style={styles.errorBoxCompact}>
-                    <AlertTriangle size={14} color={kioskColors.brandRed} />
+                    <AlertTriangle size={15} color={kioskColors.brandRed} strokeWidth={2.2} />
                     <Text style={styles.errorTextCompact}>{errorMessage}</Text>
                   </View>
                 )}
 
-                {/* Field 1: MAC Address (Partially Masked for Security) */}
+                {/* Field 1: MAC Address (Auto detected) */}
                 <View style={styles.fieldGroupCompact}>
                   <View style={styles.labelRow}>
-                    <Cpu size={13} color={kioskColors.accentBlue} />
-                    <Text style={[styles.fieldLabel, { fontSize: scaleFont(11) }]}>
-                      HARDWARE MAC ADDRESS (USERNAME)
+                    <Cpu size={14} color={kioskColors.accentBlue} strokeWidth={2.2} />
+                    <Text style={[styles.fieldLabel, { fontSize: scaleFont(11.5) }]}>
+                      DEVICE MAC ADDRESS
                     </Text>
                   </View>
                   <View style={styles.readOnlyInputCompact}>
@@ -168,18 +171,20 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     <View style={styles.macControlsRow}>
                       <TouchableOpacity
                         onPress={() => setShowFullMac(!showFullMac)}
+                        hitSlop={kioskShadows ? { top: 10, bottom: 10, left: 10, right: 10 } : undefined}
                         style={styles.macToggleBtn}
+                        accessibilityLabel="Toggle MAC address visibility"
                       >
                         {showFullMac ? (
-                          <EyeOff size={14} color={kioskColors.textSecondary} />
+                          <EyeOff size={15} color={kioskColors.textSecondary} />
                         ) : (
-                          <Eye size={14} color={kioskColors.textSecondary} />
+                          <Eye size={15} color={kioskColors.textSecondary} />
                         )}
                       </TouchableOpacity>
 
                       <View style={styles.autoDetectedBadge}>
-                        <MonitorCheck size={11} color={kioskColors.success} />
-                        <Text style={styles.autoDetectedText}>AUTO</Text>
+                        <MonitorCheck size={12} color={kioskColors.success} strokeWidth={2.4} />
+                        <Text style={styles.autoDetectedText}>AUTO DETECTED</Text>
                       </View>
                     </View>
                   </View>
@@ -188,9 +193,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                 {/* Field 2: Password */}
                 <View style={styles.fieldGroupCompact}>
                   <View style={styles.labelRow}>
-                    <Lock size={13} color={kioskColors.accentBlue} />
-                    <Text style={[styles.fieldLabel, { fontSize: scaleFont(11) }]}>
-                      DEVICE SECRET (PASSWORD)
+                    <Lock size={14} color={kioskColors.accentBlue} strokeWidth={2.2} />
+                    <Text style={[styles.fieldLabel, { fontSize: scaleFont(11.5) }]}>
+                      KIOSK SECRET PIN / PASSWORD
                     </Text>
                   </View>
 
@@ -199,7 +204,7 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                       value={deviceSecret}
                       onChangeText={setDeviceSecret}
                       placeholder="Enter kiosk secret password..."
-                      placeholderTextColor={kioskColors.textMuted}
+                      placeholderTextColor={kioskColors.textLightMuted}
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
@@ -208,19 +213,20 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                       focusable={true}
                       accessible={true}
                       accessibilityLabel="Device Secret Password"
-                      style={[styles.textInput, { fontSize: scaleFont(14) }]}
+                      style={[styles.textInput, { fontSize: scaleFont(14.5) }]}
                     />
                     <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       focusable={true}
                       accessible={true}
                       accessibilityLabel="Toggle password visibility"
                       style={styles.eyeBtnCompact}
                     >
                       {showPassword ? (
-                        <EyeOff size={18} color={kioskColors.textSecondary} />
+                        <EyeOff size={19} color={kioskColors.textSecondary} />
                       ) : (
-                        <Eye size={18} color={kioskColors.textSecondary} />
+                        <Eye size={19} color={kioskColors.textSecondary} />
                       )}
                     </TouchableOpacity>
                   </View>
@@ -230,14 +236,15 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => setShowServerConfig(!showServerConfig)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   focusable={true}
                   accessible={true}
                   accessibilityLabel="Toggle backend server endpoint settings"
                   style={styles.serverToggleCompact}
                 >
-                  <Server size={12} color={kioskColors.textMuted} />
-                  <Text style={styles.serverToggleTextCompact}>
-                    Backend Endpoint: {serverUrl}
+                  <Server size={13} color={kioskColors.accentBlue} strokeWidth={2} />
+                  <Text numberOfLines={1} style={styles.serverToggleTextCompact}>
+                    Server: {serverUrl}
                   </Text>
                 </TouchableOpacity>
 
@@ -266,11 +273,11 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                   focusable={true}
                   hasTVPreferredFocus={isTV}
                   accessible={true}
-                  accessibilityLabel="Register and Open Kiosk"
+                  accessibilityLabel="Authorize and Open Kiosk"
                   style={[styles.submitButton, kioskShadows.glowBlue]}
                 >
                   <LinearGradient
-                    colors={[kioskColors.surfaceLight, kioskColors.surfaceMedium]}
+                    colors={[kioskColors.brandNavy, kioskColors.accentBlue]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.submitGradientCompact}
@@ -280,9 +287,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     ) : (
                       <>
                         <Text style={[styles.submitText, { fontSize: scaleFont(15) }]}>
-                          REGISTER & OPEN KIOSK
+                          AUTHORIZE & LAUNCH
                         </Text>
-                        <ArrowRight size={scaleFont(18)} color={kioskColors.lightningGold} />
+                        <ArrowRight size={scaleFont(18)} color="#FFFFFF" strokeWidth={2.4} />
                       </>
                     )}
                   </LinearGradient>
@@ -302,16 +309,24 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                 />
 
                 <View style={styles.taglineWrapper}>
-                  <Text style={[styles.taglineCursiveText, { fontSize: scaleFont(17) }]}>
-                    Hardware Authentication & Terminal Registration Station
+                  <Text style={[styles.taglineCursiveText, { fontSize: scaleFont(16) }]}>
+                    Interactive Touch Terminal
                   </Text>
+                  <Text style={[styles.taglineSubText, { fontSize: scaleFont(12) }]}>
+                    Authorized Hardware Access
+                  </Text>
+                </View>
+
+                <View style={styles.securityBadge}>
+                  <ShieldCheck size={14} color={kioskColors.lightningGold} strokeWidth={2.4} />
+                  <Text style={styles.securityBadgeText}>ISO 9001:2015 CERTIFIED</Text>
                 </View>
               </View>
 
               {/* Error Alert Box */}
               {errorMessage && (
                 <View style={styles.errorBox}>
-                  <AlertTriangle size={18} color={kioskColors.brandRed} />
+                  <AlertTriangle size={18} color={kioskColors.brandRed} strokeWidth={2.2} />
                   <Text style={styles.errorText}>{errorMessage}</Text>
                 </View>
               )}
@@ -319,20 +334,22 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               {/* Field 1: Hardware MAC Address (Partially Masked) */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
-                  <Cpu size={14} color={kioskColors.accentBlue} />
-                  <Text style={[styles.fieldLabel, { fontSize: scaleFont(13) }]}>
-                    HARDWARE MAC ADDRESS (USERNAME)
+                  <Cpu size={14} color={kioskColors.accentBlue} strokeWidth={2.2} />
+                  <Text style={[styles.fieldLabel, { fontSize: scaleFont(12.5) }]}>
+                    HARDWARE MAC ADDRESS
                   </Text>
                 </View>
                 <View style={styles.readOnlyInput}>
-                  <Text style={[styles.macText, { fontSize: scaleFont(16) }]}>
+                  <Text style={[styles.macText, { fontSize: scaleFont(15) }]}>
                     {getDisplayMacAddress(macAddress)}
                   </Text>
 
                   <View style={styles.macControlsRow}>
                     <TouchableOpacity
                       onPress={() => setShowFullMac(!showFullMac)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       style={styles.macToggleBtn}
+                      accessibilityLabel="Toggle MAC visibility"
                     >
                       {showFullMac ? (
                         <EyeOff size={16} color={kioskColors.textSecondary} />
@@ -342,7 +359,7 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     </TouchableOpacity>
 
                     <View style={styles.autoDetectedBadge}>
-                      <MonitorCheck size={12} color={kioskColors.success} />
+                      <MonitorCheck size={13} color={kioskColors.success} strokeWidth={2.4} />
                       <Text style={styles.autoDetectedText}>AUTO DETECTED</Text>
                     </View>
                   </View>
@@ -352,9 +369,9 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               {/* Field 2: Password */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
-                  <Lock size={14} color={kioskColors.accentBlue} />
-                  <Text style={[styles.fieldLabel, { fontSize: scaleFont(13) }]}>
-                    DEVICE SECRET (PASSWORD)
+                  <Lock size={14} color={kioskColors.accentBlue} strokeWidth={2.2} />
+                  <Text style={[styles.fieldLabel, { fontSize: scaleFont(12.5) }]}>
+                    DEVICE SECRET PIN / PASSWORD
                   </Text>
                 </View>
 
@@ -363,7 +380,7 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     value={deviceSecret}
                     onChangeText={setDeviceSecret}
                     placeholder="Enter kiosk secret password..."
-                    placeholderTextColor={kioskColors.textMuted}
+                    placeholderTextColor={kioskColors.textLightMuted}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -372,10 +389,11 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     focusable={true}
                     accessible={true}
                     accessibilityLabel="Device Secret Password"
-                    style={[styles.textInput, { fontSize: scaleFont(16) }]}
+                    style={[styles.textInput, { fontSize: scaleFont(15.5) }]}
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     focusable={true}
                     accessible={true}
                     accessibilityLabel="Toggle password visibility"
@@ -394,14 +412,15 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setShowServerConfig(!showServerConfig)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 focusable={true}
                 accessible={true}
                 accessibilityLabel="Toggle backend server endpoint settings"
                 style={styles.serverToggle}
               >
-                <Server size={14} color={kioskColors.textMuted} />
-                <Text style={styles.serverToggleText}>
-                  Backend Endpoint: {serverUrl}
+                <Server size={14} color={kioskColors.accentBlue} strokeWidth={2} />
+                <Text numberOfLines={1} style={styles.serverToggleText}>
+                  Backend: {serverUrl}
                 </Text>
               </TouchableOpacity>
 
@@ -429,11 +448,11 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                 disabled={isLoading}
                 focusable={true}
                 accessible={true}
-                accessibilityLabel="Register and Open Kiosk"
+                accessibilityLabel="Authorize and Open Kiosk"
                 style={[styles.submitButton, kioskShadows.glowBlue]}
               >
                 <LinearGradient
-                  colors={[kioskColors.surfaceLight, kioskColors.surfaceMedium]}
+                  colors={[kioskColors.brandNavy, kioskColors.accentBlue]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.submitGradient}
@@ -442,10 +461,10 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <>
-                      <Text style={[styles.submitText, { fontSize: scaleFont(17) }]}>
-                        REGISTER & OPEN KIOSK
+                      <Text style={[styles.submitText, { fontSize: scaleFont(16.5) }]}>
+                        AUTHORIZE & LAUNCH
                       </Text>
-                      <ArrowRight size={scaleFont(20)} color={kioskColors.lightningGold} />
+                      <ArrowRight size={scaleFont(20)} color="#FFFFFF" strokeWidth={2.4} />
                     </>
                   )}
                 </LinearGradient>
@@ -561,11 +580,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 44,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 52,
   },
   macControlsRow: {
     flexDirection: 'row',
@@ -573,47 +592,48 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   macToggleBtn: {
-    padding: 4,
+    padding: 6,
   },
   inputContainerCompact: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#CBD5E1',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 44,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 52,
   },
   eyeBtnCompact: {
-    padding: 6,
+    padding: 8,
   },
   serverToggleCompact: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 12,
+    paddingVertical: 4,
   },
   serverToggleTextCompact: {
-    color: '#64748B',
-    fontSize: 11,
-    textDecorationLine: 'underline',
+    color: '#0D60AE',
+    fontSize: 12,
+    fontWeight: '600',
   },
   serverConfigContainerCompact: {
     backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   serverInputCompact: {
     color: '#0F172A',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    fontSize: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    fontSize: 12.5,
     borderWidth: 1,
     borderColor: '#CBD5E1',
   },
@@ -622,7 +642,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    minHeight: 48,
+    minHeight: 52,
     borderRadius: 12,
   },
   errorBoxCompact: {
@@ -660,12 +680,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   taglineCursiveText: {
-    fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
-    fontStyle: 'italic',
-    fontWeight: '700',
-    color: '#1E2B58',
+    fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif',
+    fontWeight: '800',
+    color: '#0F172A',
     textAlign: 'center',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
+  },
+  taglineSubText: {
+    fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif',
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 2,
+    letterSpacing: 0.4,
   },
   errorBox: {
     flexDirection: 'row',
@@ -695,20 +722,20 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'Montserrat',
-    color: '#475569',
+    color: '#334155',
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   readOnlyInput: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
     borderRadius: 14,
     paddingHorizontal: 16,
-    height: minTouchTarget - 10,
+    height: 54,
   },
   macText: {
     color: '#D97706',
@@ -718,26 +745,26 @@ const styles = StyleSheet.create({
   autoDetectedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 8,
   },
   autoDetectedText: {
     color: '#16A34A',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#CBD5E1',
     borderRadius: 14,
     paddingHorizontal: 16,
-    height: minTouchTarget - 10,
+    height: 54,
   },
   textInput: {
     flex: 1,
@@ -752,12 +779,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     alignSelf: 'center',
-    marginBottom: 14,
+    marginVertical: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
   },
   serverToggleText: {
-    color: '#64748B',
+    color: '#0D60AE',
     fontSize: 12,
-    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
   serverConfigContainer: {
     backgroundColor: '#F8FAFC',

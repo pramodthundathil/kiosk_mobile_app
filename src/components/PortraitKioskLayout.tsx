@@ -34,23 +34,51 @@ import {
 } from '../constants/colorCombos';
 import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 
-// ── Interactive Crisp Touch Card Component ──
+// ── Interactive Spring Touch Card Component with Tactile Kiosk Feedback ──
 const AnimatedCard: React.FC<{
   onPress: () => void;
   style?: any;
   children: React.ReactNode;
   activeOpacity?: number;
-}> = ({ onPress, style, children, activeOpacity = 0.82 }) => {
+  accessible?: boolean;
+  accessibilityLabel?: string;
+}> = ({ onPress, style, children, activeOpacity = 0.9, accessible, accessibilityLabel }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 28,
+      bounciness: 3,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 22,
+      bounciness: 5,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={activeOpacity}
-      onPress={onPress}
-      style={[style, { overflow: 'hidden' }]}
-    >
-      <View style={styles.cardTouchInner}>
-        {children}
-      </View>
-    </TouchableOpacity>
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+      <TouchableOpacity
+        activeOpacity={activeOpacity}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        accessible={accessible}
+        accessibilityLabel={accessibilityLabel}
+        style={{ flex: 1, overflow: 'hidden' }}
+      >
+        <View style={styles.cardTouchInner}>
+          {children}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -96,6 +124,63 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
 
   // Selected product for Bottom Sheet Popup
   const [selectedProductDetail, setSelectedProductDetail] = useState<KioskProduct | null>(null);
+
+  // Responsive card layout calculation to prevent oversized, vertically stretched cards on kiosks
+  const numColumns = screenWidth >= 900 ? 4 : screenWidth >= 600 ? 3 : 2;
+  const horizontalPadding = 16;
+  const gridGap = 12;
+  const totalGaps = (numColumns - 1) * gridGap;
+  const availableWidth = screenWidth - (horizontalPadding * 2);
+  const cardWidth = Math.floor((availableWidth - totalGaps) / numColumns);
+  // Elegant fixed proportions: cardHeight around 175-205px (compact, never stretched)
+  const cardHeight = Math.min(210, Math.max(172, Math.round(cardWidth * 1.04)));
+  const cardImgHeight = cardHeight - 50;
+
+  // Screen transition animation when switching categories or search queries
+  const contentFadeAnim = useRef(new Animated.Value(1)).current;
+  const contentTranslateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    contentFadeAnim.setValue(0);
+    contentTranslateAnim.setValue(16);
+    Animated.parallel([
+      Animated.timing(contentFadeAnim, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentTranslateAnim, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [activeCategory, searchQuery]);
+
+  // Subtle ambient attention pulse on Kiosk interactive CTA
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.04,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, []);
 
   // Bottom Sheet Animation Value
   const sheetAnim = useRef(new Animated.Value(600)).current;
@@ -267,156 +352,109 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
       )}
 
       {/* ── VIEW 1: DYNAMIC CATEGORY SELECTION SCREEN ── */}
-      {!activeCategory && !searchQuery.trim() ? (
-        <ScrollView
-          showsVerticalScrollIndicator={isCatScrollable}
-          bounces={true}
-          style={styles.categoryScrollView}
-          contentContainerStyle={[
-            styles.scrollBodyContainer,
-            isCatScrollable ? styles.scrollBodyScrollable : styles.scrollBodyCentered,
-          ]}
-          onLayout={(e) => setCatScrollHeight(e.nativeEvent.layout.height)}
-          onContentSizeChange={(_w, h) => setCatContentHeight(h)}
-        >
-          {products.length > 0 && (
-            <View style={styles.portraitTopActionRow}>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => {
-                  setActiveCategory('all');
-                  onSelectCategory('all');
-                }}
-                style={styles.portraitAllProductsBtn}
-              >
-                <Zap size={13} color="#FFFFFF" strokeWidth={2.4} />
-                <Text style={styles.portraitAllProductsBtnText}>
-                  All Products ({products.length})
-                </Text>
-                <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={styles.cardGrid}>
-            {displayCategories.map((cat, idx) => {
-              const combo = getColorCombo(cat.id || cat.name, idx);
-
-              return (
-                <AnimatedCard
-                  key={cat.id || idx}
-                  onPress={() => {
-                    setActiveCategory(cat.id);
-                    onSelectCategory(cat.id);
-                  }}
-                  style={[
-                    styles.kioskCard,
-                    { backgroundColor: combo.bg, borderColor: combo.borderColor },
-                  ]}
-                >
-                  {/* Dynamic Category Image */}
-                  <View style={styles.cardImgContainer}>
-                    {cat.image ? (
-                      <Image
-                        source={{ uri: cat.image }}
-                        style={styles.cardImg}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <View style={styles.fallbackIconCircle}>
-                        <Zap size={28} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Card Footer */}
-                  <View style={styles.cardFooterRow}>
-                    <Text numberOfLines={1} style={[styles.cardTitleText, { fontSize: scaleFont(14.5) }]}>
-                      {cat.name}
-                    </Text>
-                    <View style={[styles.arrowCircleBtn, { backgroundColor: combo.arrowBg }]}>
-                      <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
-                    </View>
-                  </View>
-                </AnimatedCard>
-              );
-            })}
-          </View>
-        </ScrollView>
-      ) : (
-        /* ── VIEW 2: DYNAMIC CATEGORY PRODUCTS SCREEN ── */
-        <View style={styles.categoryProductsView}>
-          {/* Sub-Header with Standardized Back Button */}
-          <View style={styles.catSubHeader}>
-            <KioskBackButton
-              onPress={() => {
-                setActiveCategory(null);
-                onSelectCategory('all');
-              }}
-              label="Categories"
-            />
-
-            <View style={styles.catSubHeaderInfo}>
-              <Text numberOfLines={1} style={[styles.catHeaderTitle, { fontSize: scaleFont(17) }]}>
-                {activeCategoryObj?.name || 'Products'}
-              </Text>
-              <View style={styles.productCountPill}>
-                <Text style={[styles.productCountPillText, { fontSize: scaleFont(12) }]}>{filteredProducts.length}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Product Cards Grid */}
+      {/* ── ANIMATED BODY CONTAINER WITH SMOOTH GLIDE-IN KIOSK TRANSITIONS ── */}
+      <Animated.View
+        style={[
+          styles.animatedContentWrapper,
+          {
+            opacity: contentFadeAnim,
+            transform: [{ translateY: contentTranslateAnim }],
+          },
+        ]}
+      >
+        {!activeCategory && !searchQuery.trim() ? (
           <ScrollView
-            showsVerticalScrollIndicator={isProdScrollable}
+            showsVerticalScrollIndicator={isCatScrollable}
             bounces={true}
             style={styles.categoryScrollView}
             contentContainerStyle={[
               styles.scrollBodyContainer,
-              isProdScrollable ? styles.scrollBodyScrollable : styles.scrollBodyCentered,
+              isCatScrollable ? styles.scrollBodyScrollable : styles.scrollBodyCentered,
             ]}
-            onLayout={(e) => setProdScrollHeight(e.nativeEvent.layout.height)}
-            onContentSizeChange={(_w, h) => setProdContentHeight(h)}
+            onLayout={(e) => setCatScrollHeight(e.nativeEvent.layout.height)}
+            onContentSizeChange={(_w, h) => setCatContentHeight(h)}
           >
+            {products.length > 0 && (
+              <View style={styles.portraitTopActionRow}>
+                <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setActiveCategory('all');
+                      onSelectCategory('all');
+                    }}
+                    style={styles.portraitAllProductsBtn}
+                  >
+                    <Zap size={13} color="#FFFFFF" strokeWidth={2.4} />
+                    <Text style={styles.portraitAllProductsBtnText}>
+                      All Products ({products.length})
+                    </Text>
+                    <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            )}
+
             <View style={styles.cardGrid}>
-              {filteredProducts.map((prod, idx) => {
-                const combo = getColorCombo(prod.id || prod.name, idx);
+              {displayCategories.map((cat, idx) => {
+                const combo = getColorCombo(cat.id || cat.name, idx);
+                const catProdCount = products.filter((p) => {
+                  const catTarget = (cat.id || cat.code || cat.name).toLowerCase();
+                  return (
+                    p.category?.toLowerCase() === catTarget ||
+                    p.categoryId?.toLowerCase() === catTarget ||
+                    p.categoryCode?.toLowerCase() === catTarget ||
+                    (p.categoryName && p.categoryName.toLowerCase() === catTarget) ||
+                    (p.categoryName && cat.name && p.categoryName.toLowerCase().includes(cat.name.toLowerCase()))
+                  );
+                }).length;
 
                 return (
                   <AnimatedCard
-                    key={prod.id || idx}
-                    onPress={() => setSelectedProductDetail(prod)}
+                    key={cat.id || idx}
+                    onPress={() => {
+                      setActiveCategory(cat.id);
+                      onSelectCategory(cat.id);
+                    }}
+                    accessible={true}
+                    accessibilityLabel={cat.name}
                     style={[
                       styles.kioskCard,
-                      { backgroundColor: combo.bg, borderColor: combo.borderColor },
+                      {
+                        width: cardWidth,
+                        height: cardHeight,
+                        backgroundColor: combo.bg,
+                        borderColor: combo.borderColor,
+                      },
                     ]}
                   >
-                    {/* Dynamic Product Image */}
-                    <View style={styles.cardImgContainer}>
-                      {prod.image ? (
+                    {/* Dynamic Category Image with Product Count Badge */}
+                    <View style={[styles.cardImgContainer, { height: cardImgHeight }]}>
+                      {cat.image ? (
                         <Image
-                          source={{ uri: prod.image }}
+                          source={{ uri: cat.image }}
                           style={styles.cardImg}
                           resizeMode="contain"
-                          fadeDuration={0}
                         />
                       ) : (
                         <View style={styles.fallbackIconCircle}>
                           <Zap size={scaleFont(28)} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
                         </View>
                       )}
+                      {catProdCount > 0 && (
+                        <View style={[styles.catCountBadge, { backgroundColor: combo.arrowBg }]}>
+                          <Text style={[styles.catCountBadgeText, { fontSize: scaleFont(10.5) }]}>
+                            {catProdCount} {catProdCount === 1 ? 'item' : 'items'}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     {/* Card Footer */}
                     <View style={styles.cardFooterRow}>
-                      <View style={styles.cardFooterTextCol}>
-                        <Text numberOfLines={1} style={[styles.cardTitleText, { fontSize: scaleFont(14) }]}>
-                          {prod.name}
-                        </Text>
-                        <Text numberOfLines={1} style={[styles.productSkuText, { fontSize: scaleFont(11.5) }]}>
-                          {prod.sku}
-                        </Text>
-                      </View>
+                      <Text numberOfLines={1} style={[styles.cardTitleText, { fontSize: scaleFont(14) }]}>
+                        {cat.name}
+                      </Text>
                       <View style={[styles.arrowCircleBtn, { backgroundColor: combo.arrowBg }]}>
                         <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
                       </View>
@@ -424,15 +462,162 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                   </AnimatedCard>
                 );
               })}
-              {filteredProducts.length === 0 && (
-                <View style={styles.emptyState}>
-                  <Text style={[styles.emptyStateText, { fontSize: scaleFont(13) }]}>No products found matching this filter</Text>
-                </View>
-              )}
             </View>
           </ScrollView>
-        </View>
-      )}
+        ) : (
+          /* ── VIEW 2: DYNAMIC CATEGORY PRODUCTS SCREEN ── */
+          <View style={styles.categoryProductsView}>
+            {/* Sub-Header with Standardized Back Button */}
+            <View style={styles.catSubHeader}>
+              <KioskBackButton
+                onPress={() => {
+                  setActiveCategory(null);
+                  onSelectCategory('all');
+                }}
+                label="Categories"
+              />
+
+              <View style={styles.catSubHeaderInfo}>
+                <Text numberOfLines={1} style={[styles.catHeaderTitle, { fontSize: scaleFont(17) }]}>
+                  {activeCategoryObj?.name || 'All Products'}
+                </Text>
+                <View style={styles.productCountPill}>
+                  <Text style={[styles.productCountPillText, { fontSize: scaleFont(12) }]}>{filteredProducts.length}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Horizontal Quick Category Filter Strip for Fast Browsing */}
+            <View style={styles.quickFilterStrip}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.quickFilterScroll}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  onPress={() => {
+                    setActiveCategory('all');
+                    onSelectCategory('all');
+                  }}
+                  style={[
+                    styles.quickFilterPill,
+                    (activeCategory === 'all' || !activeCategory) && styles.quickFilterPillActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.quickFilterText,
+                      (activeCategory === 'all' || !activeCategory) && styles.quickFilterTextActive,
+                      { fontSize: scaleFont(12) },
+                    ]}
+                  >
+                    All ({products.length})
+                  </Text>
+                </TouchableOpacity>
+                {displayCategories.map((c) => {
+                  const isSelected = activeCategory === c.id;
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      activeOpacity={0.82}
+                      onPress={() => {
+                        setActiveCategory(c.id);
+                        onSelectCategory(c.id);
+                      }}
+                      style={[
+                        styles.quickFilterPill,
+                        isSelected && styles.quickFilterPillActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.quickFilterText,
+                          isSelected && styles.quickFilterTextActive,
+                          { fontSize: scaleFont(12) },
+                        ]}
+                      >
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Product Cards Grid */}
+            <ScrollView
+              showsVerticalScrollIndicator={isProdScrollable}
+              bounces={true}
+              style={styles.categoryScrollView}
+              contentContainerStyle={[
+                styles.scrollBodyContainer,
+                isProdScrollable ? styles.scrollBodyScrollable : styles.scrollBodyCentered,
+              ]}
+              onLayout={(e) => setProdScrollHeight(e.nativeEvent.layout.height)}
+              onContentSizeChange={(_w, h) => setProdContentHeight(h)}
+            >
+              <View style={styles.cardGrid}>
+                {filteredProducts.map((prod, idx) => {
+                  const combo = getColorCombo(prod.id || prod.name, idx);
+
+                  return (
+                    <AnimatedCard
+                      key={prod.id || idx}
+                      onPress={() => setSelectedProductDetail(prod)}
+                      style={[
+                        styles.kioskCard,
+                        {
+                          width: cardWidth,
+                          height: cardHeight,
+                          backgroundColor: combo.bg,
+                          borderColor: combo.borderColor,
+                        },
+                      ]}
+                    >
+                      {/* Dynamic Product Image */}
+                      <View style={[styles.cardImgContainer, { height: cardImgHeight }]}>
+                        {prod.image ? (
+                          <Image
+                            source={{ uri: prod.image }}
+                            style={styles.cardImg}
+                            resizeMode="contain"
+                            fadeDuration={0}
+                          />
+                        ) : (
+                          <View style={styles.fallbackIconCircle}>
+                            <Zap size={scaleFont(28)} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Card Footer */}
+                      <View style={styles.cardFooterRow}>
+                        <View style={styles.cardFooterTextCol}>
+                          <Text numberOfLines={1} style={[styles.cardTitleText, { fontSize: scaleFont(13.5) }]}>
+                            {prod.name}
+                          </Text>
+                          <Text numberOfLines={1} style={[styles.productSkuText, { fontSize: scaleFont(11) }]}>
+                            {prod.sku}
+                          </Text>
+                        </View>
+                        <View style={[styles.arrowCircleBtn, { backgroundColor: combo.arrowBg }]}>
+                          <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
+                        </View>
+                      </View>
+                    </AnimatedCard>
+                  );
+                })}
+                {filteredProducts.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <Text style={[styles.emptyStateText, { fontSize: scaleFont(13) }]}>No products found matching this filter</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+      </Animated.View>
 
       {/* ── APP VERSION (SUBTLE LETTERING AT SIDE OF SCREEN) ── */}
       <View style={styles.portraitVersionBar}>
@@ -677,62 +862,64 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
+  animatedContentWrapper: {
+    flex: 1,
+    width: '100%',
+  },
+
   // ── Card Grid ──
   cardGrid: {
     width: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    alignItems: 'flex-start',
     gap: 12,
     paddingVertical: 8,
   },
   kioskCard: {
-    width: '46.5%',
-    minWidth: 155,
-    maxWidth: 380,
-    alignSelf: 'center',
     borderRadius: kioskRadii.md,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     overflow: 'hidden',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
     shadowRadius: 6,
     elevation: 3,
   },
   cardTouchInner: {
-    minHeight: 170,
+    width: '100%',
+    height: '100%',
     justifyContent: 'space-between',
   },
   cardImgContainer: {
-    flex: 1,
     width: '100%',
-    minHeight: 115,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
   },
   cardImg: {
-    width: '92%',
-    height: '92%',
+    width: '85%',
+    height: '85%',
   },
   fallbackIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardFooterRow: {
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
-    paddingVertical: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
   },
@@ -848,6 +1035,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     includeFontPadding: false,
   },
+  catCountBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: kioskRadii.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  catCountBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    includeFontPadding: false,
+  },
+  quickFilterStrip: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingVertical: 8,
+  },
+  quickFilterScroll: {
+    paddingHorizontal: 12,
+    gap: 8,
+    alignItems: 'center',
+  },
+  quickFilterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: kioskRadii.full,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quickFilterPillActive: {
+    backgroundColor: '#0D60AE',
+    borderColor: '#0D60AE',
+  },
+  quickFilterText: {
+    color: '#334155',
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  quickFilterTextActive: {
+    color: '#FFFFFF',
+  },
   emptyState: {
     padding: 40,
     alignItems: 'center',
@@ -872,10 +1109,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   portraitVersionText: {
-    color: kioskColors.textMuted,
-    fontWeight: '500',
+    color: '#64748B',
+    fontWeight: '600',
     letterSpacing: 0.4,
-    opacity: 0.8,
     includeFontPadding: false,
   },
   fixedBottomAdWrapper: {

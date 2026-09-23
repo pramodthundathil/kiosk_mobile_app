@@ -1,6 +1,6 @@
 {
   "name": "kiosk_mobile_app",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",

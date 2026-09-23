@@ -42,3 +42,7 @@ yarn-error.*
 
 # IDE
 .idea/
+
+# Agent / Skills
+.agents/
+skills-lock.json
