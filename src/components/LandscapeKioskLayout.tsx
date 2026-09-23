@@ -25,10 +25,13 @@ import {
   ChevronDown,
   FileText,
   Zap,
+  Box,
+  Video,
 } from 'lucide-react-native';
-import { KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/kiosk';
+import { ProductMediaAsset, KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/kiosk';
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
+import { MediaModal } from './MediaModal';
 import { useInactivityTimer } from './InactivityTracker';
 import { useAppVersion } from '../hooks/useAppVersion';
 import { getColorCombo } from '../constants/colorCombos';
@@ -163,6 +166,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   const [selectedProductDetail, setSelectedProductDetail] = useState<KioskProduct | null>(
     selectedProduct
   );
+  // Fullscreen media preview (3D or Video)
+  const [previewMediaAsset, setPreviewMediaAsset] = useState<ProductMediaAsset | null>(null);
 
   // Keep in sync with external selectedProduct prop
   useEffect(() => {
@@ -639,6 +644,18 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         ]}
                       >
                         <View style={styles.productImgWrapper}>
+                          {item.mediaAssets?.some((a) => a.asset_type === 'THREE_D') && (
+                            <View style={styles.card3DBadge}>
+                              <Box size={10} color="#0284C7" strokeWidth={2.4} />
+                              <Text style={styles.card3DBadgeText}>3D</Text>
+                            </View>
+                          )}
+                          {item.mediaAssets?.some((a) => a.asset_type === 'VIDEO') && (
+                            <View style={styles.cardVideoBadge}>
+                              <Video size={10} color="#E11D48" strokeWidth={2.4} />
+                              <Text style={styles.cardVideoBadgeText}>VIDEO</Text>
+                            </View>
+                          )}
                           {item.image ? (
                             <Image
                               source={{ uri: item.image }}
@@ -785,6 +802,36 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                       </Text>
 
                       <View style={styles.drawerMediaActions}>
+                        {selectedProductDetail.mediaAssets?.find((a) => a.asset_type === 'THREE_D') && (
+                          <TouchableOpacity
+                            style={styles.drawer3DBtn}
+                            onPress={() => {
+                              const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'THREE_D');
+                              if (a) setPreviewMediaAsset(a);
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <Box size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                            <Text style={[styles.drawer3DBtnText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                              Explore 3D
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        {selectedProductDetail.mediaAssets?.find((a) => a.asset_type === 'VIDEO') && (
+                          <TouchableOpacity
+                            style={styles.drawerVideoBtn}
+                            onPress={() => {
+                              const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'VIDEO');
+                              if (a) setPreviewMediaAsset(a);
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <Video size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                            <Text style={[styles.drawerVideoBtnText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                              Video
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                         <TouchableOpacity
                           style={styles.drawerPdfBtn}
                           onPress={() => handleOpenFullDetail(selectedProductDetail)}
@@ -839,6 +886,15 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Fullscreen 3D & Media Asset Inspector Modal */}
+      <MediaModal
+        visible={!!previewMediaAsset}
+        asset={previewMediaAsset}
+        product={selectedProductDetail}
+        onClose={() => setPreviewMediaAsset(null)}
+        scaleFont={scaleFont}
+      />
     </View>
   );
 };
@@ -1551,8 +1607,86 @@ const styles = StyleSheet.create({
   drawerMediaActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    flexWrap: 'wrap',
+  },
+  drawer3DBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    marginTop: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: kioskRadii.sm,
+    backgroundColor: '#0284C7',
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+    ...kioskShadows.subtle,
+  },
+  drawer3DBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12.5,
+    includeFontPadding: false,
+  },
+  drawerVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: kioskRadii.sm,
+    backgroundColor: '#E11D48',
+    borderWidth: 1,
+    borderColor: '#FB7185',
+  },
+  drawerVideoBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12.5,
+    includeFontPadding: false,
+  },
+  card3DBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: kioskRadii.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.5)',
+    zIndex: 5,
+  },
+  card3DBadgeText: {
+    color: '#0284C7',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  cardVideoBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FFF1F2',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: kioskRadii.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 113, 133, 0.5)',
+    zIndex: 5,
+  },
+  cardVideoBadgeText: {
+    color: '#E11D48',
+    fontSize: 10,
+    fontWeight: '800',
   },
   drawerPdfBtn: {
     flexDirection: 'row',

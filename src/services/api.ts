@@ -698,8 +698,8 @@ export async function sendKioskHeartbeat(
       if (storedVer && storedVer.trim()) currentVersion = storedVer.trim();
     } catch (e) {}
 
-    let currentAppVersion = 'v1.0.4';
-    let currentAppCode = 5;
+    let currentAppVersion = 'v1.0.8';
+    let currentAppCode = 8;
     let currentUpdateStatus: string | undefined = undefined;
     try {
       const { updateService } = await import('./updateService');

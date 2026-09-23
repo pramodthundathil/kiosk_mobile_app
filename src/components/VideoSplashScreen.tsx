@@ -86,7 +86,7 @@ export const VideoSplashScreen: React.FC<VideoSplashScreenProps> = ({ onFinish }
         style={styles.touchArea}
         hasTVPreferredFocus={isTV}
         accessible={true}
-        accessibilityLabel={isTV ? 'Press OK to skip intro' : 'Tap to skip intro'}
+        accessibilityLabel="Touch screen to skip intro"
       >
         {player ? (
           <VideoView
@@ -101,7 +101,7 @@ export const VideoSplashScreen: React.FC<VideoSplashScreenProps> = ({ onFinish }
 
         <View style={styles.skipContainer}>
           <Text style={styles.skipText}>
-            {isTV ? 'Press OK to skip' : 'Tap to skip'}
+            Touch or tap to skip
           </Text>
         </View>
       </TouchableOpacity>

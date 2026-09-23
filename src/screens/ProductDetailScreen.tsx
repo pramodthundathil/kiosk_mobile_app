@@ -21,6 +21,7 @@ import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kios
 import { KioskProduct, KioskResponsiveMetrics } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
 import { WhiteboardModal } from '../components/WhiteboardModal';
+import { ProductMediaGallery } from '../components/ProductMediaGallery';
 import { analyticsService } from '../services/analyticsService';
 import { useAppVersion } from '../hooks/useAppVersion';
 
@@ -170,15 +171,14 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         ]}
       >
         <View style={[styles.contentLayoutRow, { flexDirection: isLandscape ? 'row' : 'column' }]}>
-          {/* Left Panel: High Res Product Image & Compliance Tags */}
-          <View style={[styles.leftPanel, { width: isLandscape ? 380 : '100%' }]}>
-            <View style={styles.imageCard}>
-              <Image
-                source={{ uri: product.image }}
-                style={[styles.productImg, { height: isLandscape ? 280 : 240 }]}
-                resizeMode="contain"
-              />
-            </View>
+          {/* Left Panel: Rich Product Media Gallery (3D, Photo, Video, Docs) & Compliance Tags */}
+          <View style={[styles.leftPanel, { width: isLandscape ? 440 : '100%' }]}>
+            <ProductMediaGallery
+              product={product}
+              height={isLandscape ? 340 : 280}
+              scaleFont={scaleFont}
+              scaleSpacing={scaleSpacing}
+            />
 
             {/* Testing & Standards Compliance */}
             <View style={styles.standardsCard}>

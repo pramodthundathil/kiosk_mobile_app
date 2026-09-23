@@ -14,12 +14,14 @@ import {
   getStoredKioskToken,
   logoutKioskDevice,
   fetchScreensavers,
+  getCachedScreensavers,
   startHeartbeatRunner,
   stopHeartbeatRunner,
   parseJwtPayload,
 } from './src/services/api';
 import { syncService } from './src/services/syncService';
 import { updateService } from './src/services/updateService';
+import { Image } from 'react-native';
 
 export default function App() {
   const responsiveMetrics = useKioskResponsive();
@@ -33,12 +35,29 @@ export default function App() {
     SplashScreen.hideAsync().catch(() => {});
 
     const initApp = async () => {
-      // Pre-fetch screensavers from backend and persist in local storage (available on login & home)
       const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
-      const fetched = await fetchScreensavers(currentOrientation);
-      if (fetched && fetched.length > 0) {
-        setScreensavers(fetched);
+
+      // 1. Immediately load local cached screensavers from disk so they are available without delay
+      const cached = await getCachedScreensavers(currentOrientation);
+      if (cached && cached.length > 0) {
+        setScreensavers(cached);
+        // Pre-warm disk cache for instant display
+        cached.forEach((s) => {
+          const uri = s.image_url || s.image;
+          if (uri) Image.prefetch(uri).catch(() => {});
+        });
       }
+
+      // 2. Refresh screensavers from backend in background without blocking UI
+      fetchScreensavers(currentOrientation).then((fetched) => {
+        if (fetched && fetched.length > 0) {
+          setScreensavers(fetched);
+          fetched.forEach((s) => {
+            const uri = s.image_url || s.image;
+            if (uri) Image.prefetch(uri).catch(() => {});
+          });
+        }
+      }).catch(() => {});
 
       const token = await getStoredKioskToken();
       if (token && !token.startsWith('local_session_')) {
@@ -93,6 +112,10 @@ export default function App() {
       fetchScreensavers(currentOrientation).then((fetched) => {
         if (fetched && fetched.length > 0) {
           setScreensavers(fetched);
+          fetched.forEach((s) => {
+            const uri = s.image_url || s.image;
+            if (uri) Image.prefetch(uri).catch(() => {});
+          });
         }
       });
     });
@@ -119,12 +142,7 @@ export default function App() {
         inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers screensaver/ads even before login
         onInactivity={() => {
           if (!showSplash && !isCheckingAuth) {
-            const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
-            fetchScreensavers(currentOrientation).then((fetched) => {
-              if (fetched && fetched.length > 0) {
-                setScreensavers(fetched);
-              }
-            });
+            // Instantly activate screensaver using already-cached, pre-warmed slides
             setIsScreensaverActive(true);
           }
         }}

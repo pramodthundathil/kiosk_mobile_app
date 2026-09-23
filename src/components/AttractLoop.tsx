@@ -11,12 +11,9 @@ import {
   BackHandler,
   Easing,
 } from 'react-native';
-import { Touchpad, ArrowRight } from 'lucide-react-native';
-
-const isTV = Platform.isTV;
-import { kioskColors, kioskIcons, kioskRadii } from '../theme/kioskTheme';
+import { Touchpad } from 'lucide-react-native';
 import { KioskResponsiveMetrics, KioskScreensaver } from '../types/kiosk';
-import { fetchScreensavers } from '../services/api';
+import { getCachedScreensavers } from '../services/api';
 
 interface AttractLoopProps {
   metrics: KioskResponsiveMetrics;
@@ -91,12 +88,24 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
   const slidesRef = useRef(slides);
   slidesRef.current = slides;
 
-  // Smooth Crossfade Opacity Animations
+  // Seamless Entrance Fade (eliminates black screen blink when opening screensaver)
+  const entranceFade = useRef(new Animated.Value(0)).current;
+
+  // Smooth Crossfade Opacity Animations between Slot 0 and Slot 1
   const opacity0 = useRef(new Animated.Value(1)).current;
   const opacity1 = useRef(new Animated.Value(0)).current;
 
-  // Pulsing animation for bottom Touch/Remote prompt pill
-  const pulseAnim = useRef(new Animated.Value(0.6)).current;
+  // Subtle Attention Pulse for bottom touch prompt lettering
+  const pulseAnim = useRef(new Animated.Value(0.7)).current;
+
+  useEffect(() => {
+    Animated.timing(entranceFade, {
+      toValue: 1,
+      duration: 400,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [entranceFade]);
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -107,7 +116,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 0.5,
+          toValue: 0.65,
           duration: 900,
           useNativeDriver: true,
         }),
@@ -127,7 +136,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
     });
   }, [slides]);
 
-  // Fetch latest screensavers from backend API matching orientation
+  // Synchronize matching slides from props or disk cache (NO blocking network fetch on open)
   useEffect(() => {
     let isMounted = true;
     const targetOri = isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
@@ -140,15 +149,16 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
         setSlides(matching);
         setSlideIdx0(0);
         setSlideIdx1(matching.length > 1 ? 1 : 0);
+        return;
       }
     }
 
-    fetchScreensavers(targetOri).then((fetched) => {
-      if (isMounted && fetched && fetched.length > 0) {
-        setFailedUris({});
-        setSlides(fetched);
+    // If initialScreensavers is empty or not passed, load cached screensavers from disk immediately
+    getCachedScreensavers(targetOri).then((cached) => {
+      if (isMounted && cached && cached.length > 0) {
+        setSlides(cached);
         setSlideIdx0(0);
-        setSlideIdx1(fetched.length > 1 ? 1 : 0);
+        setSlideIdx1(cached.length > 1 ? 1 : 0);
       }
     });
 
@@ -319,8 +329,8 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
   return (
     <Modal
       visible={true}
-      transparent={false}
-      animationType="fade"
+      transparent={true}
+      animationType="none"
       statusBarTranslucent={true}
       hardwareAccelerated={true}
       onRequestClose={onDismiss}
@@ -328,46 +338,60 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
       <TouchableOpacity
         activeOpacity={1}
         onPress={onDismiss}
-        style={styles.fullContainer}
+        style={styles.touchArea}
         focusable={true}
         hasTVPreferredFocus={true}
         accessible={true}
-        accessibilityLabel="Press OK or touch to continue"
+        accessibilityLabel="Touch screen to explore"
       >
-        <View style={styles.imageWrapper}>
-          {topSlot === 1 ? (
-            <>
-              {renderSlot0()}
-              {renderSlot1()}
-            </>
-          ) : (
-            <>
-              {renderSlot1()}
-              {renderSlot0()}
-            </>
-          )}
-        </View>
+        <Animated.View style={[styles.fullContainer, { opacity: entranceFade }]}>
+          <View style={styles.imageWrapper}>
+            {topSlot === 1 ? (
+              <>
+                {renderSlot0()}
+                {renderSlot1()}
+              </>
+            ) : (
+              <>
+                {renderSlot1()}
+                {renderSlot0()}
+              </>
+            )}
+          </View>
 
-        {/* Modern Frosted Glass Floating Touch / TV Remote Prompt Pill */}
-        <View style={styles.floatingPromptContainer} pointerEvents="none">
-          <Animated.View style={[styles.floatingPromptPill, { opacity: pulseAnim }]}>
-            <Touchpad size={15} color="#FFFFFF" strokeWidth={kioskIcons.strokeWidth} />
-            <Text style={styles.floatingPromptText}>
-              {isTV ? 'PRESS OK ON REMOTE TO CONTINUE' : 'TOUCH SCREEN TO EXPLORE'}
-            </Text>
-            <ArrowRight size={15} color={kioskColors.lightningGold} strokeWidth={kioskIcons.strokeWidth} />
-          </Animated.View>
-        </View>
+          {/* Clean, Unboxed Floating Touch Prompt - High-Contrast Lettering with Deep Shadow */}
+          <View style={styles.floatingPromptContainer} pointerEvents="none">
+            <Animated.View style={[styles.floatingPromptRow, { opacity: pulseAnim }]}>
+              <Touchpad
+                size={metrics.scaleFont(16, 14)}
+                color="#FFFFFF"
+                strokeWidth={2.4}
+                style={styles.promptIcon}
+              />
+              <Text
+                style={[
+                  styles.floatingPromptText,
+                  { fontSize: metrics.scaleFont(15, 13) },
+                ]}
+              >
+                TOUCH SCREEN TO EXPLORE
+              </Text>
+            </Animated.View>
+          </View>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  touchArea: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 9999,
+  },
   fullContainer: {
     ...StyleSheet.absoluteFill,
     backgroundColor: '#000000',
-    zIndex: 9999,
   },
   imageWrapper: {
     ...StyleSheet.absoluteFill,
@@ -385,33 +409,36 @@ const styles = StyleSheet.create({
   },
   floatingPromptContainer: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 32,
     left: 0,
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10000,
   },
-  floatingPromptPill: {
+  floatingPromptRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: kioskRadii.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  promptIcon: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.95,
     shadowRadius: 6,
-    elevation: 4,
+    elevation: 6,
   },
   floatingPromptText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    fontWeight: '900',
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+    includeFontPadding: false,
   },
 });

@@ -43,6 +43,24 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'IT Data Centers & Heavy Industrial Complexes'
     ],
     standards: ['IEC 62561-2', 'UL 467', 'IEEE 80', 'IS 3043'],
+    mediaAssets: [
+      {
+        id: 'm-3d-1',
+        title: '3D Copper Bonded Rod Model',
+        asset_type: 'THREE_D',
+        asset_type_display: '3D Interactive Model',
+        file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/copper-bonded-earth-rod_JPxKz56.glb',
+        description: 'Interactive 3D model of the copper bonded earthing electrode. 360-degree rotation and zoom enabled.',
+      },
+      {
+        id: 'm-pdf-1',
+        title: 'Copper Bonded Electrode Tech Brochure',
+        asset_type: 'PDF_BROCHURE',
+        asset_type_display: 'PDF Brochure',
+        file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/Please_share_the_following.pdf',
+        description: 'Official Excel Earthings technical specification datasheet and IEC compliance test report.',
+      },
+    ],
   },
   {
     id: 'p2',

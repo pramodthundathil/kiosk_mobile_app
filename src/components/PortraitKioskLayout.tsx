@@ -21,10 +21,13 @@ import {
   Zap,
   Info,
   Edit3,
+  Box,
+  Video,
 } from 'lucide-react-native';
-import { KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/kiosk';
+import { ProductMediaAsset, KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/kiosk';
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
+import { MediaModal } from './MediaModal';
 import { useInactivityTimer } from './InactivityTracker';
 import { useAppVersion } from '../hooks/useAppVersion';
 import {
@@ -124,6 +127,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
 
   // Selected product for Bottom Sheet Popup
   const [selectedProductDetail, setSelectedProductDetail] = useState<KioskProduct | null>(null);
+  // Fullscreen media preview (3D or Video)
+  const [previewMediaAsset, setPreviewMediaAsset] = useState<ProductMediaAsset | null>(null);
 
   // Responsive card layout calculation to prevent oversized, vertically stretched cards on kiosks
   const numColumns = screenWidth >= 900 ? 4 : screenWidth >= 600 ? 3 : 2;
@@ -577,6 +582,18 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                     >
                       {/* Dynamic Product Image */}
                       <View style={[styles.cardImgContainer, { height: cardImgHeight }]}>
+                        {prod.mediaAssets?.some((a) => a.asset_type === 'THREE_D') && (
+                          <View style={styles.card3DBadge}>
+                            <Box size={10} color="#0284C7" strokeWidth={2.4} />
+                            <Text style={styles.card3DBadgeText}>3D</Text>
+                          </View>
+                        )}
+                        {prod.mediaAssets?.some((a) => a.asset_type === 'VIDEO') && (
+                          <View style={styles.cardVideoBadge}>
+                            <Video size={10} color="#E11D48" strokeWidth={2.4} />
+                            <Text style={styles.cardVideoBadgeText}>VIDEO</Text>
+                          </View>
+                        )}
                         {prod.image ? (
                           <Image
                             source={{ uri: prod.image }}
@@ -671,6 +688,43 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                 />
               </View>
 
+              {/* Media Action Quick Pills */}
+              {(selectedProductDetail.mediaAssets?.some((a) => a.asset_type === 'THREE_D') ||
+                selectedProductDetail.mediaAssets?.some((a) => a.asset_type === 'VIDEO')) && (
+                <View style={styles.sheetMediaActionsRow}>
+                  {selectedProductDetail.mediaAssets?.find((a) => a.asset_type === 'THREE_D') && (
+                    <TouchableOpacity
+                      style={styles.sheet3DBtn}
+                      onPress={() => {
+                        const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'THREE_D');
+                        if (a) setPreviewMediaAsset(a);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Box size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.4} />
+                      <Text style={[styles.sheet3DBtnText, { fontSize: scaleFont(12.5) }]}>
+                        Explore 3D Model
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {selectedProductDetail.mediaAssets?.find((a) => a.asset_type === 'VIDEO') && (
+                    <TouchableOpacity
+                      style={styles.sheetVideoBtn}
+                      onPress={() => {
+                        const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'VIDEO');
+                        if (a) setPreviewMediaAsset(a);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Video size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.4} />
+                      <Text style={[styles.sheetVideoBtnText, { fontSize: scaleFont(12.5) }]}>
+                        Watch Video
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
               <Text style={[styles.sheetProductTitle, { fontSize: scaleFont(20) }]}>
                 {selectedProductDetail.name}
               </Text>
@@ -724,6 +778,15 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
           )}
         </Animated.View>
       </Modal>
+
+      {/* Fullscreen 3D & Media Asset Inspector Modal */}
+      <MediaModal
+        visible={!!previewMediaAsset}
+        asset={previewMediaAsset}
+        product={selectedProductDetail}
+        onClose={() => setPreviewMediaAsset(null)}
+        scaleFont={scaleFont}
+      />
     </View>
   );
 };
@@ -900,6 +963,87 @@ const styles = StyleSheet.create({
     position: 'relative',
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
+  },
+  card3DBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: kioskRadii.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.5)',
+    zIndex: 5,
+  },
+  card3DBadgeText: {
+    color: '#0284C7',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  cardVideoBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FFF1F2',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: kioskRadii.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 113, 133, 0.5)',
+    zIndex: 5,
+  },
+  cardVideoBadgeText: {
+    color: '#E11D48',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  sheetMediaActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginVertical: 10,
+    flexWrap: 'wrap',
+  },
+  sheet3DBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#0284C7',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: kioskRadii.md,
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+    ...kioskShadows.subtle,
+  },
+  sheet3DBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  sheetVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#E11D48',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: kioskRadii.md,
+    borderWidth: 1,
+    borderColor: '#FB7185',
+  },
+  sheetVideoBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   cardImg: {
     width: '85%',
