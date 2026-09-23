@@ -586,7 +586,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
           {/* Muted App Version in Bottom Area */}
           <View style={styles.footerVersionContainer}>
             <Text style={[styles.footerVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
-              v{appVersion}
+              {appVersion.startsWith('v') ? appVersion : `v${appVersion}`}
             </Text>
           </View>
 

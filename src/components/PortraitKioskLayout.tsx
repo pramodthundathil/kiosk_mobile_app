@@ -434,10 +434,10 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
         </View>
       )}
 
-      {/* ── APP VERSION (ABOVE AD IMAGE) ── */}
+      {/* ── APP VERSION (SUBTLE LETTERING AT SIDE OF SCREEN) ── */}
       <View style={styles.portraitVersionBar}>
-        <Text style={[styles.portraitVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
-          v{appVersion}
+        <Text style={[styles.portraitVersionText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
+          {appVersion.startsWith('v') ? appVersion : `v${appVersion}`}
         </Text>
       </View>
 
@@ -864,17 +864,18 @@ const styles = StyleSheet.create({
   // ── Fixed Bottom Ad Banner & Version Bar ──
   portraitVersionBar: {
     width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 3,
-    backgroundColor: '#F8FAFC',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 2,
+    backgroundColor: 'transparent',
   },
   portraitVersionText: {
     color: kioskColors.textMuted,
     fontWeight: '500',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
+    opacity: 0.8,
     includeFontPadding: false,
   },
   fixedBottomAdWrapper: {
