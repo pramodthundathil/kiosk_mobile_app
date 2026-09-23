@@ -30,6 +30,7 @@ import { KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/ki
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
 import { useInactivityTimer } from './InactivityTracker';
+import { useAppVersion } from '../hooks/useAppVersion';
 import { getColorCombo } from '../constants/colorCombos';
 import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 
@@ -150,6 +151,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
 }) => {
   const { scaleFont, scaleSpacing, is4K, crispTextProps } = metrics;
   const { resetTimer } = useInactivityTimer();
+  const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
   // Active category for home → product list navigation
@@ -580,6 +582,13 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
             <Text style={[styles.languageBtnText, { fontSize: scaleFont(12) }]} {...crispTextProps}>English</Text>
             <ChevronDown size={scaleFont(11)} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
           </TouchableOpacity>
+
+          {/* Muted App Version in Bottom Area */}
+          <View style={styles.footerVersionContainer}>
+            <Text style={[styles.footerVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
+              v{appVersion}
+            </Text>
+          </View>
 
           <View style={styles.clockSection}>
             <Text style={[styles.clockTime, { fontSize: scaleFont(13) }]} {...crispTextProps}>{currentTime}</Text>
@@ -1148,6 +1157,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     height: 32,
+  },
+  footerVersionContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerVersionText: {
+    color: kioskColors.textMuted,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    includeFontPadding: false,
   },
   languageBtn: {
     flexDirection: 'row',

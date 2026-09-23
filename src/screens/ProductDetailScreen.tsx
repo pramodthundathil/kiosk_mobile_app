@@ -22,6 +22,7 @@ import { KioskProduct, KioskResponsiveMetrics } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
 import { WhiteboardModal } from '../components/WhiteboardModal';
 import { analyticsService } from '../services/analyticsService';
+import { useAppVersion } from '../hooks/useAppVersion';
 
 interface ProductDetailScreenProps {
   product: KioskProduct;
@@ -34,7 +35,8 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   metrics,
   onBack,
 }) => {
-  const { isLandscape, scaleFont, scaleSpacing } = metrics;
+  const { isLandscape, scaleFont, scaleSpacing, crispTextProps } = metrics;
+  const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
   // Track dwell time spent exploring this product
@@ -288,13 +290,20 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
 
       {/* Fixed Bottom Ad Banner in Portrait Mode */}
       {!isLandscape && (
-        <View style={styles.fixedBottomAdWrapper}>
-          <Image
-            source={require('../../assets/portrait_nature_footer.png')}
-            style={[styles.fixedBottomAdImg, { height: Math.max(68, scaleSpacing(72)) }]}
-            resizeMode="cover"
-          />
-        </View>
+        <>
+          <View style={styles.portraitVersionBar}>
+            <Text style={[styles.portraitVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
+              v{appVersion}
+            </Text>
+          </View>
+          <View style={styles.fixedBottomAdWrapper}>
+            <Image
+              source={require('../../assets/portrait_nature_footer.png')}
+              style={[styles.fixedBottomAdImg, { height: Math.max(68, scaleSpacing(72)) }]}
+              resizeMode="cover"
+            />
+          </View>
+        </>
       )}
     </View>
   );
@@ -645,5 +654,20 @@ const styles = StyleSheet.create({
   appChipText: {
     color: kioskColors.textPrimary,
     fontWeight: '700',
+  },
+  portraitVersionBar: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 3,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  portraitVersionText: {
+    color: kioskColors.textMuted,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    includeFontPadding: false,
   },
 });

@@ -26,6 +26,7 @@ import { KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/ki
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
 import { useInactivityTimer } from './InactivityTracker';
+import { useAppVersion } from '../hooks/useAppVersion';
 import {
   KIOSK_COLOR_COMBOS,
   getColorCombo,
@@ -84,6 +85,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
 }) => {
   const { resetTimer } = useInactivityTimer();
   const { scaleFont, scaleSpacing, width: screenWidth, height: screenHeight, crispTextProps } = metrics;
+  const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -431,6 +433,13 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
           </ScrollView>
         </View>
       )}
+
+      {/* ── APP VERSION (ABOVE AD IMAGE) ── */}
+      <View style={styles.portraitVersionBar}>
+        <Text style={[styles.portraitVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
+          v{appVersion}
+        </Text>
+      </View>
 
       {/* ── FIXED POSITION BOTTOM AD IMAGE ── */}
       <View style={styles.fixedBottomAdWrapper}>
@@ -852,7 +861,22 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // ── Fixed Bottom Ad Banner ──
+  // ── Fixed Bottom Ad Banner & Version Bar ──
+  portraitVersionBar: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 3,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  portraitVersionText: {
+    color: kioskColors.textMuted,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    includeFontPadding: false,
+  },
   fixedBottomAdWrapper: {
     width: '100%',
     overflow: 'hidden',
