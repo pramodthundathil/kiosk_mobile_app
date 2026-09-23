@@ -698,13 +698,16 @@ export async function sendKioskHeartbeat(
       if (storedVer && storedVer.trim()) currentVersion = storedVer.trim();
     } catch (e) {}
 
-    let currentAppVersion = 'v1.0.1';
-    let currentAppCode = 2;
+    let currentAppVersion = 'v1.0.2';
+    let currentAppCode = 3;
+    let currentUpdateStatus: string | undefined = undefined;
     try {
       const { updateService } = await import('./updateService');
       const vInfo = await updateService.getAppVersionInfo();
-      currentAppVersion = `v${vInfo.versionName}`;
+      const cleanName = vInfo.versionName.replace(/^v/i, '').trim();
+      currentAppVersion = `v${cleanName}`;
       currentAppCode = vInfo.versionCode;
+      currentUpdateStatus = updateService.getState();
     } catch (e) {}
 
     const payload: KioskTelemetryPayload = {
@@ -713,6 +716,7 @@ export async function sendKioskHeartbeat(
       is_authenticated: !!token,
       app_version: currentAppVersion,
       app_version_code: currentAppCode,
+      update_status: currentUpdateStatus,
       android_version: Platform.OS === 'android' ? 'Android TV / OS' : Platform.OS,
       device_model: Platform.OS === 'android' ? 'Android Kiosk Display' : 'Web Display',
       manufacturer: 'Excel Electronics',

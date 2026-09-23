@@ -131,18 +131,50 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
 
                 Log.i(TAG, "Starting streaming APK download from $urlStr to ${targetFile.absolutePath}")
 
-                val url = URL(urlStr)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 30000
-                connection.readTimeout = 60000
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("Accept-Encoding", "identity")
-                connection.connect()
+                var currentUrlStr = urlStr
+                var connection: HttpURLConnection? = null
+                var redirects = 0
+                val maxRedirects = 5
 
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                while (redirects < maxRedirects) {
+                    val url = URL(currentUrlStr)
+                    val conn = (url.openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 30000
+                        readTimeout = 60000
+                        requestMethod = "GET"
+                        instanceFollowRedirects = true
+                        setRequestProperty("Accept-Encoding", "identity")
+                        setRequestProperty("User-Agent", "KioskTerminal/1.0")
+                    }
+                    conn.connect()
+
+                    val status = conn.responseCode
+                    if (status == HttpURLConnection.HTTP_MOVED_PERM ||
+                        status == HttpURLConnection.HTTP_MOVED_TEMP ||
+                        status == HttpURLConnection.HTTP_SEE_OTHER ||
+                        status == 307 || status == 308) {
+                        val location = conn.getHeaderField("Location")
+                        conn.disconnect()
+                        if (!location.isNullOrEmpty()) {
+                            currentUrlStr = if (location.startsWith("http://") || location.startsWith("https://")) {
+                                location
+                            } else {
+                                URL(url, location).toString()
+                            }
+                            redirects++
+                            continue
+                        }
+                    }
+                    connection = conn
+                    break
+                }
+
+                if (connection == null || connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    val code = connection?.responseCode ?: -1
+                    val msg = connection?.responseMessage ?: "Unknown network error"
                     promise.reject(
                         "DOWNLOAD_HTTP_ERROR",
-                        "Server returned HTTP ${connection.responseCode} ${connection.responseMessage}"
+                        "Server returned HTTP $code $msg for $urlStr"
                     )
                     return@Thread
                 }
@@ -249,6 +281,42 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
                 out.close()
                 fis.close()
 
+                // Register dynamic receiver to listen for session commit outcome
+                val statusReceiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context, intent: Intent) {
+                        try {
+                            context.unregisterReceiver(this)
+                        } catch (_: Exception) {}
+
+                        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                        val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Status $status"
+                        Log.i(TAG, "PackageInstaller session #$sessionId outcome: status=$status, message=$msg")
+
+                        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                            val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                            }
+                            if (confirmIntent != null) {
+                                confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(confirmIntent)
+                            }
+                        } else if (status != PackageInstaller.STATUS_SUCCESS) {
+                            Log.w(TAG, "Silent PackageInstaller session failed ($msg). Falling back to FileProvider prompt...")
+                            installViaFileProviderPrompt(apkFile, null)
+                        }
+                    }
+                }
+
+                val filter = IntentFilter(ACTION_INSTALL_STATUS)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    reactContext.registerReceiver(statusReceiver, filter, Context.RECEIVER_EXPORTED)
+                } else {
+                    reactContext.registerReceiver(statusReceiver, filter)
+                }
+
                 val intent = Intent(ACTION_INSTALL_STATUS).apply {
                     setPackage(reactContext.packageName)
                 }
@@ -279,8 +347,19 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
         }.start()
     }
 
-    private fun installViaFileProviderPrompt(apkFile: File, promise: Promise) {
+    private fun installViaFileProviderPrompt(apkFile: File, promise: Promise?) {
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!reactContext.packageManager.canRequestPackageInstalls()) {
+                    Log.w(TAG, "REQUEST_INSTALL_PACKAGES not granted. Prompting user settings.")
+                    val manageIntent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${reactContext.packageName}")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    reactContext.startActivity(manageIntent)
+                }
+            }
+
             val authority = "${reactContext.packageName}.fileprovider"
             val contentUri: Uri = FileProvider.getUriForFile(reactContext, authority, apkFile)
 
@@ -292,13 +371,13 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
 
             reactContext.startActivity(intent)
             Log.i(TAG, "Fired FileProvider intent for user installation confirmation.")
-            promise.resolve(Arguments.createMap().apply {
+            promise?.resolve(Arguments.createMap().apply {
                 putBoolean("success", true)
                 putString("method", "FILE_PROVIDER_PROMPT")
             })
         } catch (e: Exception) {
             Log.e(TAG, "FileProvider prompt failed", e)
-            promise.reject("FILE_PROVIDER_ERROR", e.message, e)
+            promise?.reject("FILE_PROVIDER_ERROR", e.message, e)
         }
     }
 

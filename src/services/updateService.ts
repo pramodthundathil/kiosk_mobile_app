@@ -1,5 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import {
   getSavedServerUrl,
   getStoredKioskToken,
@@ -69,22 +71,34 @@ class UpdateService {
     packageName: string;
     isDeviceOwner: boolean;
   }> {
+    const fallbackVersion =
+      Application.nativeApplicationVersion ||
+      Constants.expoConfig?.version ||
+      '1.0.2';
+    const fallbackCode =
+      Number(Application.nativeBuildVersion) ||
+      Number(Constants.expoConfig?.android?.versionCode) ||
+      3;
+
     if (Platform.OS === 'android' && KioskUpdateModule && KioskUpdateModule.getAppVersionInfo) {
       try {
         const info = await KioskUpdateModule.getAppVersionInfo();
+        const rawName = info?.versionName || fallbackVersion;
+        const cleanName = String(rawName).replace(/^v/i, '').trim();
+        const parsedCode = Number(info?.versionCode) || fallbackCode;
         return {
-          versionName: info.versionName || '1.0.2',
-          versionCode: Number(info.versionCode) || 3,
-          packageName: info.packageName || 'com.kiosk.app',
-          isDeviceOwner: !!info.isDeviceOwner,
+          versionName: cleanName,
+          versionCode: parsedCode,
+          packageName: info?.packageName || 'com.kiosk.app',
+          isDeviceOwner: !!info?.isDeviceOwner,
         };
       } catch (e) {
         console.warn('[UpdateService] Failed getting native version info:', e);
       }
     }
     return {
-      versionName: '1.0.2',
-      versionCode: 3,
+      versionName: String(fallbackVersion).replace(/^v/i, '').trim(),
+      versionCode: fallbackCode,
       packageName: 'com.kiosk.app',
       isDeviceOwner: false,
     };
@@ -140,8 +154,10 @@ class UpdateService {
    * Checks for newer releases from the Django backend.
    */
   public async checkForUpdate(force = false): Promise<AppReleaseUpdateInfo | null> {
-    if (this.isProcessing && !force) {
-      console.log('[UpdateService] Update already in progress, skipping check.');
+    if (force) {
+      this.isProcessing = false;
+    } else if (this.isProcessing) {
+      console.log('[UpdateService] Update check already in progress, skipping.');
       return null;
     }
 
@@ -224,7 +240,6 @@ class UpdateService {
       if (Platform.OS !== 'android' || !KioskUpdateModule) {
         console.log('[UpdateService] Non-Android environment, skipping native download/install.');
         this.notify('IDLE');
-        this.isProcessing = false;
         return false;
       }
 
@@ -239,11 +254,10 @@ class UpdateService {
         const errMsg = dlErr?.message || 'Checksum verification or download failed';
         this.notify('VERIFY_FAILED', errMsg);
         await this.reportUpdateStatus('FAILED', versionName, versionCode, errMsg);
-        this.isProcessing = false;
         return false;
       }
 
-      // 3. Save pending update metadata in AsyncStorage so upon restart we can detect success
+      // 3. Save pending update metadata in AsyncStorage so upon restart we can verify success
       await AsyncStorage.setItem(
         PENDING_UPDATE_KEY,
         JSON.stringify({
@@ -267,8 +281,9 @@ class UpdateService {
       const errMsg = installErr?.message || 'Installation execution error';
       this.notify('INSTALL_FAILED', errMsg);
       await this.reportUpdateStatus('FAILED', versionName, versionCode, errMsg);
-      this.isProcessing = false;
       return false;
+    } finally {
+      this.isProcessing = false;
     }
   }
 
@@ -285,27 +300,57 @@ class UpdateService {
       const lastReportedCode = lastReportedRaw ? parseInt(lastReportedRaw, 10) : 0;
 
       const pendingMetaRaw = await AsyncStorage.getItem(PENDING_UPDATE_KEY);
+      let pendingMeta: { targetVersionCode: number; targetVersionName: string; timestamp: number } | null = null;
+      if (pendingMetaRaw) {
+        try {
+          pendingMeta = JSON.parse(pendingMetaRaw);
+        } catch (e) {}
+      }
 
-      if (currentCode > lastReportedCode || pendingMetaRaw) {
-        console.log(`[UpdateService] App upgraded successfully to v${currentName} (code ${currentCode})`);
+      if (pendingMeta) {
+        if (currentCode >= pendingMeta.targetVersionCode) {
+          // Installation confirmed successful!
+          console.log(`[UpdateService] App successfully upgraded to v${currentName} (code ${currentCode})`);
+          this.notify('UPDATED', `Running v${currentName}`);
+
+          await this.reportUpdateStatus(
+            'UPDATED',
+            currentName,
+            currentCode,
+            `Application upgraded and restarted successfully into kiosk mode (v${currentName})`
+          );
+
+          await AsyncStorage.setItem(LAST_REPORTED_VERSION_CODE_KEY, String(currentCode));
+          await AsyncStorage.removeItem(PENDING_UPDATE_KEY);
+
+          // Maintain lock task mode if Device Owner
+          if (Platform.OS === 'android' && KioskUpdateModule?.startLockTask && versionInfo.isDeviceOwner) {
+            KioskUpdateModule.startLockTask().catch(() => {});
+          }
+        } else {
+          // Restarted, but version did not reach targetVersionCode (e.g. cancelled or failed)
+          console.warn(`[UpdateService] App rebooted with versionCode ${currentCode}, expected >= ${pendingMeta.targetVersionCode}. Update failed or was cancelled.`);
+          this.notify('INSTALL_FAILED', 'Update installation did not complete');
+
+          await this.reportUpdateStatus(
+            'FAILED',
+            currentName,
+            currentCode,
+            `Installation did not complete or was cancelled. Still running v${currentName} (code ${currentCode})`
+          );
+          await AsyncStorage.removeItem(PENDING_UPDATE_KEY);
+        }
+      } else if (currentCode > lastReportedCode) {
+        console.log(`[UpdateService] New application version detected: v${currentName} (code ${currentCode})`);
         this.notify('UPDATED', `Running v${currentName}`);
 
-        // Report UPDATED to Django backend
         await this.reportUpdateStatus(
           'UPDATED',
           currentName,
           currentCode,
-          'Application updated and restarted successfully into kiosk mode'
+          `Application running v${currentName} (code ${currentCode})`
         );
-
-        // Store new version code and clear pending meta
         await AsyncStorage.setItem(LAST_REPORTED_VERSION_CODE_KEY, String(currentCode));
-        await AsyncStorage.removeItem(PENDING_UPDATE_KEY);
-
-        // Maintain lock task mode if Device Owner
-        if (Platform.OS === 'android' && KioskUpdateModule?.startLockTask && versionInfo.isDeviceOwner) {
-          KioskUpdateModule.startLockTask().catch(() => {});
-        }
       }
     } catch (e) {
       console.warn('[UpdateService] Error checking post update restart:', e);
