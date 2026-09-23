@@ -2,7 +2,7 @@
   "expo": {
     "name": "Kiosk Touch & TV App",
     "slug": "kiosk-app",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.kiosk.app",
-      "versionCode": 4,
+      "versionCode": 5,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#0B0F19",

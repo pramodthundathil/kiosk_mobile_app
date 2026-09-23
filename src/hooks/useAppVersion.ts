@@ -12,7 +12,7 @@ export function useAppVersion(): string {
   const defaultVersion =
     Application.nativeApplicationVersion ||
     Constants.expoConfig?.version ||
-    '1.0.3';
+    '1.0.4';
 
   const [version, setVersion] = useState<string>(defaultVersion);
 
