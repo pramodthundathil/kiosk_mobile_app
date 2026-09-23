@@ -13,6 +13,7 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.facebook.react.bridge.*
@@ -268,13 +269,24 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
 
                 Log.i(TAG, "Valid root binary detected at: $su")
 
+                // Start KioskWatchdogService in isolated process to ensure continuous relaunch
+                KioskWatchdogService.startWatchdog(reactContext, "Root APK installation underway")
+
+                // Launch a detached background root subshell to am start the kiosk after 3 seconds
+                try {
+                    val restartScript = "nohup sh -c 'sleep 3 && am start -n ${reactContext.packageName}/.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-brought-to-front' >/dev/null 2>&1 &"
+                    Runtime.getRuntime().exec(arrayOf(su, "-c", restartScript))
+                } catch (_: Exception) {}
+
                 // Pre-configure Device Owner and appops permissions via root if available
                 try {
                     Runtime.getRuntime().exec(arrayOf(
                         su, "-c",
                         "dpm set-device-owner ${reactContext.packageName}/.KioskDeviceAdminReceiver 2>/dev/null; " +
                         "appops set ${reactContext.packageName} REQUEST_INSTALL_PACKAGES allow 2>/dev/null; " +
-                        "pm grant ${reactContext.packageName} android.permission.INSTALL_PACKAGES 2>/dev/null"
+                        "appops set ${reactContext.packageName} SYSTEM_ALERT_WINDOW allow 2>/dev/null; " +
+                        "pm grant ${reactContext.packageName} android.permission.INSTALL_PACKAGES 2>/dev/null; " +
+                        "pm grant ${reactContext.packageName} android.permission.SYSTEM_ALERT_WINDOW 2>/dev/null"
                     )).waitFor()
                 } catch (_: Exception) {}
 
@@ -357,11 +369,22 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
                     Log.i(TAG, "PackageInstaller session #$sessionId outcome: status=$status, message=$msg")
 
                     if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-                        // User specifically requested NO POPUP on the screen.
-                        // Do NOT start confirmIntent so kiosk screen remains clean and undisturbed.
-                        Log.w(TAG, "PackageInstaller requested user confirmation ($msg). Suppressed popup as requested for silent mode.")
+                        Log.i(TAG, "PackageInstaller requested user confirmation ($msg). Launching confirmation intent...")
+                        val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(Intent.EXTRA_INTENT)
+                        }
+                        if (confirmIntent != null) {
+                            confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            reactContext.startActivity(confirmIntent)
+                        } else {
+                            installViaFileProvider(apkFile)
+                        }
                     } else if (status != PackageInstaller.STATUS_SUCCESS) {
-                        Log.w(TAG, "Silent PackageInstaller session failed: $msg")
+                        Log.w(TAG, "Silent PackageInstaller session failed: $msg. Triggering FileProvider fallback...")
+                        installViaFileProvider(apkFile)
                     } else {
                         Log.i(TAG, "PackageInstaller session #$sessionId completed successfully with status SUCCESS.")
                     }
@@ -385,30 +408,101 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
             }
             val pendingIntent = PendingIntent.getBroadcast(reactContext, sessionId, intent, flags)
 
+            // Start KioskWatchdogService in isolated process before committing session
+            KioskWatchdogService.startWatchdog(reactContext, "PackageInstaller session #$sessionId committed")
+
             session.commit(pendingIntent.intentSender)
             session.close()
 
-            Log.i(TAG, "PackageInstaller session #$sessionId committed silently.")
+            Log.i(TAG, "PackageInstaller session #$sessionId committed.")
             promise?.resolve(Arguments.createMap().apply {
                 putBoolean("success", true)
-                putString("method", "PACKAGE_INSTALLER_SILENT")
+                putString("method", "PACKAGE_INSTALLER")
                 putInt("sessionId", sessionId)
             })
         } catch (e: Exception) {
-            Log.e(TAG, "PackageInstaller silent session error: ${e.message}", e)
-            promise?.reject("PACKAGE_INSTALLER_ERROR", e.message, e)
+            Log.e(TAG, "PackageInstaller session error: ${e.message}", e)
+            Log.i(TAG, "Falling back to FileProvider installer due to exception...")
+            installViaFileProvider(apkFile)
+            promise?.resolve(Arguments.createMap().apply {
+                putBoolean("success", true)
+                putString("method", "FILE_PROVIDER_FALLBACK")
+            })
         }
+    }
+
+    private fun installViaFileProvider(apkFile: File) {
+        try {
+            val contentUri = FileProvider.getUriForFile(reactContext, "${reactContext.packageName}.fileprovider", apkFile)
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            reactContext.startActivity(installIntent)
+            Log.i(TAG, "Dispatched FileProvider APK installation intent.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch FileProvider installer", e)
+        }
+    }
+
+    @ReactMethod
+    fun canDrawOverlays(promise: Promise) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            promise.resolve(Settings.canDrawOverlays(reactContext))
+        } else {
+            promise.resolve(true)
+        }
+    }
+
+    @ReactMethod
+    fun requestOverlayPermission(promise: Promise) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(reactContext)) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${reactContext.packageName}")
+                ).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(intent)
+                promise.resolve(true)
+                return
+            }
+        }
+        promise.resolve(false)
+    }
+
+    @ReactMethod
+    fun notifyAppForeground(promise: Promise) {
+        try {
+            KioskWatchdogService.notifyAppForeground(reactContext)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("NOTIFY_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun triggerSimulatedCrash(promise: Promise) {
+        Log.w(TAG, "Simulated crash requested from JavaScript!")
+        Thread {
+            Thread.sleep(200)
+            throw RuntimeException("Kiosk Simulated Fatal Crash for Watchdog & Recovery Verification")
+        }.start()
+        promise.resolve(true)
     }
 
     @ReactMethod
     fun restartApp(promise: Promise) {
         try {
+            KioskWatchdogService.startWatchdog(reactContext, "Manual restartApp called")
             val launchIntent = reactContext.packageManager.getLaunchIntentForPackage(reactContext.packageName)
             if (launchIntent != null) {
                 launchIntent.addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                 )
                 reactContext.startActivity(launchIntent)
                 promise.resolve(true)

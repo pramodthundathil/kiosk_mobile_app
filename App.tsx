@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Platform, NativeModules } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -7,6 +7,7 @@ import { KioskLoginScreen } from './src/screens/KioskLoginScreen';
 import { VideoSplashScreen } from './src/components/VideoSplashScreen';
 import { AttractLoop } from './src/components/AttractLoop';
 import { InactivityTracker } from './src/components/InactivityTracker';
+import { KioskErrorBoundary } from './src/components/KioskErrorBoundary';
 import { useKioskResponsive } from './src/hooks/useKioskResponsive';
 import { KioskScreensaver } from './src/types/kiosk';
 import {
@@ -64,6 +65,16 @@ export default function App() {
 
       // Initialize Remote App Update (OTA) engine with 30-minute check cycle and post-update status reporting
       updateService.initUpdateService(30 * 60 * 1000);
+
+      // Signal native isolated watchdog that the kiosk app has successfully initialized and is active
+      if (Platform.OS === 'android' && NativeModules.KioskUpdateModule?.notifyAppForeground) {
+        NativeModules.KioskUpdateModule.notifyAppForeground().catch(() => {});
+        NativeModules.KioskUpdateModule.canDrawOverlays?.().then((hasOverlay: boolean) => {
+          if (!hasOverlay) {
+            NativeModules.KioskUpdateModule.requestOverlayPermission?.().catch(() => {});
+          }
+        }).catch(() => {});
+      }
     };
 
     initApp();
@@ -103,49 +114,51 @@ export default function App() {
 
 
   return (
-    <InactivityTracker
-      inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers screensaver/ads even before login
-      onInactivity={() => {
-        if (!showSplash && !isCheckingAuth) {
-          const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
-          fetchScreensavers(currentOrientation).then((fetched) => {
-            if (fetched && fetched.length > 0) {
-              setScreensavers(fetched);
-            }
-          });
-          setIsScreensaverActive(true);
-        }
-      }}
-      enabled={!showSplash && !isCheckingAuth}
-    >
-      <View style={styles.container}>
-        <StatusBar hidden style="light" />
+    <KioskErrorBoundary>
+      <InactivityTracker
+        inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers screensaver/ads even before login
+        onInactivity={() => {
+          if (!showSplash && !isCheckingAuth) {
+            const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
+            fetchScreensavers(currentOrientation).then((fetched) => {
+              if (fetched && fetched.length > 0) {
+                setScreensavers(fetched);
+              }
+            });
+            setIsScreensaverActive(true);
+          }
+        }}
+        enabled={!showSplash && !isCheckingAuth}
+      >
+        <View style={styles.container}>
+          <StatusBar hidden style="light" />
 
-        {/* Dynamic Screensaver Overlay (Plays after 30s inactivity even if not logged in) */}
-        {isScreensaverActive && (
-          <AttractLoop
-            metrics={responsiveMetrics}
-            screensavers={screensavers}
-            onDismiss={() => setIsScreensaverActive(false)}
-          />
-        )}
+          {/* Dynamic Screensaver Overlay (Plays after 30s inactivity even if not logged in) */}
+          {isScreensaverActive && (
+            <AttractLoop
+              metrics={responsiveMetrics}
+              screensavers={screensavers}
+              onDismiss={() => setIsScreensaverActive(false)}
+            />
+          )}
 
-        {/* Video Splash Animation Overlay */}
-        {showSplash ? (
-          <VideoSplashScreen onFinish={() => setShowSplash(false)} />
-        ) : isCheckingAuth ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00F0FF" />
-          </View>
-        ) : isAuthenticated ? (
-          /* Product Details & Full Catalog: Accessible ONLY when authenticated/logged in */
-          <HomeScreen onLogout={handleLogout} isScreensaverActive={isScreensaverActive} />
-        ) : (
-          /* Login Screen: Displayed when not authenticated */
-          <KioskLoginScreen onLoginSuccess={handleLoginSuccess} />
-        )}
-      </View>
-    </InactivityTracker>
+          {/* Video Splash Animation Overlay */}
+          {showSplash ? (
+            <VideoSplashScreen onFinish={() => setShowSplash(false)} />
+          ) : isCheckingAuth ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#00F0FF" />
+            </View>
+          ) : isAuthenticated ? (
+            /* Product Details & Full Catalog: Accessible ONLY when authenticated/logged in */
+            <HomeScreen onLogout={handleLogout} isScreensaverActive={isScreensaverActive} />
+          ) : (
+            /* Login Screen: Displayed when not authenticated */
+            <KioskLoginScreen onLoginSuccess={handleLoginSuccess} />
+          )}
+        </View>
+      </InactivityTracker>
+    </KioskErrorBoundary>
   );
 }
 

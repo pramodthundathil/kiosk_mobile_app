@@ -1,5 +1,6 @@
 package com.kiosk.app
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 
@@ -29,12 +30,19 @@ class MainActivity : ReactActivity() {
   override fun onResume() {
     super.onResume()
     enableImmersiveStickyMode()
+    KioskWatchdogService.notifyAppForeground(this)
+  }
+
+  override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    setIntent(intent)
   }
 
   override fun onWindowFocusChanged(hasFocus: Boolean) {
     super.onWindowFocusChanged(hasFocus)
     if (hasFocus) {
       enableImmersiveStickyMode()
+      KioskWatchdogService.notifyAppForeground(this)
     }
   }
 

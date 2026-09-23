@@ -21,7 +21,14 @@
   <uses-permission android:name="android.permission.INSTALL_PACKAGES" tools:ignore="ProtectedPermissions"/>
   <uses-permission android:name="android.permission.DELETE_PACKAGES" tools:ignore="ProtectedPermissions"/>
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+  <uses-permission android:name="android.permission.REORDER_TASKS"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -69,20 +76,42 @@
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
+        <category android:name="android.intent.category.HOME"/>
+        <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
+        <category android:name="android.intent.category.HOME"/>
+        <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
     </activity>
+
+    <!-- Watchdog Service running in an isolated process to guarantee app relaunch after crashes or updates -->
+    <service
+        android:name=".KioskWatchdogService"
+        android:enabled="true"
+        android:exported="false"
+        android:process=":kiosk_watchdog"
+        android:foregroundServiceType="specialUse">
+      <property
+          android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+          android:value="kiosk_display_guardian" />
+    </service>
 
     <!-- Receiver for auto-restarting app post OTA update or system boot -->
     <receiver
         android:name=".KioskPackageReplacedReceiver"
-        android:exported="true">
-      <intent-filter>
+        android:enabled="true"
+        android:exported="true"
+        android:directBootAware="true">
+      <intent-filter android:priority="1000">
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
         <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="android.intent.action.REBOOT" />
       </intent-filter>
     </receiver>
 

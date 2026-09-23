@@ -21,6 +21,20 @@ if (typeof (ReactNative as any).DevSettings === 'undefined') {
   };
 }
 
+// Register global unhandled JS exception handler for unattended kiosk recovery
+if ((globalThis as any).ErrorUtils) {
+  const originalErrorHandler = (globalThis as any).ErrorUtils.getGlobalHandler();
+  (globalThis as any).ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+    console.error('[GlobalErrorHandler] Unhandled JS exception caught:', error, 'isFatal:', isFatal);
+    if (isFatal && ReactNative.Platform.OS === 'android' && (ReactNative.NativeModules as any).KioskUpdateModule?.restartApp) {
+      (ReactNative.NativeModules as any).KioskUpdateModule.restartApp().catch(() => {});
+    }
+    if (typeof originalErrorHandler === 'function') {
+      originalErrorHandler(error, isFatal);
+    }
+  });
+}
+
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

@@ -74,11 +74,11 @@ class UpdateService {
     const fallbackVersion =
       Application.nativeApplicationVersion ||
       Constants.expoConfig?.version ||
-      '1.0.6';
+      '1.0.7';
     const fallbackCode =
       Number(Application.nativeBuildVersion) ||
       Number(Constants.expoConfig?.android?.versionCode) ||
-      6;
+      7;
 
     if (Platform.OS === 'android' && KioskUpdateModule && KioskUpdateModule.getAppVersionInfo) {
       try {
