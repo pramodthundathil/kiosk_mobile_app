@@ -228,127 +228,188 @@ class KioskUpdateModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun installApk(filePath: String, promise: Promise) {
-        try {
-            val apkFile = File(filePath)
-            if (!apkFile.exists() || apkFile.length() == 0L) {
-                promise.reject("FILE_NOT_FOUND", "APK file does not exist at $filePath")
-                return
-            }
-
-            val isOwner = devicePolicyManager?.isDeviceOwnerApp(reactContext.packageName) ?: false
-            Log.i(TAG, "Initiating APK installation: file=$filePath, isDeviceOwner=$isOwner")
-
-            if (isOwner) {
-                // Device Owner silent unattended installation via PackageInstaller
-                installViaPackageInstallerSession(apkFile, promise)
-            } else {
-                // Fallback standard installation prompt via FileProvider
-                installViaFileProviderPrompt(apkFile, promise)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error initiating install", e)
-            promise.reject("INSTALL_ERROR", e.message, e)
+        val apkFile = File(filePath)
+        if (!apkFile.exists() || apkFile.length() == 0L) {
+            promise.reject("FILE_NOT_FOUND", "APK file does not exist at $filePath")
+            return
         }
-    }
 
-    private fun installViaPackageInstallerSession(apkFile: File, promise: Promise) {
+        val isOwner = devicePolicyManager?.isDeviceOwnerApp(reactContext.packageName) ?: false
+        Log.i(TAG, "Initiating APK installation: file=$filePath, isDeviceOwner=$isOwner")
+
         Thread {
             try {
-                val packageInstaller = reactContext.packageManager.packageInstaller
-                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-                params.setAppPackageName(reactContext.packageName)
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    params.setInstallReason(PackageManager.INSTALL_REASON_POLICY)
+                // 1. First attempt: Root / su silent installation (zero-click on rooted kiosk/signage hardware)
+                if (tryRootInstall(apkFile)) {
+                    promise.resolve(Arguments.createMap().apply {
+                        putBoolean("success", true)
+                        putString("method", "ROOT_SILENT")
+                    })
+                    return@Thread
                 }
 
-                val sessionId = packageInstaller.createSession(params)
-                val session = packageInstaller.openSession(sessionId)
-
-                val out = session.openWrite("package_update", 0, apkFile.length())
-                val fis = FileInputStream(apkFile)
-                val buffer = ByteArray(65536)
-                var len: Int
-
-                while (fis.read(buffer).also { len = it } != -1) {
-                    out.write(buffer, 0, len)
-                }
-
-                session.fsync(out)
-                out.close()
-                fis.close()
-
-                // Register dynamic receiver to listen for session commit outcome
-                val statusReceiver = object : BroadcastReceiver() {
-                    override fun onReceive(context: Context, intent: Intent) {
-                        try {
-                            context.unregisterReceiver(this)
-                        } catch (_: Exception) {}
-
-                        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-                        val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Status $status"
-                        Log.i(TAG, "PackageInstaller session #$sessionId outcome: status=$status, message=$msg")
-
-                        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-                            val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-                            } else {
-                                @Suppress("DEPRECATION")
-                                intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                            }
-                            if (confirmIntent != null) {
-                                confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(confirmIntent)
-                            }
-                        } else if (status != PackageInstaller.STATUS_SUCCESS) {
-                            Log.w(TAG, "Silent PackageInstaller session failed ($msg). Falling back to FileProvider prompt...")
-                            installViaFileProviderPrompt(apkFile, null)
-                        }
-                    }
-                }
-
-                val filter = IntentFilter(ACTION_INSTALL_STATUS)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    reactContext.registerReceiver(statusReceiver, filter, Context.RECEIVER_EXPORTED)
-                } else {
-                    reactContext.registerReceiver(statusReceiver, filter)
-                }
-
-                val intent = Intent(ACTION_INSTALL_STATUS).apply {
-                    setPackage(reactContext.packageName)
-                }
-                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                }
-                val pendingIntent = PendingIntent.getBroadcast(reactContext, sessionId, intent, flags)
-
-                session.commit(pendingIntent.intentSender)
-                session.close()
-
-                Log.i(TAG, "PackageInstaller session #$sessionId committed successfully.")
-                promise.resolve(Arguments.createMap().apply {
-                    putBoolean("success", true)
-                    putString("method", "PACKAGE_INSTALLER_SILENT")
-                    putInt("sessionId", sessionId)
-                })
+                // 2. Second attempt: Android PackageInstaller session
+                // Unattended on Android 12+ (USER_ACTION_NOT_REQUIRED) and on Device Owner
+                installViaPackageInstallerSession(apkFile, promise)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed silent installation session, trying FileProvider fallback", e)
+                Log.e(TAG, "Error initiating install", e)
                 try {
                     installViaFileProviderPrompt(apkFile, promise)
                 } catch (ex: Exception) {
-                    promise.reject("PACKAGE_INSTALLER_ERROR", e.message, e)
+                    promise.reject("INSTALL_ERROR", e.message, e)
                 }
             }
         }.start()
     }
 
+    private fun tryRootInstall(apkFile: File): Boolean {
+        var process: Process? = null
+        var os: java.io.DataOutputStream? = null
+        return try {
+            process = Runtime.getRuntime().exec("su")
+            os = java.io.DataOutputStream(process.outputStream)
+            val cmd = "pm install -r -d \"${apkFile.absolutePath}\"\n"
+            os.writeBytes(cmd)
+            os.writeBytes("exit\n")
+            os.flush()
+            val exitVal = process.waitFor()
+            if (exitVal == 0) {
+                Log.i(TAG, "Root pm install succeeded with exit code 0.")
+                true
+            } else {
+                Log.w(TAG, "Root pm install exited with code $exitVal.")
+                false
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Device not rooted or su command unavailable: ${e.message}")
+            false
+        } finally {
+            try { os?.close() } catch (_: Exception) {}
+            try { process?.destroy() } catch (_: Exception) {}
+        }
+    }
+
+    private fun installViaPackageInstallerSession(apkFile: File, promise: Promise?) {
+        try {
+            // Temporarily unpin lock task mode so package installer or confirmation dialog is not blocked
+            try {
+                val activity = reactContext.currentActivity
+                if (activity != null) {
+                    val state = activityManager?.lockTaskModeState ?: ActivityManager.LOCK_TASK_MODE_NONE
+                    if (state != ActivityManager.LOCK_TASK_MODE_NONE) {
+                        activity.stopLockTask()
+                        Log.i(TAG, "Temporarily unpinned lock task mode for package installation.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not check or stop lock task mode: ${e.message}")
+            }
+
+            val packageInstaller = reactContext.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            params.setAppPackageName(reactContext.packageName)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                params.setInstallReason(PackageManager.INSTALL_REASON_POLICY)
+            }
+
+            val sessionId = packageInstaller.createSession(params)
+            val session = packageInstaller.openSession(sessionId)
+
+            val out = session.openWrite("package_update", 0, apkFile.length())
+            val fis = FileInputStream(apkFile)
+            val buffer = ByteArray(65536)
+            var len: Int
+
+            while (fis.read(buffer).also { len = it } != -1) {
+                out.write(buffer, 0, len)
+            }
+
+            session.fsync(out)
+            out.close()
+            fis.close()
+
+            // Register dynamic receiver to listen for session commit outcome
+            val statusReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    try {
+                        context.unregisterReceiver(this)
+                    } catch (_: Exception) {}
+
+                    val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                    val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Status $status"
+                    Log.i(TAG, "PackageInstaller session #$sessionId outcome: status=$status, message=$msg")
+
+                    if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                        val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                        }
+                        if (confirmIntent != null) {
+                            confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(confirmIntent)
+                        }
+                    } else if (status != PackageInstaller.STATUS_SUCCESS) {
+                        Log.w(TAG, "Silent PackageInstaller session failed ($msg). Falling back to FileProvider prompt...")
+                        installViaFileProviderPrompt(apkFile, null)
+                    }
+                }
+            }
+
+            val filter = IntentFilter(ACTION_INSTALL_STATUS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                reactContext.registerReceiver(statusReceiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                reactContext.registerReceiver(statusReceiver, filter)
+            }
+
+            val intent = Intent(ACTION_INSTALL_STATUS).apply {
+                setPackage(reactContext.packageName)
+            }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val pendingIntent = PendingIntent.getBroadcast(reactContext, sessionId, intent, flags)
+
+            session.commit(pendingIntent.intentSender)
+            session.close()
+
+            Log.i(TAG, "PackageInstaller session #$sessionId committed successfully.")
+            promise?.resolve(Arguments.createMap().apply {
+                putBoolean("success", true)
+                putString("method", "PACKAGE_INSTALLER_SESSION")
+                putInt("sessionId", sessionId)
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed silent installation session, trying FileProvider fallback", e)
+            try {
+                installViaFileProviderPrompt(apkFile, promise)
+            } catch (ex: Exception) {
+                promise?.reject("PACKAGE_INSTALLER_ERROR", e.message, e)
+            }
+        }
+    }
+
     private fun installViaFileProviderPrompt(apkFile: File, promise: Promise?) {
         try {
+            // Also ensure lock task mode is stopped before attempting to show system UI
+            try {
+                val activity = reactContext.currentActivity
+                if (activity != null) {
+                    val state = activityManager?.lockTaskModeState ?: ActivityManager.LOCK_TASK_MODE_NONE
+                    if (state != ActivityManager.LOCK_TASK_MODE_NONE) {
+                        activity.stopLockTask()
+                    }
+                }
+            } catch (_: Exception) {}
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (!reactContext.packageManager.canRequestPackageInstalls()) {
                     Log.w(TAG, "REQUEST_INSTALL_PACKAGES not granted. Prompting user settings.")

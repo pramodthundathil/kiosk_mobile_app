@@ -12,24 +12,35 @@ export function useAppVersion(): string {
   const defaultVersion =
     Application.nativeApplicationVersion ||
     Constants.expoConfig?.version ||
-    '1.0.2';
+    '1.0.3';
 
   const [version, setVersion] = useState<string>(defaultVersion);
 
   useEffect(() => {
     let isMounted = true;
 
-    updateService
-      .getAppVersionInfo()
-      .then((info) => {
-        if (isMounted && info?.versionName) {
-          setVersion(info.versionName);
-        }
-      })
-      .catch(() => {});
+    const refreshVersion = () => {
+      updateService
+        .getAppVersionInfo()
+        .then((info) => {
+          if (isMounted && info?.versionName) {
+            setVersion(info.versionName);
+          }
+        })
+        .catch(() => {});
+    };
+
+    refreshVersion();
+
+    const unsubscribe = updateService.onStateChange((state) => {
+      if (state === 'UPDATED') {
+        refreshVersion();
+      }
+    });
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 
