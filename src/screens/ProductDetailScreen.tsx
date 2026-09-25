@@ -54,8 +54,8 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     setIsWhiteboardOpen(true);
   };
 
-  const resolvedSpecs = (product.specifications && Object.keys(product.specifications).length > 0)
-    ? product.specifications
+  const resolvedSpecs: Record<string, string> = (product.specifications && Object.keys(product.specifications).length > 0)
+    ? { ...product.specifications }
     : {
         'Material / Grade': 'Electrolytic Copper Bonded (≥ 99.9% Cu Purity)',
         'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80 / IS 3043',
@@ -66,6 +66,10 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         'Item Code / SKU': product.sku || 'EX-SPEC-01',
         'Product Category': product.categoryName || 'Earthing & Lightning Protection',
       };
+
+  if (product.subCategoryName && !resolvedSpecs['Sub-Category']) {
+    resolvedSpecs['Sub-Category'] = product.subCategoryName;
+  }
 
   const resolvedStandards = (product.standards && product.standards.length > 0)
     ? product.standards
@@ -142,10 +146,19 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         <KioskBackButton onPress={onBack} label="Back to Catalog" />
 
         <View style={styles.headerTitleBox}>
-          <View style={styles.headerCategoryPill}>
-            <Text style={styles.headerCategoryText}>
-              {product.categoryName || 'Technical Catalog'}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <View style={styles.headerCategoryPill}>
+              <Text style={styles.headerCategoryText}>
+                {product.categoryName || 'Technical Catalog'}
+              </Text>
+            </View>
+            {product.subCategoryName && (
+              <View style={[styles.headerCategoryPill, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                <Text style={[styles.headerCategoryText, { color: '#16A34A' }]}>
+                  {product.subCategoryName}
+                </Text>
+              </View>
+            )}
           </View>
           <Text
             numberOfLines={1}

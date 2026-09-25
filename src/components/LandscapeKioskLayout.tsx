@@ -27,8 +27,9 @@ import {
   Zap,
   Box,
   Video,
+  Layers,
 } from 'lucide-react-native';
-import { ProductMediaAsset, KioskProduct, KioskCategory, KioskResponsiveMetrics } from '../types/kiosk';
+import { ProductMediaAsset, KioskProduct, KioskCategory, KioskSubCategory, KioskResponsiveMetrics } from '../types/kiosk';
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
 import { MediaModal } from './MediaModal';
@@ -36,21 +37,32 @@ import { useInactivityTimer } from './InactivityTracker';
 import { useAppVersion } from '../hooks/useAppVersion';
 import { getColorCombo } from '../constants/colorCombos';
 import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kioskTheme';
+import {
+  resolveCategoryThumbnail,
+  resolveCategoryDescription,
+  KIOSK_BRAND_BORDER,
+  KIOSK_BRAND_BORDER_ACTIVE,
+  KIOSK_ACTIVE_BG_DARK_GRADIENT,
+  KIOSK_DEFAULT_CARD_GRADIENT,
+} from '../utils/kioskDesignHelper';
 
 // ── Interactive Spring Press Card ──
 const AnimatedPressableCard: React.FC<{
   onPress: () => void;
   style?: any;
-  children: React.ReactNode;
+  children: React.ReactNode | ((active: boolean) => React.ReactNode);
   activeOpacity?: number;
   accessible?: boolean;
   accessibilityLabel?: string;
-}> = ({ onPress, style, children, activeOpacity = 0.9, accessible, accessibilityLabel }) => {
+  isActive?: boolean;
+}> = ({ onPress, style, children, activeOpacity = 0.92, accessible, accessibilityLabel, isActive = false }) => {
   const scale = useRef(new Animated.Value(1)).current;
+  const [isPressed, setIsPressed] = useState(false);
 
   const handlePressIn = () => {
+    setIsPressed(true);
     Animated.spring(scale, {
-      toValue: 0.96,
+      toValue: 0.97,
       useNativeDriver: true,
       speed: 26,
       bounciness: 4,
@@ -58,6 +70,7 @@ const AnimatedPressableCard: React.FC<{
   };
 
   const handlePressOut = () => {
+    setIsPressed(false);
     Animated.spring(scale, {
       toValue: 1,
       useNativeDriver: true,
@@ -66,8 +79,10 @@ const AnimatedPressableCard: React.FC<{
     }).start();
   };
 
+  const active = isPressed || isActive;
+
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
       <TouchableOpacity
         activeOpacity={activeOpacity}
         onPress={onPress}
@@ -75,9 +90,9 @@ const AnimatedPressableCard: React.FC<{
         onPressOut={handlePressOut}
         accessible={accessible}
         accessibilityLabel={accessibilityLabel}
-        style={style}
+        style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', borderRadius: 18 }}
       >
-        {children}
+        {typeof children === 'function' ? children(active) : children}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -152,15 +167,30 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   onSelectProduct,
   onOpenFullDetail,
 }) => {
-  const { scaleFont, scaleSpacing, is4K, crispTextProps } = metrics;
+  const { scaleFont, scaleSpacing, is4K, crispTextProps, width: screenWidth, height: screenHeight } = metrics;
   const { resetTimer } = useInactivityTimer();
   const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+
+  // Responsive 4-card grid sizing for landscape orientation
+  const catColumns = screenWidth >= 800 ? 4 : 2;
+  const catHorizontalPadding = scaleSpacing(16);
+  const catGridGap = scaleSpacing(screenWidth >= 1200 ? 14 : 10);
+  const catTotalGaps = (catColumns - 1) * catGridGap;
+  const sidebarWidth = 92;
+  const catAvailableWidth = Math.max(300, screenWidth - sidebarWidth - (catHorizontalPadding * 2));
+  const categoryCardWidth = Math.floor((catAvailableWidth - catTotalGaps) / catColumns);
+  // Elegant height to ensure at least 4 cards fit within the screen without vertical scrolling
+  const categoryCardHeight = is4K
+    ? 270
+    : Math.min(210, Math.max(160, Math.round(categoryCardWidth * 0.68)));
 
   // Active category for home → product list navigation
   const [activeCategory, setActiveCategory] = useState<string | null>(
     selectedCategory === 'all' ? null : selectedCategory
   );
+  // Active sub-category for category → sub-category → product list navigation
+  const [activeSubCategory, setActiveSubCategory] = useState<string | null>(null);
 
   // Selected product for the detail modal
   const [selectedProductDetail, setSelectedProductDetail] = useState<KioskProduct | null>(
@@ -182,7 +212,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
     }
   }, [isScreensaverActive]);
 
-  // Screen transition animation between category home & product list
+  // Screen transition animation between category home, sub-category & product list
   const screenTransitionAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -193,7 +223,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, activeSubCategory, searchQuery]);
 
   // Subtle ambient attention pulse on Kiosk interactive CTA
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -268,32 +298,61 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
 
   // Resolve specifications to ensure technical specs are always displayed
   const getProductSpecs = (prod: KioskProduct): Record<string, string> => {
-    if (prod.specifications && Object.keys(prod.specifications).length > 0) {
-      return prod.specifications;
+    const baseSpecs: Record<string, string> = (prod.specifications && Object.keys(prod.specifications).length > 0)
+      ? { ...prod.specifications }
+      : {
+          'Material / Grade': 'Electrolytic Copper Bonded (≥ 99.9% Cu)',
+          'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80 / IS 3043',
+          'Electrical Conductivity': '> 99.9% IACS High Conductivity',
+          'Corrosion Resistance': 'Exceeds 30 Years Service Life in Soil',
+          'Coating Thickness': '254 Microns (10 Mils) Molecular Bond',
+          'Tensile Strength': '≥ 600 N/mm² High Tensile Steel Core',
+          'SKU / Item Code': prod.sku || 'EX-SPEC-01',
+          'Category Classification': prod.categoryName || 'Earthing & Lightning Protection',
+        };
+    if (prod.subCategoryName) {
+      baseSpecs['Sub-Category'] = prod.subCategoryName;
     }
-    return {
-      'Material / Grade': 'Electrolytic Copper Bonded (≥ 99.9% Cu)',
-      'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80 / IS 3043',
-      'Electrical Conductivity': '> 99.9% IACS High Conductivity',
-      'Corrosion Resistance': 'Exceeds 30 Years Service Life in Soil',
-      'Coating Thickness': '254 Microns (10 Mils) Molecular Bond',
-      'Tensile Strength': '≥ 600 N/mm² High Tensile Steel Core',
-      'SKU / Item Code': prod.sku || 'EX-SPEC-01',
-      'Category Classification': prod.categoryName || 'Earthing & Lightning Protection',
-    };
+    return baseSpecs;
   };
 
-  // Filter products based on active category and search
+  const activeCategoryObj = categories.find((c) => c.id === activeCategory);
+  const activeSubCategoryObj = activeCategoryObj?.subcategories?.find(
+    (sc) => sc.id === activeSubCategory
+  );
+
+  const categoryProductsCount = products.filter((p) => {
+    if (!activeCategoryObj) return false;
+    const catTarget = (activeCategoryObj.id || activeCategoryObj.code || activeCategoryObj.name).toLowerCase();
+    return (
+      p.category?.toLowerCase() === catTarget ||
+      p.categoryId?.toLowerCase() === catTarget ||
+      p.categoryCode?.toLowerCase() === catTarget ||
+      (p.categoryName && p.categoryName.toLowerCase() === catTarget) ||
+      (p.categoryName && activeCategoryObj.name && p.categoryName.toLowerCase().includes(activeCategoryObj.name.toLowerCase()))
+    );
+  }).length;
+
+  // Filter products based on active category, active sub-category, and search
   const filteredProducts = products.filter((p) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      return (
+        p.name.toLowerCase().includes(query) ||
+        p.sku.toLowerCase().includes(query) ||
+        (p.subtitle && p.subtitle.toLowerCase().includes(query)) ||
+        (p.description && p.description.toLowerCase().includes(query)) ||
+        (p.subCategoryName && p.subCategoryName.toLowerCase().includes(query)) ||
+        (p.categoryName && p.categoryName.toLowerCase().includes(query))
+      );
+    }
+
     const rawTarget = activeCategory || selectedCategory || 'all';
     const targetCat = rawTarget.trim().toLowerCase();
     
     let matchesCat = !targetCat || targetCat === 'all';
     if (!matchesCat) {
-      const activeCatObj = categories.find(
-        (c) => c.id.toLowerCase() === targetCat || c.code.toLowerCase() === targetCat
-      );
-      const activeCatName = activeCatObj?.name?.toLowerCase() || '';
+      const activeCatName = activeCategoryObj?.name?.toLowerCase() || '';
 
       matchesCat = Boolean(
         p.category?.toLowerCase() === targetCat ||
@@ -305,18 +364,25 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
       );
     }
 
-    const query = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !query ||
-      p.name.toLowerCase().includes(query) ||
-      p.sku.toLowerCase().includes(query) ||
-      (p.subtitle && p.subtitle.toLowerCase().includes(query)) ||
-      (p.description && p.description.toLowerCase().includes(query));
+    if (!matchesCat) return false;
 
-    return matchesCat && matchesSearch;
+    if (activeSubCategory && activeSubCategory !== 'all') {
+      const targetSub = activeSubCategory.trim().toLowerCase();
+      const subCatName = activeSubCategoryObj?.name?.toLowerCase() || '';
+
+      const matchesSub = Boolean(
+        p.subCategory?.toLowerCase() === targetSub ||
+        p.subCategoryId?.toLowerCase() === targetSub ||
+        p.subCategoryCode?.toLowerCase() === targetSub ||
+        (subCatName && p.subCategoryName?.toLowerCase() === subCatName) ||
+        (p.subCategoryName && p.subCategoryName.toLowerCase().includes(targetSub)) ||
+        (subCatName && p.subCategoryName && subCatName.includes(p.subCategoryName.toLowerCase()))
+      );
+      return matchesSub;
+    }
+
+    return true;
   });
-
-  const activeCategoryObj = categories.find((c) => c.id === activeCategory);
 
   // Live clock for footer
   const [currentTime, setCurrentTime] = useState(() => {
@@ -362,6 +428,11 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
           resizeMode="cover"
         >
           <View style={styles.logoSection}>
+            <Image
+              source={require('../../assets/excel_since_logo.png')}
+              style={{ width: scaleSpacing(38), height: scaleSpacing(36), marginRight: scaleSpacing(10) }}
+              resizeMode="contain"
+            />
             <Image
               source={require('../../assets/excel_logo_white.png')}
               style={styles.logoImg}
@@ -440,7 +511,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
           {!activeCategory && !searchQuery.trim() ? (
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.categoryHomeContent}
+              contentContainerStyle={[styles.categoryHomeContent, { paddingHorizontal: catHorizontalPadding }]}
             >
               <View style={styles.sectionHeadRow}>
                 <View style={styles.sectionHeadLeft}>
@@ -472,9 +543,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 )}
               </View>
 
-              <View style={styles.categoryGrid}>
+              <View style={[styles.categoryGrid, { gap: catGridGap, justifyContent: displayCategories.length < 4 ? 'center' : 'flex-start' }]}>
                 {displayCategories.map((cat, idx) => {
-                  const combo = getColorCombo(cat.id || cat.name, idx);
                   const catProdCount = products.filter((p) => {
                     const catTarget = (cat.id || cat.code || cat.name).toLowerCase();
                     return (
@@ -485,6 +555,9 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                       (p.categoryName && cat.name && p.categoryName.toLowerCase().includes(cat.name.toLowerCase()))
                     );
                   }).length;
+                  const imageUrl = resolveCategoryThumbnail(cat);
+                  const description = resolveCategoryDescription(cat);
+                  const isCardSelected = activeCategory === cat.id;
 
                   return (
                     <AnimatedPressableCard
@@ -493,70 +566,290 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         setActiveCategory(cat.id);
                         onSelectCategory(cat.id);
                       }}
+                      isActive={isCardSelected}
                       accessible={true}
                       accessibilityLabel={cat.name}
                       style={[
                         styles.categoryCard,
-                        { backgroundColor: combo.bg, borderColor: combo.borderColor },
+                        {
+                          width: categoryCardWidth,
+                          height: categoryCardHeight,
+                          borderColor: isCardSelected ? KIOSK_BRAND_BORDER_ACTIVE : KIOSK_BRAND_BORDER,
+                        },
                       ]}
                     >
-                      {/* Dynamic Category Image with Elegant Fallback */}
-                      <View style={styles.categoryImgContainer}>
-                        {cat.image ? (
+                      {(active) => (
+                        <View style={[styles.cardBoxFillWrapper, { padding: scaleSpacing(screenWidth >= 1200 ? 13 : 10) }]}>
+                          {/* Image filling the box */}
                           <Image
-                            source={{ uri: cat.image }}
-                            style={styles.categoryImg}
-                            resizeMode="contain"
+                            source={{ uri: imageUrl }}
+                            style={StyleSheet.absoluteFill}
+                            resizeMode="cover"
                           />
-                        ) : (
-                          <View style={styles.fallbackIconCircle}>
-                            <Zap size={scaleFont(28)} color={combo.arrowBg} strokeWidth={kioskIcons.strokeWidth} />
-                          </View>
-                        )}
-                        {catProdCount > 0 && (
-                          <View style={[styles.catCountBadge, { backgroundColor: combo.arrowBg }]}>
-                            <Text style={[styles.catCountBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
-                              {catProdCount} items
-                            </Text>
-                          </View>
-                        )}
-                        <View style={[styles.chevronBadge, { backgroundColor: combo.arrowBg }]}>
-                          <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.6} />
-                        </View>
-                      </View>
 
-                      <View style={styles.categoryCardFooter}>
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.categoryCardTitle, { color: combo.textColor, fontSize: scaleFont(13.5) }]}
-                          {...crispTextProps}
-                        >
-                          {cat.name}
+                          {/* Dark Gradient Overlay / Dark Blue Active State */}
+                          <LinearGradient
+                            colors={
+                              active
+                                ? KIOSK_ACTIVE_BG_DARK_GRADIENT
+                                : KIOSK_DEFAULT_CARD_GRADIENT
+                            }
+                            style={StyleSheet.absoluteFill}
+                          />
+
+                          {/* Active Blue Glow Border Inner Indicator */}
+                          {active && <View style={styles.cardActiveGlowBorder} />}
+
+                          {/* Card Content */}
+                          <View style={styles.cardMainContent}>
+                            <View style={styles.cardHeaderArea}>
+                              <Text
+                                numberOfLines={2}
+                                style={[
+                                  styles.cardHeadingTitle,
+                                  { fontSize: scaleFont(is4K ? 22 : screenWidth >= 1200 ? 16 : 14.5) },
+                                ]}
+                                {...crispTextProps}
+                              >
+                                {cat.name}
+                              </Text>
+
+                              {/* Subtle divider below heading */}
+                              <View style={styles.cardHeadingDivider} />
+
+                              {/* Description at the bottom of the heading */}
+                              <Text
+                                numberOfLines={2}
+                                style={[
+                                  styles.cardDescriptionText,
+                                  {
+                                    fontSize: scaleFont(is4K ? 14 : screenWidth >= 1200 ? 11.5 : 10.5),
+                                    lineHeight: scaleFont(is4K ? 19 : screenWidth >= 1200 ? 16 : 14.5),
+                                  },
+                                ]}
+                                {...crispTextProps}
+                              >
+                                {description}
+                              </Text>
+                            </View>
+
+                            {/* Footer row */}
+                            <View style={styles.cardFooterOverlayRow}>
+                              <View style={styles.cardCategoryBadge}>
+                                <Text style={[styles.cardCategoryBadgeText, { fontSize: scaleFont(is4K ? 13 : 10.5) }]} {...crispTextProps}>
+                                  {cat.subcategories && cat.subcategories.length > 0
+                                    ? `${cat.subcategories.length} Sub-Categories`
+                                    : catProdCount > 0
+                                    ? `${catProdCount} items`
+                                    : 'Explore'}
+                                </Text>
+                              </View>
+
+                              <View style={[styles.cardArrowCircle, active && styles.cardArrowCircleActive]}>
+                                <ChevronRight size={scaleFont(is4K ? 15 : 11)} color="#FFFFFF" strokeWidth={2.6} />
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+                    </AnimatedPressableCard>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          ) : activeCategory && activeCategory !== 'all' && !activeSubCategory && !searchQuery.trim() && (activeCategoryObj?.subcategories?.length ?? 0) > 0 ? (
+            /* ── VIEW 2: SUB-CATEGORY SELECTION SCREEN ── */
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[styles.categoryHomeContent, { paddingHorizontal: catHorizontalPadding }]}
+            >
+              <View style={styles.sectionHeadRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <KioskBackButton
+                    onPress={() => {
+                      setActiveCategory(null);
+                      setActiveSubCategory(null);
+                      onSelectCategory('all');
+                    }}
+                    label="Categories"
+                  />
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={[styles.sectionTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
+                        {activeCategoryObj?.name}
+                      </Text>
+                      <View style={styles.sectionBadge}>
+                        <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                          {activeCategoryObj?.subcategories?.length || 0} Sub-Categories
                         </Text>
                       </View>
+                    </View>
+                    <Text style={{ fontSize: scaleFont(12), color: kioskColors.textSecondary, marginTop: 2 }}>
+                      Select a product category to explore specialized components
+                    </Text>
+                  </View>
+                </View>
+
+                {categoryProductsCount > 0 && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setActiveSubCategory('all');
+                    }}
+                    style={styles.viewAllAssignedBtn}
+                  >
+                    <Zap size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                    <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
+                      All {activeCategoryObj?.name} Products ({categoryProductsCount})
+                    </Text>
+                    <ChevronRight size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={[styles.categoryGrid, { gap: catGridGap, justifyContent: (activeCategoryObj?.subcategories?.length ?? 0) < 4 ? 'center' : 'flex-start' }]}>
+                {activeCategoryObj?.subcategories?.map((subCat, idx) => {
+                  const subCatProdCount = products.filter((p) => {
+                    const target = (subCat.id || subCat.code || subCat.name).toLowerCase();
+                    return (
+                      p.subCategory?.toLowerCase() === target ||
+                      p.subCategoryId?.toLowerCase() === target ||
+                      p.subCategoryCode?.toLowerCase() === target ||
+                      (p.subCategoryName && p.subCategoryName.toLowerCase() === target) ||
+                      (p.subCategoryName && subCat.name && p.subCategoryName.toLowerCase().includes(subCat.name.toLowerCase()))
+                    );
+                  }).length;
+                  const imageUrl = resolveCategoryThumbnail(subCat);
+                  const description = resolveCategoryDescription(subCat);
+                  const isCardSelected = activeSubCategory === subCat.id;
+
+                  return (
+                    <AnimatedPressableCard
+                      key={subCat.id || idx}
+                      onPress={() => {
+                        setActiveSubCategory(subCat.id);
+                      }}
+                      isActive={isCardSelected}
+                      accessible={true}
+                      accessibilityLabel={subCat.name}
+                      style={[
+                        styles.categoryCard,
+                        {
+                          width: categoryCardWidth,
+                          height: categoryCardHeight,
+                          borderColor: isCardSelected ? KIOSK_BRAND_BORDER_ACTIVE : KIOSK_BRAND_BORDER,
+                        },
+                      ]}
+                    >
+                      {(active) => (
+                        <View style={[styles.cardBoxFillWrapper, { padding: scaleSpacing(screenWidth >= 1200 ? 13 : 10) }]}>
+                          {/* Image filling the box */}
+                          <Image
+                            source={{ uri: imageUrl }}
+                            style={StyleSheet.absoluteFill}
+                            resizeMode="cover"
+                          />
+
+                          {/* Dark Gradient Overlay / Dark Blue Active State */}
+                          <LinearGradient
+                            colors={
+                              active
+                                ? KIOSK_ACTIVE_BG_DARK_GRADIENT
+                                : KIOSK_DEFAULT_CARD_GRADIENT
+                            }
+                            style={StyleSheet.absoluteFill}
+                          />
+
+                          {/* Active Blue Glow Border Inner Indicator */}
+                          {active && <View style={styles.cardActiveGlowBorder} />}
+
+                          {/* Card Content */}
+                          <View style={styles.cardMainContent}>
+                            <View style={styles.cardHeaderArea}>
+                              <Text
+                                numberOfLines={2}
+                                style={[
+                                  styles.cardHeadingTitle,
+                                  { fontSize: scaleFont(is4K ? 22 : screenWidth >= 1200 ? 16 : 14.5) },
+                                ]}
+                                {...crispTextProps}
+                              >
+                                {subCat.name}
+                              </Text>
+
+                              {/* Subtle divider below heading */}
+                              <View style={styles.cardHeadingDivider} />
+
+                              {/* Description at the bottom of the heading */}
+                              <Text
+                                numberOfLines={2}
+                                style={[
+                                  styles.cardDescriptionText,
+                                  {
+                                    fontSize: scaleFont(is4K ? 14 : screenWidth >= 1200 ? 11.5 : 10.5),
+                                    lineHeight: scaleFont(is4K ? 19 : screenWidth >= 1200 ? 16 : 14.5),
+                                  },
+                                ]}
+                                {...crispTextProps}
+                              >
+                                {description}
+                              </Text>
+                            </View>
+
+                            {/* Footer row */}
+                            <View style={styles.cardFooterOverlayRow}>
+                              <View style={styles.cardCategoryBadge}>
+                                <Text style={[styles.cardCategoryBadgeText, { fontSize: scaleFont(is4K ? 13 : 10.5) }]} {...crispTextProps}>
+                                  {subCatProdCount > 0 ? `${subCatProdCount} items` : 'Explore'}
+                                </Text>
+                              </View>
+
+                              <View style={[styles.cardArrowCircle, active && styles.cardArrowCircleActive]}>
+                                <ChevronRight size={scaleFont(is4K ? 15 : 11)} color="#FFFFFF" strokeWidth={2.6} />
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      )}
                     </AnimatedPressableCard>
                   );
                 })}
               </View>
             </ScrollView>
           ) : (
-            /* ── VIEW 2: PRODUCT LIST SCREEN ── */
+            /* ── VIEW 3: PRODUCT LIST SCREEN ── */
             <View style={styles.productListView}>
               <View style={styles.productSubHeader}>
                 <KioskBackButton
                   onPress={() => {
-                    setActiveCategory(null);
-                    onSelectCategory('all');
+                    if (activeSubCategory && (activeCategoryObj?.subcategories?.length ?? 0) > 0) {
+                      setActiveSubCategory(null);
+                    } else {
+                      setActiveCategory(null);
+                      setActiveSubCategory(null);
+                      onSelectCategory('all');
+                    }
                   }}
-                  label="Categories"
+                  label={activeSubCategory && (activeCategoryObj?.subcategories?.length ?? 0) > 0 ? (activeCategoryObj?.name || 'Back') : 'Categories'}
                 />
 
                 <View style={styles.subHeaderDivider} />
 
                 <View style={styles.productSubHeaderInfo}>
-                  <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
-                    {activeCategoryObj?.name || 'All Products'}
-                  </Text>
+                  {activeSubCategoryObj ? (
+                    <View>
+                      <Text style={{ fontSize: scaleFont(11), color: kioskColors.textSecondary, fontWeight: '600', marginBottom: 1 }} {...crispTextProps}>
+                        {activeCategoryObj?.name} ›
+                      </Text>
+                      <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
+                        {activeSubCategoryObj.name}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
+                      {activeCategoryObj?.name || 'All Products'}
+                    </Text>
+                  )}
                   <View style={styles.productCountPill}>
                     <Text style={[styles.productCountPillText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
                       {filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'}
@@ -565,63 +858,126 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 </View>
               </View>
 
-              {/* Horizontal Quick Category Filter Strip for Fast Browsing in Landscape */}
+              {/* Horizontal Quick Filter Strip for Sibling Sub-Categories or Main Categories */}
               <View style={styles.quickFilterStrip}>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.quickFilterScroll}
                 >
-                  <TouchableOpacity
-                    activeOpacity={0.82}
-                    onPress={() => {
-                      setActiveCategory('all');
-                      onSelectCategory('all');
-                    }}
-                    style={[
-                      styles.quickFilterPill,
-                      (activeCategory === 'all' || !activeCategory) && styles.quickFilterPillActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.quickFilterText,
-                        (activeCategory === 'all' || !activeCategory) && styles.quickFilterTextActive,
-                        { fontSize: scaleFont(12) },
-                      ]}
-                      {...crispTextProps}
-                    >
-                      All ({products.length})
-                    </Text>
-                  </TouchableOpacity>
-                  {displayCategories.map((c) => {
-                    const isSelected = activeCategory === c.id;
-                    return (
+                  {activeCategoryObj && (activeCategoryObj.subcategories?.length ?? 0) > 0 ? (
+                    <>
                       <TouchableOpacity
-                        key={c.id}
                         activeOpacity={0.82}
-                        onPress={() => {
-                          setActiveCategory(c.id);
-                          onSelectCategory(c.id);
-                        }}
+                        onPress={() => setActiveSubCategory('all')}
                         style={[
                           styles.quickFilterPill,
-                          isSelected && styles.quickFilterPillActive,
+                          (activeSubCategory === 'all' || !activeSubCategory) && styles.quickFilterPillActive,
                         ]}
                       >
                         <Text
                           style={[
                             styles.quickFilterText,
-                            isSelected && styles.quickFilterTextActive,
+                            (activeSubCategory === 'all' || !activeSubCategory) && styles.quickFilterTextActive,
                             { fontSize: scaleFont(12) },
                           ]}
                           {...crispTextProps}
                         >
-                          {c.name}
+                          All ({categoryProductsCount})
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
+                      {activeCategoryObj.subcategories!.map((sc) => {
+                        const isSelected = activeSubCategory === sc.id;
+                        const scCount = products.filter((p) => {
+                          const target = (sc.id || sc.code || sc.name).toLowerCase();
+                          return (
+                            p.subCategory?.toLowerCase() === target ||
+                            p.subCategoryId?.toLowerCase() === target ||
+                            p.subCategoryCode?.toLowerCase() === target ||
+                            (p.subCategoryName && p.subCategoryName.toLowerCase() === target) ||
+                            (p.subCategoryName && sc.name && p.subCategoryName.toLowerCase().includes(sc.name.toLowerCase()))
+                          );
+                        }).length;
+                        return (
+                          <TouchableOpacity
+                            key={sc.id}
+                            activeOpacity={0.82}
+                            onPress={() => setActiveSubCategory(sc.id)}
+                            style={[
+                              styles.quickFilterPill,
+                              isSelected && styles.quickFilterPillActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.quickFilterText,
+                                isSelected && styles.quickFilterTextActive,
+                                { fontSize: scaleFont(12) },
+                              ]}
+                              {...crispTextProps}
+                            >
+                              {sc.name} ({scCount})
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        activeOpacity={0.82}
+                        onPress={() => {
+                          setActiveCategory('all');
+                          setActiveSubCategory(null);
+                          onSelectCategory('all');
+                        }}
+                        style={[
+                          styles.quickFilterPill,
+                          (activeCategory === 'all' || !activeCategory) && styles.quickFilterPillActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.quickFilterText,
+                            (activeCategory === 'all' || !activeCategory) && styles.quickFilterTextActive,
+                            { fontSize: scaleFont(12) },
+                          ]}
+                          {...crispTextProps}
+                        >
+                          All ({products.length})
+                        </Text>
+                      </TouchableOpacity>
+                      {displayCategories.map((c) => {
+                        const isSelected = activeCategory === c.id;
+                        return (
+                          <TouchableOpacity
+                            key={c.id}
+                            activeOpacity={0.82}
+                            onPress={() => {
+                              setActiveCategory(c.id);
+                              setActiveSubCategory(null);
+                              onSelectCategory(c.id);
+                            }}
+                            style={[
+                              styles.quickFilterPill,
+                              isSelected && styles.quickFilterPillActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.quickFilterText,
+                                isSelected && styles.quickFilterTextActive,
+                                { fontSize: scaleFont(12) },
+                              ]}
+                              {...crispTextProps}
+                            >
+                              {c.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </>
+                  )}
                 </ScrollView>
               </View>
 
@@ -670,11 +1026,13 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         </View>
                         <View style={styles.productCardFooter}>
                           <View style={styles.productCardTextCol}>
-                            <Text numberOfLines={1} style={[styles.productCardTitle, { color: combo.textColor, fontSize: scaleFont(13.5) }]} {...crispTextProps}>
+                            {item.subCategoryName ? (
+                              <Text numberOfLines={1} style={{ fontSize: scaleFont(10.5), color: '#059669', fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 }} {...crispTextProps}>
+                                {item.subCategoryName}
+                              </Text>
+                            ) : null}
+                            <Text numberOfLines={2} style={[styles.productCardTitle, { color: combo.textColor, fontSize: scaleFont(13) }]} {...crispTextProps}>
                               {item.name}
-                            </Text>
-                            <Text numberOfLines={1} style={[styles.productCardSku, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
-                              {item.sku}
                             </Text>
                           </View>
                           <View style={[styles.arrowCircle, { backgroundColor: combo.arrowBg }]}>
@@ -755,10 +1113,19 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 {/* Side Drawer Header */}
                 <View style={styles.sideDrawerHeader}>
                   <View style={styles.sideDrawerHeaderLeft}>
-                    <View style={styles.drawerCategoryBadge}>
-                      <Text style={[styles.drawerCategoryBadgeText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
-                        {activeCategoryObj?.name || selectedProductDetail.categoryName || 'Catalog'}
-                      </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                      <View style={styles.drawerCategoryBadge}>
+                        <Text style={[styles.drawerCategoryBadgeText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
+                          {selectedProductDetail.categoryName || activeCategoryObj?.name || 'Catalog'}
+                        </Text>
+                      </View>
+                      {(selectedProductDetail.subCategoryName || activeSubCategoryObj?.name) && (
+                        <View style={[styles.drawerCategoryBadge, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                          <Text style={[styles.drawerCategoryBadgeText, { color: '#16A34A', fontSize: scaleFont(11.5) }]} {...crispTextProps}>
+                            {selectedProductDetail.subCategoryName || activeSubCategoryObj?.name}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                     <Text numberOfLines={1} style={[styles.drawerHeaderTitle, { fontSize: scaleFont(15) }]} {...crispTextProps}>
                       {selectedProductDetail.name}
@@ -1083,24 +1450,113 @@ const styles = StyleSheet.create({
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 12,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
     width: '100%',
+    paddingVertical: 8,
   },
   categoryCard: {
-    width: 155,
-    backgroundColor: '#FFFFFF',
-    borderRadius: kioskRadii.md,
+    backgroundColor: '#0F1E36',
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    minHeight: 145,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: KIOSK_BRAND_BORDER,
+    shadowColor: '#0D60AE',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  cardBoxFillWrapper: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
     justifyContent: 'space-between',
+    padding: 12,
+    overflow: 'hidden',
+    borderRadius: 14,
+  },
+  cardActiveGlowBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 2.5,
+    borderColor: '#38BDF8',
+    borderRadius: 14,
+    zIndex: 10,
+    pointerEvents: 'none',
+  },
+  cardMainContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+    zIndex: 5,
+  },
+  cardHeaderArea: {
+    width: '100%',
+  },
+  cardHeadingTitle: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    includeFontPadding: false,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 3,
+  },
+  cardHeadingDivider: {
+    height: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    marginVertical: 6,
+    width: '100%',
+    borderRadius: 1,
+  },
+  cardDescriptionText: {
+    color: 'rgba(255, 255, 255, 0.94)',
+    fontWeight: '400',
+    letterSpacing: 0.1,
+    includeFontPadding: false,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  cardFooterOverlayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  cardCategoryBadge: {
+    backgroundColor: 'rgba(13, 96, 174, 0.85)',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: kioskRadii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.5)',
+  },
+  cardCategoryBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  cardArrowCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#0D60AE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2.5,
+    elevation: 3,
+  },
+  cardArrowCircleActive: {
+    backgroundColor: '#0284C7',
+    transform: [{ scale: 1.08 }],
   },
   categoryImgContainer: {
     height: 105,

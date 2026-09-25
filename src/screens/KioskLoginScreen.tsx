@@ -127,22 +127,29 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               {/* Left Column: Branding Logo & Terminal Registration */}
               <View style={styles.landscapeLeftCol}>
                 <Image
+                  source={require('../../assets/excel_since_logo.png')}
+                  style={{ width: scaleSpacing(90), height: scaleSpacing(86), marginBottom: scaleSpacing(8) }}
+                  resizeMode="contain"
+                />
+                <Image
                   source={require('../../assets/excel logo_blue.png')}
                   style={styles.landscapeLogoImg}
                   resizeMode="contain"
                 />
                 <View style={styles.taglineWrapper}>
-                  <Text style={[styles.taglineCursiveText, { fontSize: scaleFont(14) }]}>
-                    Interactive Touch Terminal
-                  </Text>
-                  <Text style={[styles.taglineSubText, { fontSize: scaleFont(11) }]}>
-                    Authorized Hardware Access
+                  <Image
+                    source={require('../../assets/excel_dedicated_caption.png')}
+                    style={{ width: scaleSpacing(220), height: scaleSpacing(22), marginTop: scaleSpacing(6) }}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.taglineSubText, { fontSize: scaleFont(11), marginTop: scaleSpacing(4) }]}>
+                    Excel Earthing Kiosk App • Authorized Access
                   </Text>
                 </View>
 
                 <View style={styles.securityBadge}>
                   <ShieldCheck size={14} color={kioskColors.lightningGold} strokeWidth={2.4} />
-                  <Text style={styles.securityBadgeText}>ISO 9001:2015 CERTIFIED</Text>
+                  <Text style={styles.securityBadgeText}>SINCE 2006 • ISO 9001:2015 CERTIFIED</Text>
                 </View>
               </View>
 
@@ -303,23 +310,30 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               {/* Header Branding with Transparent Official Logo */}
               <View style={styles.brandHeader}>
                 <Image
+                  source={require('../../assets/excel_since_logo.png')}
+                  style={{ width: scaleSpacing(80), height: scaleSpacing(76), marginBottom: scaleSpacing(6) }}
+                  resizeMode="contain"
+                />
+                <Image
                   source={require('../../assets/excel logo_blue.png')}
                   style={styles.logoImg}
                   resizeMode="contain"
                 />
 
                 <View style={styles.taglineWrapper}>
-                  <Text style={[styles.taglineCursiveText, { fontSize: scaleFont(16) }]}>
-                    Interactive Touch Terminal
-                  </Text>
-                  <Text style={[styles.taglineSubText, { fontSize: scaleFont(12) }]}>
-                    Authorized Hardware Access
+                  <Image
+                    source={require('../../assets/excel_dedicated_caption.png')}
+                    style={{ width: scaleSpacing(200), height: scaleSpacing(20), marginTop: scaleSpacing(4) }}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.taglineSubText, { fontSize: scaleFont(12), marginTop: scaleSpacing(4) }]}>
+                    Excel Earthing Kiosk App • Authorized Access
                   </Text>
                 </View>
 
                 <View style={styles.securityBadge}>
                   <ShieldCheck size={14} color={kioskColors.lightningGold} strokeWidth={2.4} />
-                  <Text style={styles.securityBadgeText}>ISO 9001:2015 CERTIFIED</Text>
+                  <Text style={styles.securityBadgeText}>SINCE 2006 • ISO 9001:2015 CERTIFIED</Text>
                 </View>
               </View>
 

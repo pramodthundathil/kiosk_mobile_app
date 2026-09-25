@@ -1,23 +1,25 @@
 {
   "expo": {
-    "name": "Kiosk Touch & TV App",
+    "name": "Excel Earthing Kiosk App",
     "slug": "kiosk-app",
-    "version": "1.0.8",
+    "version": "1.1.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "backgroundColor": "#0B0F19"
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050811"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "package": "com.kiosk.app",
-      "versionCode": 8,
+      "versionCode": 10,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "backgroundColor": "#0B0F19",
+        "backgroundColor": "#050811",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,

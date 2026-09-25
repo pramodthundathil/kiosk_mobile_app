@@ -57,15 +57,22 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
       <View style={styles.leftSection}>
         <View style={styles.logoContainer}>
           <Image
+            source={require('../../assets/excel_since_logo.png')}
+            style={styles.crestLogoImage}
+            resizeMode="contain"
+          />
+          <Image
             source={require('../../assets/excel logo_blue.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
           {isLandscape && (
             <View style={styles.brandTextWrapper}>
-              <Text style={[styles.taglineCursive, { fontSize: scaleFont(13) }]}>
-                Product Showcase & Specification Station
-              </Text>
+              <Image
+                source={require('../../assets/excel_dedicated_caption.png')}
+                style={styles.captionImage}
+                resizeMode="contain"
+              />
             </View>
           )}
         </View>
@@ -171,11 +178,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logoImage: {
-    width: 160,
-    height: 44,
+    width: 150,
+    height: 40,
+  },
+  crestLogoImage: {
+    width: 38,
+    height: 38,
   },
   brandTextWrapper: {
     justifyContent: 'center',
+    marginLeft: 4,
+  },
+  captionImage: {
+    width: 180,
+    height: 20,
   },
   taglineCursive: {
     fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',

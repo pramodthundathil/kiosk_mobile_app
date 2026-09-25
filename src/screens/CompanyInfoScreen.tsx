@@ -112,10 +112,22 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
         <View style={styles.bannerCard}>
           <View style={styles.bannerLogoRow}>
             <Image
-              source={require('../../assets/excel logo_blue.png')}
-              style={styles.brandLogoImg}
+              source={require('../../assets/excel_since_logo.png')}
+              style={{ width: scaleSpacing(72), height: scaleSpacing(68) }}
               resizeMode="contain"
             />
+            <View>
+              <Image
+                source={require('../../assets/excel logo_blue.png')}
+                style={styles.brandLogoImg}
+                resizeMode="contain"
+              />
+              <Image
+                source={require('../../assets/excel_dedicated_caption.png')}
+                style={{ width: scaleSpacing(190), height: scaleSpacing(18), marginTop: scaleSpacing(4) }}
+                resizeMode="contain"
+              />
+            </View>
             <View style={styles.bannerTaglineBox}>
               <Text style={[styles.taglineHeading, { fontSize: scaleFont(18) }]}>
                 Premier Earthing & Lightning Protection Systems Manufacturer

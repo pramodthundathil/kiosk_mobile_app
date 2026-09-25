@@ -14,6 +14,7 @@ import {
   KIOSK_CONTENT_VERSION_KEY,
   KIOSK_LAST_SYNC_TIME_KEY,
 } from './api';
+import { mediaCacheService } from './mediaCacheService';
 
 export interface SyncStats {
   productsCount: number;
@@ -190,27 +191,37 @@ class KioskSyncService {
       const categories = await fetchCatalogCategories();
       console.log(`[SyncService] Categories collected: ${categories.length} categories.`);
 
-      // 4. Warm up / prefetch high-priority media assets (non-blocking)
+      // 4. Download and cache ALL media assets into persistent local device disk storage
       try {
-        const imagesToPrefetch: string[] = [];
+        const imagesToCache: string[] = [];
         assignedProducts.forEach((p) => {
-          if (p.image && p.image.startsWith('http')) imagesToPrefetch.push(p.image);
+          if (p.image && p.image.startsWith('http')) imagesToCache.push(p.image);
+          if (Array.isArray(p.mediaAssets)) {
+            p.mediaAssets.forEach((m) => {
+              if (m.file_url && m.file_url.startsWith('http')) imagesToCache.push(m.file_url);
+            });
+          }
         });
         screensaversMap.forEach((ss) => {
-          if (ss.image && ss.image.startsWith('http')) imagesToPrefetch.push(ss.image);
+          const img = ss.image_url || ss.image;
+          if (img && img.startsWith('http')) imagesToCache.push(img);
+        });
+        categories.forEach((c) => {
+          if (c.image && c.image.startsWith('http')) imagesToCache.push(c.image);
         });
 
-        // Limit concurrent prefetching to first 15 key images
-        const prefetchSlice = imagesToPrefetch.slice(0, 15);
-        Promise.all(
-          prefetchSlice.map((url) =>
-            Image.prefetch(url).catch(() => {
-              // Ignore individual image prefetch errors
-            })
-          )
-        ).catch(() => {});
+        console.log(`[SyncService] Storing ${imagesToCache.length} media assets into offline disk storage...`);
+        await mediaCacheService.cacheBatchImages(imagesToCache);
+
+        // Pre-warm local files into memory/Fresco
+        imagesToCache.forEach((url) => {
+          const localUri = mediaCacheService.resolveCachedImageUri(url);
+          if (localUri) {
+            Image.prefetch(localUri).catch(() => {});
+          }
+        });
       } catch (imgErr) {
-        console.warn('[SyncService] Media prefetch notice:', imgErr);
+        console.warn('[SyncService] Media caching notice:', imgErr);
       }
 
       // 5. Update local content version to targetVersion

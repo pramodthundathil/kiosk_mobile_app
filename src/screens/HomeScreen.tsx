@@ -6,9 +6,16 @@ import { LandscapeKioskLayout } from '../components/LandscapeKioskLayout';
 import { ProductDetailScreen } from './ProductDetailScreen';
 import { CompanyInfoScreen } from './CompanyInfoScreen';
 import { KioskProduct, KioskCategory } from '../types/kiosk';
-import { fetchCatalogProducts, fetchCatalogCategories } from '../services/api';
+import {
+  fetchCatalogProducts,
+  fetchCatalogCategories,
+  getCachedCatalogProducts,
+  getCachedCatalogCategories,
+} from '../services/api';
 import { analyticsService } from '../services/analyticsService';
 import { syncService } from '../services/syncService';
+
+import { MOCK_CATEGORIES } from '../mock/kioskData';
 
 const DEFAULT_CATEGORY: KioskCategory = {
   id: 'all',
@@ -35,7 +42,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [products, setProducts] = useState<KioskProduct[]>([]);
-  const [categories, setCategories] = useState<KioskCategory[]>([DEFAULT_CATEGORY]);
+  const [categories, setCategories] = useState<KioskCategory[]>(
+    MOCK_CATEGORIES && MOCK_CATEGORIES.length > 0 ? MOCK_CATEGORIES : [DEFAULT_CATEGORY]
+  );
   const [selectedProduct, setSelectedProduct] = useState<KioskProduct | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
@@ -49,6 +58,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
     }
   }, [isScreensaverActive, activePage]);
 
+  // Immediate Offline Cache Hydration: Loads latest cached catalog instantly on mount
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([getCachedCatalogProducts(), getCachedCatalogCategories()])
+      .then(([cachedProds, cachedCats]) => {
+        if (isMounted) {
+          if (cachedProds && cachedProds.length > 0) {
+            setProducts(cachedProds);
+          }
+          if (cachedCats && cachedCats.length > 0) {
+            setCategories([DEFAULT_CATEGORY, ...cachedCats]);
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Dynamic Data Fetcher from Django Backend
   const loadDynamicCatalog = useCallback(async () => {
     setIsSyncing(true);
@@ -58,22 +88,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
         fetchCatalogCategories(),
       ]);
 
-      console.log('[HomeScreen] liveProducts received count:', liveProducts?.length);
-      console.log('[HomeScreen] liveCategories count:', liveCategories?.length);
-
       if (liveProducts && liveProducts.length > 0) {
         setProducts(liveProducts);
       } else {
-        setProducts([]);
+        // If live products array was empty or failed, ensure cached products are preserved
+        const cached = await getCachedCatalogProducts();
+        if (cached && cached.length > 0) {
+          setProducts(cached);
+        }
       }
 
       if (liveCategories && liveCategories.length > 0) {
         setCategories([DEFAULT_CATEGORY, ...liveCategories]);
       } else {
-        setCategories([DEFAULT_CATEGORY]);
+        const cachedCats = await getCachedCatalogCategories();
+        if (cachedCats && cachedCats.length > 0) {
+          setCategories([DEFAULT_CATEGORY, ...cachedCats]);
+        }
       }
     } catch (e) {
       console.warn('Backend fetch notice:', e);
+      const cached = await getCachedCatalogProducts();
+      if (cached && cached.length > 0) {
+        setProducts(cached);
+      }
     } finally {
       setIsSyncing(false);
     }

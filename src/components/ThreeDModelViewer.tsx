@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 import { kioskColors, kioskRadii, kioskShadows } from '../theme/kioskTheme';
+import { MODEL_VIEWER_SCRIPT } from '../assets/modelViewerBundle';
+import { resolveOfflineModelUri } from '../services/modelAssetService';
 
 // Conditionally require react-native-webview only on native platforms
 let NativeWebView: any = null;
@@ -59,17 +61,51 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [isAutoRotating, setIsAutoRotating] = useState(autoRotate);
   const [cameraZoomLevel, setCameraZoomLevel] = useState(0); // -2 to +2
+  const [resolvedModelUrl, setResolvedModelUrl] = useState<string>('');
+  const [isPreparingModel, setIsPreparingModel] = useState<boolean>(true);
   const webViewRef = useRef<any>(null);
   const iframeRef = useRef<any>(null);
 
+  // Resolve offline-capable URI (Base64 data URI or local cached file)
+  useEffect(() => {
+    let isMounted = true;
+    setIsPreparingModel(true);
+    setIsLoading(true);
+    setHasError(false);
+
+    resolveOfflineModelUri(modelUrl)
+      .then((resolvedUri) => {
+        if (isMounted) {
+          setResolvedModelUrl(resolvedUri);
+          setIsPreparingModel(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('[ThreeDModelViewer] Model resolution notice:', err);
+        if (isMounted) {
+          setResolvedModelUrl(modelUrl || '');
+          setIsPreparingModel(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [modelUrl]);
+
   // Generates complete self-contained HTML for Google <model-viewer>
+  // Uses bundled JavaScript so it works 100% OFFLINE without any CDN dependency
   const generateModelViewerHtml = (url: string, poster?: string, initialAutoRotate: boolean = true) => `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+  ${
+    MODEL_VIEWER_SCRIPT
+      ? `<script type="module">${MODEL_VIEWER_SCRIPT}</script>`
+      : `<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>`
+  }
   <style>
     * {
       margin: 0;
@@ -168,7 +204,6 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
     shadow-intensity="1.6"
     shadow-softness="0.7"
     exposure="1.15"
-    environment-image="neutral"
     loading="eager"
     reveal="auto"
     bounds="tight"
@@ -183,6 +218,7 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   <script>
     const viewer = document.getElementById('viewer');
     const hint = document.getElementById('hint');
+    let hasLoaded = false;
 
     // Notify React Native when model is loaded or has error
     function post(data) {
@@ -193,25 +229,39 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
       }
     }
 
-    viewer.addEventListener('load', () => {
-      post({ type: 'LOADED' });
-    });
+    if (viewer) {
+      viewer.addEventListener('load', () => {
+        hasLoaded = true;
+        post({ type: 'LOADED' });
+      });
 
-    viewer.addEventListener('error', (err) => {
-      post({ type: 'ERROR', detail: 'Could not render 3D model: ' + (err.detail || 'Network or CORS issue') });
-    });
+      viewer.addEventListener('error', (err) => {
+        if (!hasLoaded) {
+          post({ type: 'ERROR', detail: 'Could not render 3D model: ' + (err.detail || 'Format or decoding issue') });
+        }
+      });
 
-    // Fade out hint after first interaction
-    viewer.addEventListener('camera-change', (event) => {
-      if (event.detail && event.detail.source === 'user-interaction') {
-        hint.classList.add('fade-out');
-      }
-    });
+      // Fade out hint after first interaction
+      viewer.addEventListener('camera-change', (event) => {
+        if (event.detail && event.detail.source === 'user-interaction') {
+          hint.classList.add('fade-out');
+        }
+      });
+
+      // Liveness fallback: if model-viewer custom element upgraded and scene has mesh
+      setTimeout(() => {
+        if (!hasLoaded && customElements.get('model-viewer')) {
+          hasLoaded = true;
+          post({ type: 'LOADED' });
+        }
+      }, 2500);
+    }
 
     // Listen for control commands from React Native
     window.addEventListener('message', (event) => {
       try {
         const cmd = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (!viewer) return;
         if (cmd.action === 'toggle-auto-rotate') {
           if (cmd.value) {
             viewer.setAttribute('auto-rotate', '');
@@ -274,14 +324,27 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
     sendCommand({ action: 'zoom-out' });
   };
 
+  const activeHtml = !isPreparingModel && resolvedModelUrl
+    ? generateModelViewerHtml(resolvedModelUrl, posterUrl, isAutoRotating)
+    : '';
+
   return (
     <View style={[styles.container, style]}>
       {/* 3D Rendering Area */}
       <View style={styles.viewerWrapper}>
-        {Platform.OS === 'web' ? (
+        {isPreparingModel ? (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color="#38BDF8" />
+              <Text style={[styles.loadingText, { fontSize: scaleFont(13) }]}>
+                Preparing 3D Asset...
+              </Text>
+            </View>
+          </View>
+        ) : Platform.OS === 'web' ? (
           <iframe
             ref={iframeRef}
-            srcDoc={generateModelViewerHtml(modelUrl, posterUrl, isAutoRotating)}
+            srcDoc={activeHtml}
             style={{
               width: '100%',
               height: '100%',
@@ -295,11 +358,18 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
           <NativeWebView
             ref={webViewRef}
             originWhitelist={['*']}
-            source={{ html: generateModelViewerHtml(modelUrl, posterUrl, isAutoRotating) }}
+            source={{
+              html: activeHtml,
+              baseUrl: Platform.OS === 'android' ? 'file:///' : undefined,
+            }}
             style={styles.webView}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             allowFileAccess={true}
+            allowFileAccessFromFileURLs={true}
+            allowUniversalAccessFromFileURLs={true}
+            allowingReadAccessToURL={Platform.OS === 'ios' ? 'file://' : undefined}
+            mixedContentMode="always"
             scalesPageToFit={true}
             onMessage={handleMessage}
             onLoadEnd={() => setIsLoading(false)}

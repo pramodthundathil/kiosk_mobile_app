@@ -14,6 +14,7 @@ import {
 import { Touchpad } from 'lucide-react-native';
 import { KioskResponsiveMetrics, KioskScreensaver } from '../types/kiosk';
 import { getCachedScreensavers } from '../services/api';
+import { mediaCacheService } from '../services/mediaCacheService';
 
 interface AttractLoopProps {
   metrics: KioskResponsiveMetrics;
@@ -66,10 +67,14 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
   const orientationParam = isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
   const defaultFallback = isLandscape ? DEFAULT_LANDSCAPE_SCREENSAVERS : DEFAULT_PORTRAIT_SCREENSAVERS;
 
-  // Filter initial screensavers matching current orientation
-  const initialMatching = initialScreensavers?.filter(
-    (s) => !s.orientation || s.orientation === orientationParam || s.orientation === 'BOTH'
-  );
+  // Filter initial screensavers matching current orientation and resolve offline disk URIs
+  const initialMatching = initialScreensavers
+    ?.filter((s) => !s.orientation || s.orientation === orientationParam || s.orientation === 'BOTH')
+    .map((s) => ({
+      ...s,
+      image: mediaCacheService.resolveCachedImageUri(s.image) || s.image,
+      image_url: mediaCacheService.resolveCachedImageUri(s.image_url) || s.image_url,
+    }));
 
   const [slides, setSlides] = useState<(KioskScreensaver | Partial<KioskScreensaver>)[]>(
     initialMatching && initialMatching.length > 0 ? initialMatching : defaultFallback
@@ -146,7 +151,12 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
         (s) => !s.orientation || s.orientation === targetOri || s.orientation === 'BOTH'
       );
       if (matching.length > 0) {
-        setSlides(matching);
+        const resolved = matching.map((s) => ({
+          ...s,
+          image: mediaCacheService.resolveCachedImageUri(s.image) || s.image,
+          image_url: mediaCacheService.resolveCachedImageUri(s.image_url) || s.image_url,
+        }));
+        setSlides(resolved);
         setSlideIdx0(0);
         setSlideIdx1(matching.length > 1 ? 1 : 0);
         return;
@@ -156,7 +166,12 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
     // If initialScreensavers is empty or not passed, load cached screensavers from disk immediately
     getCachedScreensavers(targetOri).then((cached) => {
       if (isMounted && cached && cached.length > 0) {
-        setSlides(cached);
+        const resolved = cached.map((s) => ({
+          ...s,
+          image: mediaCacheService.resolveCachedImageUri(s.image) || s.image,
+          image_url: mediaCacheService.resolveCachedImageUri(s.image_url) || s.image_url,
+        }));
+        setSlides(resolved);
         setSlideIdx0(0);
         setSlideIdx1(cached.length > 1 ? 1 : 0);
       }
@@ -177,12 +192,14 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
       const safeIdx = ((idx % slideList.length) + slideList.length) % slideList.length;
       const slide = slideList[safeIdx];
       const raw = slide?.image_url || slide?.image;
-      if (raw && !failedUris[raw]) {
+      if (raw) {
+        const resolved = mediaCacheService.resolveCachedImageUri(raw);
+        if (resolved) return resolved;
         return raw;
       }
       return defaultFallback[safeIdx % defaultFallback.length].image_url!;
     },
-    [failedUris, defaultFallback]
+    [defaultFallback]
   );
 
   // Smooth Crossfade Transition (zero black gap, fully fit to screen, no overflow, no contain)
@@ -291,9 +308,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
         resizeMode="stretch"
         fadeDuration={0}
         onError={() => {
-          if (uri0) {
-            setFailedUris((prev) => ({ ...prev, [uri0]: true }));
-          }
+          console.warn('[AttractLoop] Slide notice loading uri0:', uri0);
         }}
       />
     </Animated.View>
@@ -318,9 +333,7 @@ export const AttractLoop: React.FC<AttractLoopProps> = ({
         resizeMode="stretch"
         fadeDuration={0}
         onError={() => {
-          if (uri1) {
-            setFailedUris((prev) => ({ ...prev, [uri1]: true }));
-          }
+          console.warn('[AttractLoop] Slide notice loading uri1:', uri1);
         }}
       />
     </Animated.View>

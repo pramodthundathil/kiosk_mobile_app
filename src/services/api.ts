@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { KioskProduct, KioskCategory, KioskScreensaver } from '../types/kiosk';
+import { MOCK_CATEGORIES } from '../mock/kioskData';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
 import {
   shouldIdentifyLocation,
@@ -9,15 +10,13 @@ import {
   saveRecordedLocation,
   DeviceCoordinates,
 } from '../utils/locationService';
-
-
+import { mediaCacheService } from './mediaCacheService';
 
 // Production backend server endpoint
 export const PRODUCTION_SERVER_URL = 'https://excel.byteboot.in';
 export const DEFAULT_SERVER_URL = PRODUCTION_SERVER_URL;
 
 export interface KioskAuthResponse {
-
   access: string;
   refresh: string;
   kiosk_id?: string;
@@ -34,54 +33,11 @@ export const KIOSK_CONTENT_VERSION_KEY = '@kiosk_content_version';
 export const KIOSK_CACHED_PRODUCTS_KEY = '@kiosk_cached_products';
 export const KIOSK_CACHED_CATEGORIES_KEY = '@kiosk_cached_categories';
 export const KIOSK_LAST_SYNC_TIME_KEY = '@kiosk_last_sync_time';
+export const KIOSK_IS_AUTHENTICATED_KEY = '@kiosk_is_authenticated';
+export const KIOSK_SAVED_CREDENTIALS_KEY = '@kiosk_saved_credentials';
 
-// Safe Storage abstraction to prevent "Native module is null" crashes on Web/Expo Go
-const memoryStorageCache: Record<string, string> = {};
-
-export async function storageGetItem(key: string): Promise<string | null> {
-  try {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage.getItem(key);
-    }
-    const val = await AsyncStorage.getItem(key);
-    return val;
-  } catch (e) {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try { return window.localStorage.getItem(key); } catch (err) {}
-    }
-    return memoryStorageCache[key] || null;
-  }
-}
-
-export async function storageSetItem(key: string, value: string): Promise<void> {
-  try {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(key, value);
-      return;
-    }
-    await AsyncStorage.setItem(key, value);
-  } catch (e) {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.setItem(key, value); } catch (err) {}
-    }
-    memoryStorageCache[key] = value;
-  }
-}
-
-export async function storageRemoveItem(key: string): Promise<void> {
-  try {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(key);
-      return;
-    }
-    await AsyncStorage.removeItem(key);
-  } catch (e) {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.removeItem(key); } catch (err) {}
-    }
-    delete memoryStorageCache[key];
-  }
-}
+import { storageGetItem, storageSetItem, storageRemoveItem } from '../utils/storage';
+export { storageGetItem, storageSetItem, storageRemoveItem };
 
 export async function getSavedServerUrl(): Promise<string> {
   return PRODUCTION_SERVER_URL;
@@ -175,6 +131,11 @@ export async function loginKioskDevice(
       if (res.json.refresh) await storageSetItem(KIOSK_REFRESH_KEY, res.json.refresh);
       await storageSetItem(KIOSK_SERVER_URL_KEY, targetUrl);
       await storageSetItem(KIOSK_INFO_KEY, JSON.stringify(res.json));
+      await storageSetItem(KIOSK_IS_AUTHENTICATED_KEY, 'true');
+      await storageSetItem(
+        KIOSK_SAVED_CREDENTIALS_KEY,
+        JSON.stringify({ macAddress, deviceSecret, serverUrl: targetUrl })
+      );
 
       return { success: true, data: res.json };
     } else {
@@ -202,6 +163,125 @@ export async function getStoredKioskToken(): Promise<string | null> {
     return token;
   } catch (e) {
     return null;
+  }
+}
+
+/**
+ * Returns whether the kiosk device is currently in an authenticated state.
+ * Persists across device restarts, reboots, and crashes so the kiosk never drops to logout.
+ */
+export async function isKioskAuthenticated(): Promise<boolean> {
+  try {
+    const isAuth = await storageGetItem(KIOSK_IS_AUTHENTICATED_KEY);
+    if (isAuth === 'true') return true;
+
+    // Fallback: check if valid device info or token exists
+    const info = await storageGetItem(KIOSK_INFO_KEY);
+    if (info) {
+      const parsed = JSON.parse(info);
+      if (parsed.kiosk_id || parsed.device_id || parsed.access) {
+        await storageSetItem(KIOSK_IS_AUTHENTICATED_KEY, 'true');
+        return true;
+      }
+    }
+
+    const token = await storageGetItem(KIOSK_TOKEN_KEY);
+    if (token && !token.startsWith('local_session_')) {
+      await storageSetItem(KIOSK_IS_AUTHENTICATED_KEY, 'true');
+      return true;
+    }
+
+    const creds = await storageGetItem(KIOSK_SAVED_CREDENTIALS_KEY);
+    if (creds) {
+      const parsed = JSON.parse(creds);
+      if (parsed.deviceSecret) {
+        await storageSetItem(KIOSK_IS_AUTHENTICATED_KEY, 'true');
+        return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
+}
+
+/**
+ * Verifies and refreshes the kiosk session in the background when network is available.
+ * If offline or server unreachable, KEEPS the authenticated state intact so the kiosk can run offline.
+ */
+export async function ensureKioskSessionValid(): Promise<boolean> {
+  try {
+    const token = await storageGetItem(KIOSK_TOKEN_KEY);
+    const refreshToken = await storageGetItem(KIOSK_REFRESH_KEY);
+    const serverUrl = await getSavedServerUrl();
+    const cleanUrl = serverUrl.replace(/\/+$/, '');
+
+    let needRefresh = false;
+    if (token) {
+      const payload = parseJwtPayload(token);
+      // Refresh if expired or expiring within 15 minutes
+      if (payload && payload.exp && Date.now() >= (payload.exp - 900) * 1000) {
+        needRefresh = true;
+      }
+    } else {
+      needRefresh = true;
+    }
+
+    if (!needRefresh) {
+      return true;
+    }
+
+    // Attempt token refresh via refresh endpoint
+    if (refreshToken) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const refreshRes = await fetch(`${cleanUrl}/api/token/refresh/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ refresh: refreshToken }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (refreshRes.ok) {
+          const json = await refreshRes.json();
+          if (json.access) {
+            await storageSetItem(KIOSK_TOKEN_KEY, json.access);
+            if (json.refresh) await storageSetItem(KIOSK_REFRESH_KEY, json.refresh);
+            console.log('[ensureKioskSessionValid] JWT access token refreshed successfully.');
+            return true;
+          }
+        }
+      } catch (refErr) {
+        // Network offline or failed - stay authenticated offline
+      }
+    }
+
+    // Fallback: auto re-authenticate using saved credentials if available
+    const savedCredsRaw = await storageGetItem(KIOSK_SAVED_CREDENTIALS_KEY);
+    if (savedCredsRaw) {
+      try {
+        const creds = JSON.parse(savedCredsRaw);
+        if (creds.macAddress && creds.deviceSecret) {
+          const loginRes = await tryFetchLogin(creds.serverUrl || cleanUrl, creds.macAddress, creds.deviceSecret);
+          if (loginRes.ok && loginRes.json.access) {
+            await storageSetItem(KIOSK_TOKEN_KEY, loginRes.json.access);
+            if (loginRes.json.refresh) await storageSetItem(KIOSK_REFRESH_KEY, loginRes.json.refresh);
+            await storageSetItem(KIOSK_INFO_KEY, JSON.stringify(loginRes.json));
+            console.log('[ensureKioskSessionValid] Auto re-authentication successful via saved credentials.');
+            return true;
+          }
+        }
+      } catch (authErr) {
+        // Network offline or failed - stay authenticated offline
+      }
+    }
+
+    // Always maintain authenticated state for physical kiosk even if offline
+    return true;
+  } catch (err) {
+    console.warn('[ensureKioskSessionValid] Notice:', err);
+    return true;
   }
 }
 
@@ -294,7 +374,18 @@ export async function getCachedCatalogProducts(): Promise<KioskProduct[]> {
     const raw = await storageGetItem(KIOSK_CACHED_PRODUCTS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((p: KioskProduct) => ({
+          ...p,
+          image: mediaCacheService.resolveCachedImageUri(p.image),
+          mediaAssets: Array.isArray(p.mediaAssets)
+            ? p.mediaAssets.map((m) => ({
+                ...m,
+                file_url: mediaCacheService.resolveCachedImageUri(m.file_url),
+              }))
+            : [],
+        }));
+      }
     }
   } catch (e) {}
   return [];
@@ -305,10 +396,15 @@ export async function getCachedCatalogCategories(): Promise<KioskCategory[]> {
     const raw = await storageGetItem(KIOSK_CACHED_CATEGORIES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((c: KioskCategory) => ({
+          ...c,
+          image: c.image ? mediaCacheService.resolveCachedImageUri(c.image) : undefined,
+        }));
+      }
     }
   } catch (e) {}
-  return [];
+  return MOCK_CATEGORIES;
 }
 
 export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceId?: string): Promise<KioskProduct[]> {
@@ -333,9 +429,6 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
     const qs = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
     const endpoint = `${cleanUrl}/api/products/${qs}`;
 
-    console.log('[fetchCatalogProducts] Resolved kioskId:', kioskId, 'deviceId:', deviceId);
-    console.log('[fetchCatalogProducts] Request endpoint:', endpoint, 'Token exists:', !!token);
-
     const headers: Record<string, string> = {
       'Accept': 'application/json',
     };
@@ -348,8 +441,6 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
         const isExpired = Date.now() >= payload.exp * 1000;
         if (!isExpired) {
           canSendToken = true;
-        } else {
-          console.log('[fetchCatalogProducts] Stored JWT token has expired, proceeding with kiosk_id query parameter');
         }
       } else {
         canSendToken = true;
@@ -361,33 +452,27 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     let response = await fetch(endpoint, { headers, signal: controller.signal });
     clearTimeout(timeoutId);
 
-    console.log('[fetchCatalogProducts] Initial response status:', response.status, response.ok);
-
     // If server rejected the Kiosk JWT token (401 or 403), retry without Authorization header using query params
     if ((response.status === 401 || response.status === 403) && headers['Authorization']) {
-      console.log(`[fetchCatalogProducts] HTTP ${response.status} auth rejection received, retrying without Authorization header...`);
       const retryController = new AbortController();
-      const retryTimeout = setTimeout(() => retryController.abort(), 8000);
+      const retryTimeout = setTimeout(() => retryController.abort(), 4000);
       response = await fetch(endpoint, {
         headers: { 'Accept': 'application/json' },
         signal: retryController.signal,
       });
       clearTimeout(retryTimeout);
-      console.log('[fetchCatalogProducts] Retry response status:', response.status, response.ok);
     }
 
     if (!response.ok) {
-      console.warn('[fetchCatalogProducts] Response not OK, falling back to cached products');
       return await getCachedCatalogProducts();
     }
 
     const json = await response.json();
-    console.log('[fetchCatalogProducts] Parsed JSON is array:', Array.isArray(json), 'Count:', Array.isArray(json) ? json.length : json);
     if (!Array.isArray(json)) return await getCachedCatalogProducts();
 
     const mapped: KioskProduct[] = json.map((p: any) => {
@@ -430,6 +515,12 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
       const catName = p.category?.name || 'General Product';
       const categoryKey = catCode || catId || 'all';
 
+      // Sub-Category extraction
+      const subCatCode = p.sub_category?.code ? p.sub_category.code.toLowerCase() : '';
+      const subCatId = p.sub_category?.id ? String(p.sub_category.id) : (p.sub_category_id ? String(p.sub_category_id) : '');
+      const subCatName = p.sub_category?.name || '';
+      const subCategoryKey = subCatCode || subCatId || '';
+
       // Fallback image if product image is empty
       const finalImage =
         fixedImg ||
@@ -450,6 +541,11 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
         categoryId: catId,
         categoryCode: p.category?.code || '',
         categoryName: catName,
+        subCategory: subCategoryKey,
+        subCategoryId: subCatId,
+        subCategoryCode: subCatCode,
+        subCategoryName: subCatName,
+        parentId: p.parent_id ? String(p.parent_id) : undefined,
         description: p.description || '',
         image: finalImage,
         specifications: specs,
@@ -462,7 +558,32 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
     });
 
     if (mapped.length > 0) {
-      await storageSetItem(KIOSK_CACHED_PRODUCTS_KEY, JSON.stringify(mapped));
+      // Resolve any available offline cached media URIs
+      const resolved = mapped.map((p) => ({
+        ...p,
+        image: mediaCacheService.resolveCachedImageUri(p.image),
+        mediaAssets: Array.isArray(p.mediaAssets)
+          ? p.mediaAssets.map((m) => ({
+              ...m,
+              file_url: mediaCacheService.resolveCachedImageUri(m.file_url),
+            }))
+          : [],
+      }));
+
+      // Cache all product images to local disk storage in background
+      const imgUrls: string[] = [];
+      mapped.forEach((p) => {
+        if (p.image) imgUrls.push(p.image);
+        if (Array.isArray(p.mediaAssets)) {
+          p.mediaAssets.forEach((m) => {
+            if (m.file_url) imgUrls.push(m.file_url);
+          });
+        }
+      });
+      mediaCacheService.cacheBatchImages(imgUrls).catch(() => {});
+
+      await storageSetItem(KIOSK_CACHED_PRODUCTS_KEY, JSON.stringify(resolved));
+      return resolved;
     }
     return mapped;
   } catch (err) {
@@ -478,7 +599,7 @@ export async function fetchCatalogCategories(): Promise<KioskCategory[]> {
     const endpoint = `${cleanUrl}/api/products/categories/`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
 
     const response = await fetch(endpoint, { signal: controller.signal });
     clearTimeout(timeoutId);
@@ -488,17 +609,60 @@ export async function fetchCatalogCategories(): Promise<KioskCategory[]> {
     const json = await response.json();
     if (!Array.isArray(json)) return await getCachedCatalogCategories();
 
-    const mappedCats: KioskCategory[] = json.map((c: any) => ({
-      id: c.code ? c.code.toLowerCase() : String(c.id),
-      name: c.name || 'Category',
-      code: c.code || 'CAT',
-      icon: 'grid',
-      description: c.description || '',
-      image: c.image_url ? sanitizeMediaUrl(c.image_url, cleanUrl) : undefined,
-    }));
+    const mappedCats: KioskCategory[] = json.map((c: any) => {
+      const catKey = c.code ? c.code.toLowerCase() : String(c.id);
+
+      const mappedSubs = Array.isArray(c.subcategories)
+        ? c.subcategories.map((s: any) => ({
+            id: s.code ? s.code.toLowerCase() : String(s.id),
+            name: s.name || 'Sub-Category',
+            code: s.code || 'SUBCAT',
+            description: s.description || '',
+            image: s.image_url ? sanitizeMediaUrl(s.image_url, cleanUrl) : undefined,
+            categoryId: catKey,
+            categoryName: c.name || '',
+            categoryCode: c.code || '',
+            productsCount: s.products_count || 0,
+          }))
+        : [];
+
+      return {
+        id: catKey,
+        name: c.name || 'Category',
+        code: c.code || 'CAT',
+        icon: 'grid',
+        description: c.description || '',
+        image: c.image_url ? sanitizeMediaUrl(c.image_url, cleanUrl) : undefined,
+        subcategories: mappedSubs,
+        subcategoriesCount: mappedSubs.length,
+        productsCount: c.products_count || 0,
+      };
+    });
 
     if (mappedCats.length > 0) {
-      await storageSetItem(KIOSK_CACHED_CATEGORIES_KEY, JSON.stringify(mappedCats));
+      const resolved = mappedCats.map((c) => ({
+        ...c,
+        image: c.image ? mediaCacheService.resolveCachedImageUri(c.image) : undefined,
+        subcategories: Array.isArray(c.subcategories)
+          ? c.subcategories.map((s) => ({
+              ...s,
+              image: s.image ? mediaCacheService.resolveCachedImageUri(s.image) : undefined,
+            }))
+          : [],
+      }));
+
+      const catImgs: string[] = [];
+      mappedCats.forEach((c) => {
+        if (c.image) catImgs.push(c.image);
+        if (Array.isArray(c.subcategories)) {
+          c.subcategories.forEach((s) => {
+            if (s.image) catImgs.push(s.image);
+          });
+        }
+      });
+      mediaCacheService.cacheBatchImages(catImgs).catch(() => {});
+      await storageSetItem(KIOSK_CACHED_CATEGORIES_KEY, JSON.stringify(resolved));
+      return resolved;
     }
     return mappedCats;
   } catch (err) {
@@ -506,12 +670,15 @@ export async function fetchCatalogCategories(): Promise<KioskCategory[]> {
   }
 }
 
+
 export async function logoutKioskDevice(): Promise<void> {
   try {
     stopHeartbeatRunner();
     await storageRemoveItem(KIOSK_TOKEN_KEY);
     await storageRemoveItem(KIOSK_REFRESH_KEY);
     await storageRemoveItem(KIOSK_INFO_KEY);
+    await storageRemoveItem(KIOSK_IS_AUTHENTICATED_KEY);
+    await storageRemoveItem(KIOSK_SAVED_CREDENTIALS_KEY);
   } catch (e) {}
 }
 
@@ -537,7 +704,7 @@ export async function getCachedScreensavers(orientation?: string): Promise<Kiosk
       if (Array.isArray(parsed) && parsed.length > 0) {
         let items: KioskScreensaver[] = parsed.map((item: any) => {
           const rawImg = item.image_url || item.image || '';
-          const fixedImg = sanitizeMediaUrl(rawImg, activeBaseUrl);
+          const fixedImg = mediaCacheService.resolveCachedImageUri(rawImg) || sanitizeMediaUrl(rawImg, activeBaseUrl);
           return {
             ...item,
             image: fixedImg,
@@ -585,7 +752,7 @@ export async function fetchScreensavers(orientation?: string): Promise<KioskScre
     
     for (const endpoint of [primaryEndpoint, fallbackEndpoint]) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
 
       try {
         const response = await fetch(endpoint, { signal: controller.signal });
@@ -625,12 +792,26 @@ export async function fetchScreensavers(orientation?: string): Promise<KioskScre
               }
             }
 
+            // Resolve offline URIs and trigger background caching to disk
+            const resolved = mapped.map((s) => {
+              const resImg = mediaCacheService.resolveCachedImageUri(s.image) || s.image;
+              return {
+                ...s,
+                image: resImg,
+                image_url: resImg,
+              };
+            });
+
             // Always persist latest downloaded screensavers to orientation-specific cache and general cache
-            await storageSetItem(orientationCacheKey, JSON.stringify(mapped));
-            await storageSetItem(KIOSK_SCREENSAVERS_CACHE_KEY, JSON.stringify(mapped));
+            await storageSetItem(orientationCacheKey, JSON.stringify(resolved));
+            await storageSetItem(KIOSK_SCREENSAVERS_CACHE_KEY, JSON.stringify(resolved));
             await storageSetItem(KIOSK_SCREENSAVERS_LAST_FETCHED_KEY, String(Date.now()));
 
-            return mapped;
+            // Cache screensaver images to local device disk storage immediately in background
+            const ssImgs = mapped.map((s) => s.image_url || s.image).filter(Boolean);
+            mediaCacheService.cacheBatchImages(ssImgs).catch(() => {});
+
+            return resolved;
           }
         }
       } catch (err) {

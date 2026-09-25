@@ -19,6 +19,18 @@ export interface KioskResponsiveMetrics {
   };
 }
 
+export interface KioskSubCategory {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  image?: string;
+  categoryId: string;
+  categoryName?: string;
+  categoryCode?: string;
+  productsCount?: number;
+}
+
 export interface KioskCategory {
   id: string;
   name: string;
@@ -27,6 +39,9 @@ export interface KioskCategory {
   description?: string;
   color?: string;
   image?: string; // Optional category image URL from backend
+  subcategories?: KioskSubCategory[];
+  subcategoriesCount?: number;
+  productsCount?: number;
 }
 
 export interface ProductMediaAsset {
@@ -47,6 +62,11 @@ export interface KioskProduct {
   categoryId?: string;
   categoryCode?: string;
   categoryName?: string;
+  subCategory?: string;
+  subCategoryId?: string;
+  subCategoryCode?: string;
+  subCategoryName?: string;
+  parentId?: string;
   description: string;
   image: string;
   specifications: Record<string, string>;
@@ -61,6 +81,7 @@ export interface KioskProduct {
   techSheetUrl?: string;
   isPopular?: boolean;
 }
+
 
 export interface KioskScreensaver {
   id: string;

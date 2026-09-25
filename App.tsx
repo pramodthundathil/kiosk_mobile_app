@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator, Platform, NativeModules } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Platform, NativeModules, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { KioskLoginScreen } from './src/screens/KioskLoginScreen';
-import { VideoSplashScreen } from './src/components/VideoSplashScreen';
+import { AnimatedSplashScreen } from './src/components/AnimatedSplashScreen';
 import { AttractLoop } from './src/components/AttractLoop';
 import { InactivityTracker } from './src/components/InactivityTracker';
 import { KioskErrorBoundary } from './src/components/KioskErrorBoundary';
@@ -18,7 +18,10 @@ import {
   startHeartbeatRunner,
   stopHeartbeatRunner,
   parseJwtPayload,
+  isKioskAuthenticated,
+  ensureKioskSessionValid,
 } from './src/services/api';
+import { mediaCacheService } from './src/services/mediaCacheService';
 import { syncService } from './src/services/syncService';
 import { updateService } from './src/services/updateService';
 import { Image } from 'react-native';
@@ -36,6 +39,9 @@ export default function App() {
 
     const initApp = async () => {
       const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
+
+      // 0. Initialize offline media cache storage
+      await mediaCacheService.initMediaCache().catch(() => {});
 
       // 1. Immediately load local cached screensavers from disk so they are available without delay
       const cached = await getCachedScreensavers(currentOrientation);
@@ -59,24 +65,16 @@ export default function App() {
         }
       }).catch(() => {});
 
-      const token = await getStoredKioskToken();
-      if (token && !token.startsWith('local_session_')) {
-        const payload = parseJwtPayload(token);
-        if (payload && payload.exp && Date.now() >= payload.exp * 1000) {
-          // Token expired -> purge stored session and require fresh authentication
-          await logoutKioskDevice();
-          setIsAuthenticated(false);
-        } else {
-          setIsAuthenticated(true);
-        }
-      } else {
-        // No valid token or legacy offline session -> clear and enforce login
-        if (token) {
-          await logoutKioskDevice();
-        }
-        setIsAuthenticated(false);
-      }
+      // 3. Persistent Kiosk Authentication:
+      // Guarantee kiosk stays logged in across device restarts, reboots, crashes, and network loss!
+      const authenticated = await isKioskAuthenticated();
+      setIsAuthenticated(authenticated);
       setIsCheckingAuth(false);
+
+      if (authenticated) {
+        // Silently verify/refresh token in background without blocking or logging out
+        ensureKioskSessionValid().catch(() => {});
+      }
 
       // Start 10-second hardware heartbeat runner immediately on device boot/launch
       // Monitors hardware availability via MAC address even on dynamic IP networks
@@ -160,12 +158,24 @@ export default function App() {
             />
           )}
 
-          {/* Video Splash Animation Overlay */}
+          {/* Animated Splash Screen Overlay */}
           {showSplash ? (
-            <VideoSplashScreen onFinish={() => setShowSplash(false)} />
+            <AnimatedSplashScreen onFinish={() => setShowSplash(false)} />
           ) : isCheckingAuth ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#00F0FF" />
+              <Image
+                source={require('./assets/excel_since_logo.png')}
+                style={styles.loadingCrestLogo}
+                resizeMode="contain"
+              />
+              <Image
+                source={require('./assets/excel_corporate_logo.png')}
+                style={styles.loadingCorporateLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.loadingTitle}>Excel Earthing Kiosk App</Text>
+              <Text style={styles.loadingSub}>Initializing Terminal & Security...</Text>
+              <ActivityIndicator size="large" color="#FFC107" style={{ marginTop: 18 }} />
             </View>
           ) : isAuthenticated ? (
             /* Product Details & Full Catalog: Accessible ONLY when authenticated/logged in */
@@ -187,8 +197,36 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#070A11',
+    backgroundColor: '#050811',
+    paddingHorizontal: 24,
+  },
+  loadingCrestLogo: {
+    width: 140,
+    height: 135,
+    marginBottom: 12,
+  },
+  loadingCorporateLogo: {
+    width: 280,
+    height: 67,
+    marginBottom: 10,
+  },
+  loadingTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    letterSpacing: 1.5,
+    textAlign: 'center',
+  },
+  loadingSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
