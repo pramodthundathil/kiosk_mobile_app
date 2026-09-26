@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator, Platform, NativeModules, Text } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Platform, NativeModules, Text, AppState, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -24,7 +24,6 @@ import {
 import { mediaCacheService } from './src/services/mediaCacheService';
 import { syncService } from './src/services/syncService';
 import { updateService } from './src/services/updateService';
-import { Image } from 'react-native';
 
 export default function App() {
   const responsiveMetrics = useKioskResponsive();
@@ -54,18 +53,7 @@ export default function App() {
         });
       }
 
-      // 2. Refresh screensavers from backend in background without blocking UI
-      fetchScreensavers(currentOrientation).then((fetched) => {
-        if (fetched && fetched.length > 0) {
-          setScreensavers(fetched);
-          fetched.forEach((s) => {
-            const uri = s.image_url || s.image;
-            if (uri) Image.prefetch(uri).catch(() => {});
-          });
-        }
-      }).catch(() => {});
-
-      // 3. Persistent Kiosk Authentication:
+      // 2. Persistent Kiosk Authentication:
       // Guarantee kiosk stays logged in across device restarts, reboots, crashes, and network loss!
       const authenticated = await isKioskAuthenticated();
       setIsAuthenticated(authenticated);
@@ -76,11 +64,14 @@ export default function App() {
         ensureKioskSessionValid().catch(() => {});
       }
 
-      // Start 10-second hardware heartbeat runner immediately on device boot/launch
+      // 3. Start 10-second hardware heartbeat runner immediately on device boot/launch
       // Monitors hardware availability via MAC address even on dynamic IP networks
       startHeartbeatRunner(10000);
 
-      // Initialize Remote App Update (OTA) engine with 30-minute check cycle and post-update status reporting
+      // 4. Start 3-hour periodic sync scheduler (and startup collection check in background)
+      syncService.startSyncScheduler();
+
+      // 5. Initialize Remote App Update (OTA) engine with 30-minute check cycle and post-update status reporting
       updateService.initUpdateService(30 * 60 * 1000);
 
       // Signal native isolated watchdog that the kiosk app has successfully initialized and is active
@@ -98,19 +89,29 @@ export default function App() {
 
     return () => {
       stopHeartbeatRunner();
+      syncService.stopSyncScheduler();
       updateService.stopUpdateService();
     };
   }, [responsiveMetrics.isLandscape]);
 
+  // Listen for AppState changes to trigger sync if returning after >= 3 hours
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        syncService.checkAndTriggerSync();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
-  // Dynamically update screensavers when background synchronization completes
+  // Dynamically update screensavers from local storage cache when background synchronization completes
   useEffect(() => {
     const unsubscribe = syncService.onContentSynced(() => {
       const currentOrientation = responsiveMetrics.isLandscape ? 'LANDSCAPE' : 'PORTRAIT';
-      fetchScreensavers(currentOrientation).then((fetched) => {
-        if (fetched && fetched.length > 0) {
-          setScreensavers(fetched);
-          fetched.forEach((s) => {
+      getCachedScreensavers(currentOrientation).then((cached) => {
+        if (cached && cached.length > 0) {
+          setScreensavers(cached);
+          cached.forEach((s) => {
             const uri = s.image_url || s.image;
             if (uri) Image.prefetch(uri).catch(() => {});
           });

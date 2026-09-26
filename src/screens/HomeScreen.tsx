@@ -5,6 +5,7 @@ import { PortraitKioskLayout } from '../components/PortraitKioskLayout';
 import { LandscapeKioskLayout } from '../components/LandscapeKioskLayout';
 import { ProductDetailScreen } from './ProductDetailScreen';
 import { CompanyInfoScreen } from './CompanyInfoScreen';
+import { MediaViewerScreen } from './MediaViewerScreen';
 import { KioskProduct, KioskCategory } from '../types/kiosk';
 import {
   fetchCatalogProducts,
@@ -25,7 +26,7 @@ const DEFAULT_CATEGORY: KioskCategory = {
   color: '#0D60AE',
 };
 
-type KioskActivePage = 'catalog' | 'product-detail' | 'company-info';
+type KioskActivePage = 'catalog' | 'product-detail' | 'company-info' | 'media-viewer';
 type KioskActiveTab = 'home' | 'products' | 'about';
 
 interface HomeScreenProps {
@@ -38,6 +39,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
   const { isLandscape } = responsiveMetrics;
 
   const [activePage, setActivePage] = useState<KioskActivePage>('catalog');
+  const [previousPage, setPreviousPage] = useState<'catalog' | 'product-detail'>('catalog');
   const [activeTab, setActiveTab] = useState<KioskActiveTab>('home');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -46,6 +48,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
     MOCK_CATEGORIES && MOCK_CATEGORIES.length > 0 ? MOCK_CATEGORIES : [DEFAULT_CATEGORY]
   );
   const [selectedProduct, setSelectedProduct] = useState<KioskProduct | null>(null);
+  const [selectedMediaAssetId, setSelectedMediaAssetId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Automatically dismiss modal/product and reset to catalog when screensaver activates
@@ -58,82 +61,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
     }
   }, [isScreensaverActive, activePage]);
 
-  // Immediate Offline Cache Hydration: Loads latest cached catalog instantly on mount
-  useEffect(() => {
-    let isMounted = true;
-    Promise.all([getCachedCatalogProducts(), getCachedCatalogCategories()])
-      .then(([cachedProds, cachedCats]) => {
-        if (isMounted) {
-          if (cachedProds && cachedProds.length > 0) {
-            setProducts(cachedProds);
-          }
-          if (cachedCats && cachedCats.length > 0) {
-            setCategories([DEFAULT_CATEGORY, ...cachedCats]);
-          }
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Dynamic Data Fetcher from Django Backend
-  const loadDynamicCatalog = useCallback(async () => {
-    setIsSyncing(true);
+  // Load content directly from Local Storage for instant, zero-latency kiosk performance
+  const loadFromLocalStorage = useCallback(async () => {
     try {
-      const [liveProducts, liveCategories] = await Promise.all([
-        fetchCatalogProducts(),
-        fetchCatalogCategories(),
+      const [cachedProds, cachedCats] = await Promise.all([
+        getCachedCatalogProducts(),
+        getCachedCatalogCategories(),
       ]);
 
-      if (liveProducts && liveProducts.length > 0) {
-        setProducts(liveProducts);
-      } else {
-        // If live products array was empty or failed, ensure cached products are preserved
-        const cached = await getCachedCatalogProducts();
-        if (cached && cached.length > 0) {
-          setProducts(cached);
-        }
+      if (cachedProds && cachedProds.length > 0) {
+        setProducts(cachedProds);
       }
-
-      if (liveCategories && liveCategories.length > 0) {
-        setCategories([DEFAULT_CATEGORY, ...liveCategories]);
-      } else {
-        const cachedCats = await getCachedCatalogCategories();
-        if (cachedCats && cachedCats.length > 0) {
-          setCategories([DEFAULT_CATEGORY, ...cachedCats]);
-        }
+      if (cachedCats && cachedCats.length > 0) {
+        setCategories([DEFAULT_CATEGORY, ...cachedCats]);
       }
     } catch (e) {
-      console.warn('Backend fetch notice:', e);
-      const cached = await getCachedCatalogProducts();
-      if (cached && cached.length > 0) {
-        setProducts(cached);
-      }
-    } finally {
-      setIsSyncing(false);
+      console.warn('[HomeScreen] Local storage load notice:', e);
     }
   }, []);
 
+  // 1. Instant loading from Local Storage when kiosk pops up
   useEffect(() => {
-    loadDynamicCatalog();
-  }, [loadDynamicCatalog]);
+    loadFromLocalStorage();
+  }, [loadFromLocalStorage]);
 
-  // Dynamically re-render assigned products and categories when background synchronization completes
+  // 2. Refresh from Local Storage whenever background synchronization completes (at startup or 3-hour interval)
   useEffect(() => {
-    const unsubscribe = syncService.onContentSynced((targetVersion, stats) => {
-      console.log(`[HomeScreen] Synchronization completed (v${targetVersion}). Reloading catalog products...`);
-      loadDynamicCatalog();
+    const unsubscribe = syncService.onContentSynced((targetVersion) => {
+      console.log(`[HomeScreen] Content synced (v${targetVersion}). Reloading from local storage...`);
+      loadFromLocalStorage();
     });
     return unsubscribe;
-  }, [loadDynamicCatalog]);
+  }, [loadFromLocalStorage]);
 
   const handleOpenProductDetail = (product: KioskProduct) => {
     analyticsService.trackProductClick(product, 'VIEW_DETAIL');
     setSelectedProduct(product);
     setActivePage('product-detail');
+  };
+
+  const handleOpenMediaViewer = (product: KioskProduct, initialAssetId?: string) => {
+    analyticsService.trackProductClick(product, 'MEDIA_VIEW', { asset_id: initialAssetId });
+    setSelectedProduct(product);
+    setSelectedMediaAssetId(initialAssetId || null);
+    setPreviousPage(activePage === 'product-detail' ? 'product-detail' : 'catalog');
+    setActivePage('media-viewer');
+  };
+
+  const handleBackFromMediaViewer = () => {
+    if (previousPage === 'product-detail' && selectedProduct) {
+      setActivePage('product-detail');
+    } else {
+      setActivePage('catalog');
+    }
   };
 
   const handleSelectProduct = (product: KioskProduct | null) => {
@@ -172,6 +152,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
     }
   };
 
+  // Dedicated Full-Page View: Fullscreen Interactive Media & 3D Viewer
+  if (activePage === 'media-viewer' && selectedProduct) {
+    return (
+      <MediaViewerScreen
+        product={selectedProduct}
+        initialAssetId={selectedMediaAssetId}
+        metrics={responsiveMetrics}
+        onBack={handleBackFromMediaViewer}
+      />
+    );
+  }
+
   // Dedicated Full-Page View: Product Detail
   if (activePage === 'product-detail' && selectedProduct) {
     return (
@@ -179,6 +171,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
         product={selectedProduct}
         metrics={responsiveMetrics}
         onBack={handleBackToCatalog}
+        onOpenMediaViewer={handleOpenMediaViewer}
       />
     );
   }
@@ -209,6 +202,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
           onSearchChange={handleSearchChange}
           onSelectProduct={handleSelectProduct}
           onOpenFullDetail={handleOpenProductDetail}
+          onOpenMediaViewer={handleOpenMediaViewer}
         />
       ) : (
         <PortraitKioskLayout
@@ -224,6 +218,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
           onSelectProduct={handleOpenProductDetail}
           onSelectTab={handleSelectTab}
           onLogout={onLogout}
+          onOpenMediaViewer={handleOpenMediaViewer}
         />
       )}
     </View>

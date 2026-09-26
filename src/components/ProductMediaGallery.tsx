@@ -29,6 +29,7 @@ interface ProductMediaGalleryProps {
   height?: number;
   scaleFont?: (size: number, min?: number) => number;
   scaleSpacing?: (size: number) => number;
+  onOpenMediaViewer?: (asset?: ProductMediaAsset) => void;
 }
 
 type MediaTabType = 'photo' | 'three_d' | 'video' | 'brochure';
@@ -70,6 +71,7 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
   height = 320,
   scaleFont = (s) => s,
   scaleSpacing = (s) => s,
+  onOpenMediaViewer,
 }) => {
   const mediaAssets = product.mediaAssets || [];
 
@@ -133,37 +135,50 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
   const [fullscreenAsset, setFullscreenAsset] = useState<ProductMediaAsset | null>(null);
 
   const handleOpenFullscreen = (asset: ProductMediaAsset) => {
-    setFullscreenAsset(asset);
+    if (onOpenMediaViewer) {
+      onOpenMediaViewer(asset);
+    } else {
+      setFullscreenAsset(asset);
+    }
   };
 
   const handleOpenActiveFullscreen = () => {
+    let targetAsset: ProductMediaAsset | null = null;
     if (activeTab === 'three_d' && threeDAsset) {
-      setFullscreenAsset(threeDAsset);
+      targetAsset = threeDAsset;
     } else if (activeTab === 'video' && videoAssets[selectedVideoIndex]) {
-      setFullscreenAsset(videoAssets[selectedVideoIndex]);
+      targetAsset = videoAssets[selectedVideoIndex];
     } else if (activeTab === 'brochure' && docAssets[0]) {
-      setFullscreenAsset(docAssets[0]);
+      targetAsset = docAssets[0];
     } else {
       const curPhoto = photoAssets[selectedPhotoIndex];
-      setFullscreenAsset({
+      targetAsset = {
         id: curPhoto?.id || 'photo',
         title: product.name,
         asset_type: 'IMAGE',
         file_url: curPhoto?.url || product.image,
-      });
+      };
+    }
+
+    if (onOpenMediaViewer && targetAsset) {
+      onOpenMediaViewer(targetAsset);
+    } else {
+      setFullscreenAsset(targetAsset);
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Fullscreen Inspector Modal */}
-      <MediaModal
-        visible={!!fullscreenAsset}
-        asset={fullscreenAsset}
-        product={product}
-        onClose={() => setFullscreenAsset(null)}
-        scaleFont={scaleFont}
-      />
+      {/* Fullscreen Inspector Modal (Fallback if onOpenMediaViewer not wired) */}
+      {!onOpenMediaViewer && (
+        <MediaModal
+          visible={!!fullscreenAsset}
+          asset={fullscreenAsset}
+          product={product}
+          onClose={() => setFullscreenAsset(null)}
+          scaleFont={scaleFont}
+        />
+      )}
 
       {/* Modern Media Tab Switcher */}
       <View style={styles.tabBar}>
@@ -315,21 +330,21 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
           </View>
         ) : (
           // Default Photo View
-          <View style={styles.stageContent}>
+          <TouchableOpacity
+            style={styles.stageContent}
+            onPress={handleOpenActiveFullscreen}
+            activeOpacity={0.92}
+          >
             <Image
               source={{ uri: photoAssets[selectedPhotoIndex]?.url || product.image }}
               style={styles.mainPhoto}
               resizeMode="contain"
             />
             {/* Fullscreen Expansion Button */}
-            <TouchableOpacity
-              style={styles.expandButton}
-              onPress={handleOpenActiveFullscreen}
-              activeOpacity={0.8}
-            >
+            <View style={styles.expandButton}>
               <Maximize2 size={scaleFont(15)} color="#38BDF8" strokeWidth={2.4} />
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
         )}
       </View>
 

@@ -1,4 +1,5 @@
 import { KioskCategory, KioskSubCategory } from '../types/kiosk';
+import { mediaCacheService } from '../services/mediaCacheService';
 
 // Official Excel Brand Blue for Borders and Active States
 export const KIOSK_BRAND_BORDER = '#0D60AE';
@@ -13,7 +14,7 @@ export const KIOSK_DEFAULT_CARD_GRADIENT = [
 /**
  * Curated high-resolution industrial fallback imagery matching the 4 primary Kiosk categories.
  */
-const FALLBACK_CATEGORY_IMAGES: Record<string, string> = {
+export const FALLBACK_CATEGORY_IMAGES: Record<string, string> = {
   earthing: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=1200&q=80',
   lightning: 'https://images.unsplash.com/photo-1516912481808-3406841bd33c?auto=format&fit=crop&w=1200&q=80',
   enclosure: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
@@ -23,31 +24,31 @@ const FALLBACK_CATEGORY_IMAGES: Record<string, string> = {
 };
 
 /**
- * Resolves high quality image to fill category box.
+ * Resolves high quality image to fill category box using local offline cache when available.
  */
 export function resolveCategoryThumbnail(
   cat?: Partial<KioskCategory | KioskSubCategory> | null
 ): string {
   if (cat?.image && typeof cat.image === 'string' && cat.image.trim().length > 0) {
-    return cat.image;
+    return mediaCacheService.resolveCachedImageUri(cat.image);
   }
   const key = `${cat?.name || ''} ${cat?.code || ''} ${cat?.id || ''}`.toLowerCase();
   if (key.includes('earth') || key.includes('compound') || key.includes('electrode')) {
-    return FALLBACK_CATEGORY_IMAGES.earthing;
+    return mediaCacheService.resolveCachedImageUri(FALLBACK_CATEGORY_IMAGES.earthing);
   }
   if (key.includes('lightning') || key.includes('strike') || key.includes('air')) {
-    return FALLBACK_CATEGORY_IMAGES.lightning;
+    return mediaCacheService.resolveCachedImageUri(FALLBACK_CATEGORY_IMAGES.lightning);
   }
   if (key.includes('enclosure') || key.includes('pit') || key.includes('box') || key.includes('cover')) {
-    return FALLBACK_CATEGORY_IMAGES.enclosure;
+    return mediaCacheService.resolveCachedImageUri(FALLBACK_CATEGORY_IMAGES.enclosure);
   }
   if (key.includes('cable') || key.includes('tray') || key.includes('ladder') || key.includes('management')) {
-    return FALLBACK_CATEGORY_IMAGES.cable;
+    return mediaCacheService.resolveCachedImageUri(FALLBACK_CATEGORY_IMAGES.cable);
   }
   if (key.includes('surge') || key.includes('spd')) {
-    return FALLBACK_CATEGORY_IMAGES.spd;
+    return mediaCacheService.resolveCachedImageUri(FALLBACK_CATEGORY_IMAGES.spd);
   }
-  return FALLBACK_CATEGORY_IMAGES.default;
+  return mediaCacheService.resolveCachedImageUri(FALLBACK_CATEGORY_IMAGES.default);
 }
 
 /**

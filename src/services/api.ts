@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { KioskProduct, KioskCategory, KioskScreensaver } from '../types/kiosk';
-import { MOCK_CATEGORIES } from '../mock/kioskData';
+import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '../mock/kioskData';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
 import {
   shouldIdentifyLocation,
@@ -387,8 +387,19 @@ export async function getCachedCatalogProducts(): Promise<KioskProduct[]> {
         }));
       }
     }
-  } catch (e) {}
-  return [];
+  } catch (e) {
+    console.warn('[api] getCachedCatalogProducts parse notice:', e);
+  }
+  return MOCK_PRODUCTS.map((p) => ({
+    ...p,
+    image: mediaCacheService.resolveCachedImageUri(p.image),
+    mediaAssets: Array.isArray(p.mediaAssets)
+      ? p.mediaAssets.map((m) => ({
+          ...m,
+          file_url: mediaCacheService.resolveCachedImageUri(m.file_url),
+        }))
+      : [],
+  }));
 }
 
 export async function getCachedCatalogCategories(): Promise<KioskCategory[]> {
@@ -400,11 +411,28 @@ export async function getCachedCatalogCategories(): Promise<KioskCategory[]> {
         return parsed.map((c: KioskCategory) => ({
           ...c,
           image: c.image ? mediaCacheService.resolveCachedImageUri(c.image) : undefined,
+          subcategories: Array.isArray(c.subcategories)
+            ? c.subcategories.map((sc) => ({
+                ...sc,
+                image: sc.image ? mediaCacheService.resolveCachedImageUri(sc.image) : undefined,
+              }))
+            : [],
         }));
       }
     }
-  } catch (e) {}
-  return MOCK_CATEGORIES;
+  } catch (e) {
+    console.warn('[api] getCachedCatalogCategories parse notice:', e);
+  }
+  return MOCK_CATEGORIES.map((c) => ({
+    ...c,
+    image: c.image ? mediaCacheService.resolveCachedImageUri(c.image) : undefined,
+    subcategories: Array.isArray(c.subcategories)
+      ? c.subcategories.map((sc) => ({
+          ...sc,
+          image: sc.image ? mediaCacheService.resolveCachedImageUri(sc.image) : undefined,
+        }))
+      : [],
+  }));
 }
 
 export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceId?: string): Promise<KioskProduct[]> {

@@ -24,11 +24,13 @@ import {
   Box,
   Video,
   Layers,
+  FileText,
 } from 'lucide-react-native';
 import { ProductMediaAsset, KioskProduct, KioskCategory, KioskSubCategory, KioskResponsiveMetrics } from '../types/kiosk';
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
 import { MediaModal } from './MediaModal';
+import { KioskScrollContainer } from './KioskScrollContainer';
 import { useInactivityTimer } from './InactivityTracker';
 import { useAppVersion } from '../hooks/useAppVersion';
 import {
@@ -90,7 +92,7 @@ const AnimatedCard: React.FC<{
         onPressOut={handlePressOut}
         accessible={accessible}
         accessibilityLabel={accessibilityLabel}
-        style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', borderRadius: 18 }}
+        style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', borderRadius: 14 }}
       >
         <View style={styles.cardTouchInner}>
           {typeof children === 'function' ? children(active) : children}
@@ -116,6 +118,7 @@ interface PortraitKioskLayoutProps {
   onSelectProduct: (product: KioskProduct) => void;
   onSelectTab?: (tab: 'home' | 'products' | 'about') => void;
   onLogout?: () => void;
+  onOpenMediaViewer?: (product: KioskProduct, initialAssetId?: string) => void;
 }
 
 export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
@@ -128,6 +131,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   onSelectCategory,
   onSearchChange,
   onSelectProduct,
+  onLogout,
+  onOpenMediaViewer,
 }) => {
   const { resetTimer } = useInactivityTimer();
   const { scaleFont, scaleSpacing, width: screenWidth, height: screenHeight, crispTextProps } = metrics;
@@ -154,7 +159,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   const catTotalGaps = (catColumns - 1) * catGridGap;
   const catAvailableWidth = screenWidth - (catHorizontalPadding * 2);
   const categoryCardWidth = Math.floor((catAvailableWidth - catTotalGaps) / catColumns);
-  const categoryCardHeight = Math.max(250, Math.min(320, Math.round(categoryCardWidth * 0.78)));
+  const categoryCardHeight = Math.max(235, Math.min(345, Math.round(categoryCardWidth * 1.22)));
 
   // Responsive product card layout calculation for technical catalog
   const numColumns = screenWidth >= 900 ? 4 : screenWidth >= 600 ? 3 : 2;
@@ -437,8 +442,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
         ]}
       >
         {!activeCategory && !searchQuery.trim() ? (
-          <ScrollView
-            showsVerticalScrollIndicator={isCatScrollable}
+          <KioskScrollContainer
+            showsVerticalScrollIndicator={false}
             bounces={true}
             style={styles.categoryScrollView}
             contentContainerStyle={[
@@ -501,75 +506,41 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                       {
                         width: categoryCardWidth,
                         height: categoryCardHeight,
-                        borderColor: isCardSelected ? KIOSK_BRAND_BORDER_ACTIVE : KIOSK_BRAND_BORDER,
                       },
                     ]}
                   >
                     {(active) => (
                       <View style={styles.cardBoxFillWrapper}>
-                        {/* Image filling the box */}
-                        <Image
-                          source={{ uri: imageUrl }}
-                          style={StyleSheet.absoluteFill}
-                          resizeMode="cover"
-                        />
+                        {/* Top: Square photo filling upper section */}
+                        <View style={styles.cardSquarePhotoWrapper}>
+                          <Image
+                            source={{ uri: imageUrl }}
+                            style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 14, borderTopRightRadius: 14 }]}
+                            resizeMode="cover"
+                            fadeDuration={0}
+                          />
+                          {active && (
+                            <View style={styles.cardActivePhotoOverlay} />
+                          )}
+                        </View>
 
-                        {/* Dark Gradient Overlay / Dark Blue Active State */}
-                        <LinearGradient
-                          colors={
-                            active
-                              ? KIOSK_ACTIVE_BG_DARK_GRADIENT
-                              : KIOSK_DEFAULT_CARD_GRADIENT
-                          }
-                          style={StyleSheet.absoluteFill}
-                        />
-
-                        {/* Active Blue Glow Border Inner Indicator */}
-                        {active && <View style={styles.cardActiveGlowBorder} />}
-
-                        {/* Card Content */}
-                        <View style={styles.cardMainContent}>
-                          <View style={styles.cardHeaderArea}>
+                        {/* Bottom: Writing on bottom (dark blue theme color, no description, full name visible) */}
+                        <View style={styles.cardBottomWriting}>
+                          <View style={styles.cardBottomTextCol}>
                             <Text
                               numberOfLines={2}
                               style={[
-                                styles.cardHeadingTitle,
-                                { fontSize: scaleFont(20) },
+                                styles.cardBottomTitle,
+                                { fontSize: scaleFont(15.5), lineHeight: scaleFont(20.5) },
+                                active && styles.cardBottomTitleActive,
                               ]}
+                              {...crispTextProps}
                             >
                               {cat.name}
                             </Text>
-
-                            {/* Subtle divider below heading */}
-                            <View style={styles.cardHeadingDivider} />
-
-                            {/* Description at the bottom of the heading */}
-                            <Text
-                              numberOfLines={3}
-                              style={[
-                                styles.cardDescriptionText,
-                                { fontSize: scaleFont(13.5), lineHeight: scaleFont(19) },
-                              ]}
-                            >
-                              {description}
-                            </Text>
                           </View>
-
-                          {/* Footer with sub-categories or items info & chevron */}
-                          <View style={styles.cardFooterOverlayRow}>
-                            <View style={styles.cardCategoryBadge}>
-                              <Text style={[styles.cardCategoryBadgeText, { fontSize: scaleFont(11.5) }]}>
-                                {cat.subcategories && cat.subcategories.length > 0
-                                  ? `${cat.subcategories.length} Sub-Categories`
-                                  : catProdCount > 0
-                                  ? `${catProdCount} items`
-                                  : 'Explore'}
-                              </Text>
-                            </View>
-
-                            <View style={[styles.cardArrowCircle, active && styles.cardArrowCircleActive]}>
-                              <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
-                            </View>
+                          <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
+                            <ChevronRight size={scaleFont(15)} color={active ? kioskColors.accentBlue : kioskColors.brandNavy} strokeWidth={2.6} />
                           </View>
                         </View>
                       </View>
@@ -578,7 +549,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                 );
               })}
             </View>
-          </ScrollView>
+          </KioskScrollContainer>
         ) : activeCategory && activeCategory !== 'all' && !activeSubCategory && !searchQuery.trim() && (activeCategoryObj?.subcategories?.length ?? 0) > 0 ? (
           /* ── VIEW 2: SUB-CATEGORY SELECTION SCREEN ── */
           <View style={styles.categoryProductsView}>
@@ -604,8 +575,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
               </View>
             </View>
 
-            <ScrollView
-              showsVerticalScrollIndicator={true}
+            <KioskScrollContainer
+              showsVerticalScrollIndicator={false}
               bounces={true}
               style={styles.categoryScrollView}
               contentContainerStyle={[
@@ -661,71 +632,41 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                         {
                           width: categoryCardWidth,
                           height: categoryCardHeight,
-                          borderColor: isCardSelected ? KIOSK_BRAND_BORDER_ACTIVE : KIOSK_BRAND_BORDER,
                         },
                       ]}
                     >
                       {(active) => (
                         <View style={styles.cardBoxFillWrapper}>
-                          {/* Image filling the box */}
-                          <Image
-                            source={{ uri: imageUrl }}
-                            style={StyleSheet.absoluteFill}
-                            resizeMode="cover"
-                          />
+                          {/* Top: Square photo filling upper section */}
+                          <View style={styles.cardSquarePhotoWrapper}>
+                            <Image
+                              source={{ uri: imageUrl }}
+                              style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 14, borderTopRightRadius: 14 }]}
+                              resizeMode="cover"
+                              fadeDuration={0}
+                            />
+                            {active && (
+                              <View style={styles.cardActivePhotoOverlay} />
+                            )}
+                          </View>
 
-                          {/* Dark Gradient Overlay / Dark Blue Active State */}
-                          <LinearGradient
-                            colors={
-                              active
-                                ? KIOSK_ACTIVE_BG_DARK_GRADIENT
-                                : KIOSK_DEFAULT_CARD_GRADIENT
-                            }
-                            style={StyleSheet.absoluteFill}
-                          />
-
-                          {/* Active Blue Glow Border Inner Indicator */}
-                          {active && <View style={styles.cardActiveGlowBorder} />}
-
-                          {/* Card Content */}
-                          <View style={styles.cardMainContent}>
-                            <View style={styles.cardHeaderArea}>
+                          {/* Bottom: Writing on bottom (dark blue theme color, no description, full name visible) */}
+                          <View style={styles.cardBottomWriting}>
+                            <View style={styles.cardBottomTextCol}>
                               <Text
                                 numberOfLines={2}
                                 style={[
-                                  styles.cardHeadingTitle,
-                                  { fontSize: scaleFont(19) },
+                                  styles.cardBottomTitle,
+                                  { fontSize: scaleFont(15), lineHeight: scaleFont(20) },
+                                  active && styles.cardBottomTitleActive,
                                 ]}
+                                {...crispTextProps}
                               >
                                 {subCat.name}
                               </Text>
-
-                              {/* Subtle divider below heading */}
-                              <View style={styles.cardHeadingDivider} />
-
-                              {/* Description at the bottom of the heading */}
-                              <Text
-                                numberOfLines={3}
-                                style={[
-                                  styles.cardDescriptionText,
-                                  { fontSize: scaleFont(13), lineHeight: scaleFont(18.5) },
-                                ]}
-                              >
-                                {description}
-                              </Text>
                             </View>
-
-                            {/* Footer with items info & chevron */}
-                            <View style={styles.cardFooterOverlayRow}>
-                              <View style={styles.cardCategoryBadge}>
-                                <Text style={[styles.cardCategoryBadgeText, { fontSize: scaleFont(11) }]}>
-                                  {subCatProdCount > 0 ? `${subCatProdCount} items` : 'Explore'}
-                                </Text>
-                              </View>
-
-                              <View style={[styles.cardArrowCircle, active && styles.cardArrowCircleActive]}>
-                                <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
-                              </View>
+                            <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
+                              <ChevronRight size={scaleFont(15)} color={active ? kioskColors.accentBlue : kioskColors.brandNavy} strokeWidth={2.6} />
                             </View>
                           </View>
                         </View>
@@ -734,7 +675,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                   );
                 })}
               </View>
-            </ScrollView>
+            </KioskScrollContainer>
           </View>
         ) : (
           /* ── VIEW 3: DYNAMIC PRODUCTS SCREEN ── */
@@ -895,8 +836,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
             </View>
 
             {/* Product Cards Grid */}
-            <ScrollView
-              showsVerticalScrollIndicator={isProdScrollable}
+            <KioskScrollContainer
+              showsVerticalScrollIndicator={false}
               bounces={true}
               style={styles.categoryScrollView}
               contentContainerStyle={[
@@ -977,7 +918,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                   </View>
                 )}
               </View>
-            </ScrollView>
+            </KioskScrollContainer>
           </View>
         )}
       </Animated.View>
@@ -1019,13 +960,21 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
           {/* Drag Handle & Close Button Header */}
           <View style={styles.sheetHeader}>
             <View style={styles.dragHandleBar} />
-            <TouchableOpacity onPress={closeBottomSheet} style={styles.closeBtnCircle}>
-              <X size={15} color={kioskColors.textSecondary} strokeWidth={2.4} />
+            <TouchableOpacity
+              onPress={closeBottomSheet}
+              style={styles.closeBtnCircle}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <X size={16} color={kioskColors.textSecondary} strokeWidth={2.4} />
             </TouchableOpacity>
           </View>
 
           {selectedProductDetail && (
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
+            <KioskScrollContainer
+              showsVerticalScrollIndicator={false}
+              style={styles.sheetScrollFlex}
+              contentContainerStyle={styles.sheetScroll}
+            >
               <View style={styles.sheetMainImgContainer}>
                 <Image
                   source={{ uri: selectedProductDetail.image }}
@@ -1043,7 +992,12 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                       style={styles.sheet3DBtn}
                       onPress={() => {
                         const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'THREE_D');
-                        if (a) setPreviewMediaAsset(a);
+                        if (onOpenMediaViewer) {
+                          closeBottomSheet();
+                          onOpenMediaViewer(selectedProductDetail, a?.id);
+                        } else if (a) {
+                          setPreviewMediaAsset(a);
+                        }
                       }}
                       activeOpacity={0.85}
                     >
@@ -1058,7 +1012,12 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                       style={styles.sheetVideoBtn}
                       onPress={() => {
                         const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'VIDEO');
-                        if (a) setPreviewMediaAsset(a);
+                        if (onOpenMediaViewer) {
+                          closeBottomSheet();
+                          onOpenMediaViewer(selectedProductDetail, a?.id);
+                        } else if (a) {
+                          setPreviewMediaAsset(a);
+                        }
                       }}
                       activeOpacity={0.85}
                     >
@@ -1093,6 +1052,25 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                 {selectedProductDetail.description || selectedProductDetail.subtitle || 'Industrial Grade Component'}
               </Text>
 
+              {/* Instant Full Specifications Button in Body */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => {
+                  const prod = selectedProductDetail;
+                  closeBottomSheet();
+                  onSelectProduct(prod);
+                }}
+                style={styles.sheetInlineFullSpecsBtn}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <FileText size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.4} />
+                  <Text style={[styles.sheetInlineFullSpecsText, { fontSize: scaleFont(12.5) }]}>
+                    Open Full Specifications Page
+                  </Text>
+                </View>
+                <ChevronRight size={scaleFont(15)} color="#FFFFFF" strokeWidth={2.6} />
+              </TouchableOpacity>
+
               {/* Technical Specifications Table */}
               <View style={styles.keySpecsContainer}>
                 <View style={styles.keySpecsHeaderRow}>
@@ -1114,15 +1092,17 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                     </View>
                   ))}
               </View>
-            </ScrollView>
+            </KioskScrollContainer>
           )}
 
-          {/* Bottom Action Footer */}
+          {/* Bottom Action Footer - Always Pinned and Visible */}
           {selectedProductDetail && (
             <View style={styles.sheetFooter}>
-              <Text numberOfLines={1} style={[styles.sheetFooterHint, { fontSize: scaleFont(12) }]}>
-                Detailed electrical ratings & diagrams
-              </Text>
+              <View style={styles.sheetFooterTextCol}>
+                <Text numberOfLines={1} style={[styles.sheetFooterHint, { fontSize: scaleFont(12) }]}>
+                  Detailed technical parameters & ratings
+                </Text>
+              </View>
               <TouchableOpacity
                 activeOpacity={0.88}
                 onPress={() => {
@@ -1132,8 +1112,8 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                 }}
                 style={styles.fullDetailBtn}
               >
-                <Text style={[styles.fullDetailBtnText, { fontSize: scaleFont(12.5) }]}>Full Specifications</Text>
-                <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.4} />
+                <Text style={[styles.fullDetailBtnText, { fontSize: scaleFont(13) }]}>Full Specifications</Text>
+                <ChevronRight size={scaleFont(15)} color="#FFFFFF" strokeWidth={2.6} />
               </TouchableOpacity>
             </View>
           )}
@@ -1301,28 +1281,81 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 8,
   },
-  // Redesigned Category Cards: Full Box Fill Imagery with Blue Branding Border
+  // Redesigned Category Cards: Square photo on top, writing on bottom, borderless with box shadow
   categoryKioskCard: {
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: KIOSK_BRAND_BORDER,
+    borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#0F1E36',
-    shadowColor: '#0D60AE',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 0,
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.12,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 5,
   },
   cardBoxFillWrapper: {
     flex: 1,
     width: '100%',
     height: '100%',
-    position: 'relative',
-    justifyContent: 'space-between',
-    padding: 16,
+    flexDirection: 'column',
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
-    borderRadius: 16,
+    borderRadius: 14,
+  },
+  cardSquarePhotoWrapper: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  cardActivePhotoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(13, 96, 174, 0.12)',
+  },
+  cardBottomWriting: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 64,
+  },
+  cardBottomTextCol: {
+    flex: 1,
+    marginRight: 6,
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  cardBottomTitle: {
+    color: kioskColors.brandNavy,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    includeFontPadding: false,
+  },
+  cardBottomTitleActive: {
+    color: kioskColors.accentBlue,
+  },
+  cardBottomArrowCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBottomArrowCircleActive: {
+    backgroundColor: '#EFF6FF',
   },
   cardActiveGlowBorder: {
     position: 'absolute',
@@ -1330,63 +1363,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: '#38BDF8',
-    borderRadius: 16,
+    borderRadius: 14,
     zIndex: 10,
     pointerEvents: 'none',
-  },
-  cardMainContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-    zIndex: 5,
-  },
-  cardHeaderArea: {
-    width: '100%',
-  },
-  cardHeadingTitle: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    letterSpacing: -0.2,
-    includeFontPadding: false,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 3,
-  },
-  cardHeadingDivider: {
-    height: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
-    marginVertical: 10,
-    width: '100%',
-    borderRadius: 1,
-  },
-  cardDescriptionText: {
-    color: 'rgba(255, 255, 255, 0.94)',
-    fontWeight: '400',
-    letterSpacing: 0.1,
-    includeFontPadding: false,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  cardFooterOverlayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  cardCategoryBadge: {
-    backgroundColor: 'rgba(13, 96, 174, 0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    borderRadius: kioskRadii.full,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.5)',
-  },
-  cardCategoryBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    includeFontPadding: false,
   },
   cardArrowCircle: {
     width: 30,
@@ -1406,7 +1387,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.08 }],
   },
   kioskCard: {
-    borderRadius: kioskRadii.md,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     overflow: 'hidden',
@@ -1420,6 +1401,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     justifyContent: 'space-between',
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   cardImgContainer: {
     width: '100%',
@@ -1428,6 +1411,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
   },
   card3DBadge: {
     position: 'absolute',
@@ -1531,12 +1516,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
   },
   cardTitleText: {
     flex: 1,
     fontWeight: '800',
     fontSize: 14,
-    color: kioskColors.textPrimary,
+    color: kioskColors.brandNavy,
     letterSpacing: -0.2,
     marginRight: 6,
     includeFontPadding: false,
@@ -1748,42 +1735,76 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    height: '82%',
     maxHeight: '85%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: kioskRadii.xl,
     borderTopRightRadius: kioskRadii.xl,
     paddingHorizontal: 18,
-    paddingBottom: 18,
+    paddingBottom: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.18,
     shadowRadius: 16,
     elevation: 16,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  sheetScrollFlex: {
+    flex: 1,
+    minHeight: 0,
+  },
+  sheetInlineFullSpecsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0D60AE',
+    borderRadius: kioskRadii.md,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    marginVertical: 6,
+    shadowColor: '#0D60AE',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sheetInlineFullSpecsText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   sheetHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    justifyContent: 'center',
+    paddingTop: 8,
+    paddingBottom: 12,
     position: 'relative',
+    minHeight: 44,
+    width: '100%',
+    zIndex: 100,
   },
   dragHandleBar: {
-    width: 40,
-    height: 4,
+    width: 44,
+    height: 4.5,
     backgroundColor: '#CBD5E1',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   closeBtnCircle: {
     position: 'absolute',
     right: 0,
-    top: 6,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: 4,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 101,
   },
   sheetScroll: {
     gap: 12,
+    paddingTop: 6,
     paddingBottom: 12,
   },
   sheetMainImgContainer: {
@@ -1872,6 +1893,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexShrink: 0,
+    zIndex: 50,
+  },
+  sheetFooterTextCol: {
+    flex: 1,
+    marginRight: 10,
   },
   sheetFooterHint: {
     fontWeight: '600',

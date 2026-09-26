@@ -24,6 +24,7 @@ import { kioskColors, kioskIcons, kioskRadii } from '../theme/kioskTheme';
 import { KioskResponsiveMetrics } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
 import { WhiteboardModal } from '../components/WhiteboardModal';
+import { KioskScrollContainer } from '../components/KioskScrollContainer';
 import { useAppVersion } from '../hooks/useAppVersion';
 
 interface CompanyInfoScreenProps {
@@ -101,8 +102,8 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
       </View>
 
       {/* Full Page Content ScrollView */}
-      <ScrollView
-        showsVerticalScrollIndicator={true}
+      <KioskScrollContainer
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollBody,
           { padding: scaleSpacing(20) },
@@ -228,7 +229,7 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
             </View>
           </View>
         </View>
-      </ScrollView>
+      </KioskScrollContainer>
 
       {/* Fixed Bottom Ad Banner in Portrait Mode */}
       {!isLandscape && (

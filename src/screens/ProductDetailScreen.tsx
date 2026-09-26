@@ -16,12 +16,15 @@ import {
   FileText,
   Zap,
   Edit3,
+  Maximize2,
+  Sparkles,
 } from 'lucide-react-native';
 import { kioskColors, kioskIcons, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 import { KioskProduct, KioskResponsiveMetrics } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
 import { WhiteboardModal } from '../components/WhiteboardModal';
 import { ProductMediaGallery } from '../components/ProductMediaGallery';
+import { KioskScrollContainer } from '../components/KioskScrollContainer';
 import { analyticsService } from '../services/analyticsService';
 import { useAppVersion } from '../hooks/useAppVersion';
 
@@ -29,12 +32,14 @@ interface ProductDetailScreenProps {
   product: KioskProduct;
   metrics: KioskResponsiveMetrics;
   onBack: () => void;
+  onOpenMediaViewer?: (product: KioskProduct, initialAssetId?: string) => void;
 }
 
 export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   product,
   metrics,
   onBack,
+  onOpenMediaViewer,
 }) => {
   const { isLandscape, scaleFont, scaleSpacing, crispTextProps } = metrics;
   const appVersion = useAppVersion();
@@ -52,6 +57,12 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   const handleOpenWhiteboard = () => {
     analyticsService.trackProductClick(product, 'WHITEBOARD_OPEN');
     setIsWhiteboardOpen(true);
+  };
+
+  const handleLaunchMediaViewer = (assetId?: string) => {
+    if (onOpenMediaViewer) {
+      onOpenMediaViewer(product, assetId);
+    }
   };
 
   const resolvedSpecs: Record<string, string> = (product.specifications && Object.keys(product.specifications).length > 0)
@@ -176,8 +187,8 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       </View>
 
       {/* Full Page Content ScrollView */}
-      <ScrollView
-        showsVerticalScrollIndicator={true}
+      <KioskScrollContainer
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollBody,
           { padding: scaleSpacing(20) },
@@ -191,7 +202,30 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               height={isLandscape ? 340 : 280}
               scaleFont={scaleFont}
               scaleSpacing={scaleSpacing}
+              onOpenMediaViewer={(asset) => handleLaunchMediaViewer(asset?.id)}
             />
+
+            {/* Quick Launch Full Page Media Viewer */}
+            <TouchableOpacity
+              style={styles.openFullMediaPageBtn}
+              onPress={() => handleLaunchMediaViewer()}
+              activeOpacity={0.88}
+            >
+              <View style={styles.openFullMediaPageBtnLeft}>
+                <View style={styles.openFullMediaPageIconWrap}>
+                  <Maximize2 size={scaleFont(14)} color="#0D60AE" strokeWidth={2.4} />
+                </View>
+                <View>
+                  <Text style={[styles.openFullMediaPageBtnTitle, { fontSize: scaleFont(12.5) }]}>
+                    Launch Full-Screen Media Viewer
+                  </Text>
+                  <Text style={[styles.openFullMediaPageBtnSub, { fontSize: scaleFont(10.5) }]}>
+                    Interactive 3D, In-App PDF & Video Gallery
+                  </Text>
+                </View>
+              </View>
+              <Sparkles size={scaleFont(15)} color="#FFC107" strokeWidth={2.4} />
+            </TouchableOpacity>
 
             {/* Testing & Standards Compliance */}
             <View style={styles.standardsCard}>
@@ -323,7 +357,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             </View>
           </View>
         </View>
-      </ScrollView>
+      </KioskScrollContainer>
 
       {/* Fixed Bottom Ad Banner in Portrait Mode */}
       {!isLandscape && (
@@ -477,6 +511,46 @@ const styles = StyleSheet.create({
   },
   leftPanel: {
     gap: 14,
+  },
+  openFullMediaPageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    borderRadius: kioskRadii.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#0D60AE',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  openFullMediaPageBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  openFullMediaPageIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: kioskRadii.sm,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  openFullMediaPageBtnTitle: {
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+  openFullMediaPageBtnSub: {
+    color: '#0D60AE',
+    fontWeight: '600',
+    marginTop: 1,
   },
   imageCard: {
     backgroundColor: '#FFFFFF',

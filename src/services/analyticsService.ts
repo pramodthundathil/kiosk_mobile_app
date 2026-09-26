@@ -10,7 +10,8 @@ export type InteractionType =
   | 'BROCHURE_VIEW'
   | 'WHITEBOARD_OPEN'
   | 'SEARCH_SELECT'
-  | 'CATEGORY_CLICK';
+  | 'CATEGORY_CLICK'
+  | 'MEDIA_VIEW';
 
 export interface TelemetryEvent {
   event_type: InteractionType;

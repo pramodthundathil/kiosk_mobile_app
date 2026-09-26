@@ -33,6 +33,7 @@ import { ProductMediaAsset, KioskProduct, KioskCategory, KioskSubCategory, Kiosk
 import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
 import { MediaModal } from './MediaModal';
+import { KioskScrollContainer } from './KioskScrollContainer';
 import { useInactivityTimer } from './InactivityTracker';
 import { useAppVersion } from '../hooks/useAppVersion';
 import { getColorCombo } from '../constants/colorCombos';
@@ -90,7 +91,7 @@ const AnimatedPressableCard: React.FC<{
         onPressOut={handlePressOut}
         accessible={accessible}
         accessibilityLabel={accessibilityLabel}
-        style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', borderRadius: 18 }}
+        style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', borderRadius: 14 }}
       >
         {typeof children === 'function' ? children(active) : children}
       </TouchableOpacity>
@@ -152,6 +153,7 @@ interface LandscapeKioskLayoutProps {
   onSearchChange: (query: string) => void;
   onSelectProduct: (product: KioskProduct | null) => void;
   onOpenFullDetail: (product: KioskProduct) => void;
+  onOpenMediaViewer?: (product: KioskProduct, initialAssetId?: string) => void;
 }
 
 export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
@@ -166,24 +168,32 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   onSearchChange,
   onSelectProduct,
   onOpenFullDetail,
+  onOpenMediaViewer,
 }) => {
   const { scaleFont, scaleSpacing, is4K, crispTextProps, width: screenWidth, height: screenHeight } = metrics;
   const { resetTimer } = useInactivityTimer();
   const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
-  // Responsive 4-card grid sizing for landscape orientation
-  const catColumns = screenWidth >= 800 ? 4 : 2;
-  const catHorizontalPadding = scaleSpacing(16);
+  // Redesigned 2x2 grid layout for landscape: 2 cards per row ("two two each")
+  // Dynamically sized to fit 4 cards neatly on a single screen without clipping or overflow
+  const catColumns = 2;
+  const catHorizontalPadding = scaleSpacing(screenWidth >= 1200 ? 18 : 14);
   const catGridGap = scaleSpacing(screenWidth >= 1200 ? 14 : 10);
   const catTotalGaps = (catColumns - 1) * catGridGap;
   const sidebarWidth = 92;
   const catAvailableWidth = Math.max(300, screenWidth - sidebarWidth - (catHorizontalPadding * 2));
   const categoryCardWidth = Math.floor((catAvailableWidth - catTotalGaps) / catColumns);
-  // Elegant height to ensure at least 4 cards fit within the screen without vertical scrolling
+
+  // Available height accounts for Top Header (52px), Footer (32px), Section Title (~36px),
+  // Content padding (top: 8, bottom: 10), and inter-card row gap (catGridGap).
+  const verticalOverhead = scaleSpacing(is4K ? 230 : 142);
+  const availableVerticalForCards = Math.max(220, screenHeight - verticalOverhead - catGridGap);
+  const maxCardFitHeight = Math.floor(availableVerticalForCards / 2);
+
   const categoryCardHeight = is4K
-    ? 270
-    : Math.min(210, Math.max(160, Math.round(categoryCardWidth * 0.68)));
+    ? Math.min(480, Math.max(315, maxCardFitHeight))
+    : Math.min(335, Math.max(195, maxCardFitHeight));
 
   // Active category for home → product list navigation
   const [activeCategory, setActiveCategory] = useState<string | null>(
@@ -509,7 +519,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
 
           {/* ── VIEW 1: CATEGORY SELECTION SCREEN ── */}
           {!activeCategory && !searchQuery.trim() ? (
-            <ScrollView
+            <KioskScrollContainer
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[styles.categoryHomeContent, { paddingHorizontal: catHorizontalPadding }]}
             >
@@ -574,80 +584,48 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         {
                           width: categoryCardWidth,
                           height: categoryCardHeight,
-                          borderColor: isCardSelected ? KIOSK_BRAND_BORDER_ACTIVE : KIOSK_BRAND_BORDER,
                         },
                       ]}
                     >
                       {(active) => (
-                        <View style={[styles.cardBoxFillWrapper, { padding: scaleSpacing(screenWidth >= 1200 ? 13 : 10) }]}>
-                          {/* Image filling the box */}
-                          <Image
-                            source={{ uri: imageUrl }}
-                            style={StyleSheet.absoluteFill}
-                            resizeMode="cover"
-                          />
+                        <View style={styles.cardBoxFillWrapper}>
+                          {/* Top: Square photo filling upper section */}
+                          <View style={styles.cardSquarePhotoWrapper}>
+                            <Image
+                              source={{ uri: imageUrl }}
+                              style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 14, borderTopRightRadius: 14 }]}
+                              resizeMode="cover"
+                              fadeDuration={0}
+                            />
+                            {active && (
+                              <View style={styles.cardActivePhotoOverlay} />
+                            )}
+                          </View>
 
-                          {/* Dark Gradient Overlay / Dark Blue Active State */}
-                          <LinearGradient
-                            colors={
-                              active
-                                ? KIOSK_ACTIVE_BG_DARK_GRADIENT
-                                : KIOSK_DEFAULT_CARD_GRADIENT
-                            }
-                            style={StyleSheet.absoluteFill}
-                          />
-
-                          {/* Active Blue Glow Border Inner Indicator */}
-                          {active && <View style={styles.cardActiveGlowBorder} />}
-
-                          {/* Card Content */}
-                          <View style={styles.cardMainContent}>
-                            <View style={styles.cardHeaderArea}>
+                          {/* Bottom: Writing on bottom (dark blue theme color, no description, full name visible) */}
+                          <View style={styles.cardBottomWriting}>
+                            <View style={styles.cardBottomTextCol}>
                               <Text
                                 numberOfLines={2}
                                 style={[
-                                  styles.cardHeadingTitle,
-                                  { fontSize: scaleFont(is4K ? 22 : screenWidth >= 1200 ? 16 : 14.5) },
+                                  styles.cardBottomTitle,
+                                  {
+                                    fontSize: scaleFont(is4K ? 21 : screenWidth >= 1200 ? 15.5 : 14),
+                                    lineHeight: scaleFont(is4K ? 27 : screenWidth >= 1200 ? 21 : 19),
+                                  },
+                                  active && styles.cardBottomTitleActive,
                                 ]}
                                 {...crispTextProps}
                               >
                                 {cat.name}
                               </Text>
-
-                              {/* Subtle divider below heading */}
-                              <View style={styles.cardHeadingDivider} />
-
-                              {/* Description at the bottom of the heading */}
-                              <Text
-                                numberOfLines={2}
-                                style={[
-                                  styles.cardDescriptionText,
-                                  {
-                                    fontSize: scaleFont(is4K ? 14 : screenWidth >= 1200 ? 11.5 : 10.5),
-                                    lineHeight: scaleFont(is4K ? 19 : screenWidth >= 1200 ? 16 : 14.5),
-                                  },
-                                ]}
-                                {...crispTextProps}
-                              >
-                                {description}
-                              </Text>
                             </View>
-
-                            {/* Footer row */}
-                            <View style={styles.cardFooterOverlayRow}>
-                              <View style={styles.cardCategoryBadge}>
-                                <Text style={[styles.cardCategoryBadgeText, { fontSize: scaleFont(is4K ? 13 : 10.5) }]} {...crispTextProps}>
-                                  {cat.subcategories && cat.subcategories.length > 0
-                                    ? `${cat.subcategories.length} Sub-Categories`
-                                    : catProdCount > 0
-                                    ? `${catProdCount} items`
-                                    : 'Explore'}
-                                </Text>
-                              </View>
-
-                              <View style={[styles.cardArrowCircle, active && styles.cardArrowCircleActive]}>
-                                <ChevronRight size={scaleFont(is4K ? 15 : 11)} color="#FFFFFF" strokeWidth={2.6} />
-                              </View>
+                            <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
+                              <ChevronRight
+                                size={scaleFont(is4K ? 16 : 13)}
+                                color={active ? kioskColors.accentBlue : kioskColors.brandNavy}
+                                strokeWidth={2.6}
+                              />
                             </View>
                           </View>
                         </View>
@@ -656,10 +634,10 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                   );
                 })}
               </View>
-            </ScrollView>
+            </KioskScrollContainer>
           ) : activeCategory && activeCategory !== 'all' && !activeSubCategory && !searchQuery.trim() && (activeCategoryObj?.subcategories?.length ?? 0) > 0 ? (
             /* ── VIEW 2: SUB-CATEGORY SELECTION SCREEN ── */
-            <ScrollView
+            <KioskScrollContainer
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[styles.categoryHomeContent, { paddingHorizontal: catHorizontalPadding }]}
             >
@@ -737,76 +715,48 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         {
                           width: categoryCardWidth,
                           height: categoryCardHeight,
-                          borderColor: isCardSelected ? KIOSK_BRAND_BORDER_ACTIVE : KIOSK_BRAND_BORDER,
                         },
                       ]}
                     >
                       {(active) => (
-                        <View style={[styles.cardBoxFillWrapper, { padding: scaleSpacing(screenWidth >= 1200 ? 13 : 10) }]}>
-                          {/* Image filling the box */}
-                          <Image
-                            source={{ uri: imageUrl }}
-                            style={StyleSheet.absoluteFill}
-                            resizeMode="cover"
-                          />
+                        <View style={styles.cardBoxFillWrapper}>
+                          {/* Top: Square photo filling upper section */}
+                          <View style={styles.cardSquarePhotoWrapper}>
+                            <Image
+                              source={{ uri: imageUrl }}
+                              style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 14, borderTopRightRadius: 14 }]}
+                              resizeMode="cover"
+                              fadeDuration={0}
+                            />
+                            {active && (
+                              <View style={styles.cardActivePhotoOverlay} />
+                            )}
+                          </View>
 
-                          {/* Dark Gradient Overlay / Dark Blue Active State */}
-                          <LinearGradient
-                            colors={
-                              active
-                                ? KIOSK_ACTIVE_BG_DARK_GRADIENT
-                                : KIOSK_DEFAULT_CARD_GRADIENT
-                            }
-                            style={StyleSheet.absoluteFill}
-                          />
-
-                          {/* Active Blue Glow Border Inner Indicator */}
-                          {active && <View style={styles.cardActiveGlowBorder} />}
-
-                          {/* Card Content */}
-                          <View style={styles.cardMainContent}>
-                            <View style={styles.cardHeaderArea}>
+                          {/* Bottom: Writing on bottom (dark blue theme color, no description, full name visible) */}
+                          <View style={styles.cardBottomWriting}>
+                            <View style={styles.cardBottomTextCol}>
                               <Text
                                 numberOfLines={2}
                                 style={[
-                                  styles.cardHeadingTitle,
-                                  { fontSize: scaleFont(is4K ? 22 : screenWidth >= 1200 ? 16 : 14.5) },
+                                  styles.cardBottomTitle,
+                                  {
+                                    fontSize: scaleFont(is4K ? 21 : screenWidth >= 1200 ? 15.5 : 14),
+                                    lineHeight: scaleFont(is4K ? 27 : screenWidth >= 1200 ? 21 : 19),
+                                  },
+                                  active && styles.cardBottomTitleActive,
                                 ]}
                                 {...crispTextProps}
                               >
                                 {subCat.name}
                               </Text>
-
-                              {/* Subtle divider below heading */}
-                              <View style={styles.cardHeadingDivider} />
-
-                              {/* Description at the bottom of the heading */}
-                              <Text
-                                numberOfLines={2}
-                                style={[
-                                  styles.cardDescriptionText,
-                                  {
-                                    fontSize: scaleFont(is4K ? 14 : screenWidth >= 1200 ? 11.5 : 10.5),
-                                    lineHeight: scaleFont(is4K ? 19 : screenWidth >= 1200 ? 16 : 14.5),
-                                  },
-                                ]}
-                                {...crispTextProps}
-                              >
-                                {description}
-                              </Text>
                             </View>
-
-                            {/* Footer row */}
-                            <View style={styles.cardFooterOverlayRow}>
-                              <View style={styles.cardCategoryBadge}>
-                                <Text style={[styles.cardCategoryBadgeText, { fontSize: scaleFont(is4K ? 13 : 10.5) }]} {...crispTextProps}>
-                                  {subCatProdCount > 0 ? `${subCatProdCount} items` : 'Explore'}
-                                </Text>
-                              </View>
-
-                              <View style={[styles.cardArrowCircle, active && styles.cardArrowCircleActive]}>
-                                <ChevronRight size={scaleFont(is4K ? 15 : 11)} color="#FFFFFF" strokeWidth={2.6} />
-                              </View>
+                            <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
+                              <ChevronRight
+                                size={scaleFont(is4K ? 16 : 13)}
+                                color={active ? kioskColors.accentBlue : kioskColors.brandNavy}
+                                strokeWidth={2.6}
+                              />
                             </View>
                           </View>
                         </View>
@@ -815,7 +765,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                   );
                 })}
               </View>
-            </ScrollView>
+            </KioskScrollContainer>
           ) : (
             /* ── VIEW 3: PRODUCT LIST SCREEN ── */
             <View style={styles.productListView}>
@@ -981,7 +931,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 </ScrollView>
               </View>
 
-              <ScrollView
+              <KioskScrollContainer
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.productHomeContent}
               >
@@ -1048,7 +998,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                     </View>
                   )}
                 </View>
-              </ScrollView>
+              </KioskScrollContainer>
             </View>
           )}
         </Animated.View>
@@ -1145,7 +1095,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 </View>
 
                 {/* Side Drawer Scroll Body */}
-                <ScrollView
+                <KioskScrollContainer
                   style={styles.sideDrawerScroll}
                   contentContainerStyle={styles.sideDrawerContent}
                   showsVerticalScrollIndicator={false}
@@ -1174,7 +1124,13 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                             style={styles.drawer3DBtn}
                             onPress={() => {
                               const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'THREE_D');
-                              if (a) setPreviewMediaAsset(a);
+                              if (onOpenMediaViewer) {
+                                setSelectedProductDetail(null);
+                                onSelectProduct(null);
+                                onOpenMediaViewer(selectedProductDetail, a?.id);
+                              } else if (a) {
+                                setPreviewMediaAsset(a);
+                              }
                             }}
                             activeOpacity={0.85}
                           >
@@ -1189,7 +1145,13 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                             style={styles.drawerVideoBtn}
                             onPress={() => {
                               const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'VIDEO');
-                              if (a) setPreviewMediaAsset(a);
+                              if (onOpenMediaViewer) {
+                                setSelectedProductDetail(null);
+                                onSelectProduct(null);
+                                onOpenMediaViewer(selectedProductDetail, a?.id);
+                              } else if (a) {
+                                setPreviewMediaAsset(a);
+                              }
                             }}
                             activeOpacity={0.85}
                           >
@@ -1201,7 +1163,18 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         )}
                         <TouchableOpacity
                           style={styles.drawerPdfBtn}
-                          onPress={() => handleOpenFullDetail(selectedProductDetail)}
+                          onPress={() => {
+                            const pdf = selectedProductDetail.mediaAssets?.find(
+                              (m) => m.asset_type === 'PDF_BROCHURE' || m.asset_type === 'TECH_SHEET'
+                            );
+                            if (onOpenMediaViewer && (pdf || selectedProductDetail.brochureUrl || selectedProductDetail.techSheetUrl)) {
+                              setSelectedProductDetail(null);
+                              onSelectProduct(null);
+                              onOpenMediaViewer(selectedProductDetail, pdf?.id);
+                            } else {
+                              handleOpenFullDetail(selectedProductDetail);
+                            }
+                          }}
                           activeOpacity={0.85}
                         >
                           <FileText size={scaleFont(13)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
@@ -1232,7 +1205,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         </View>
                       ))}
                   </View>
-                </ScrollView>
+                </KioskScrollContainer>
 
                 {/* Side Drawer Footer */}
                 <View style={styles.sideDrawerFooter}>
@@ -1389,17 +1362,18 @@ const styles = StyleSheet.create({
 
   // ── CATEGORY SELECTION VIEW ──
   categoryHomeContent: {
-    padding: 14,
-    paddingBottom: 22,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
     alignItems: 'center',
   },
   sectionHeadRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 8,
     width: '100%',
-    paddingHorizontal: 20,
+    paddingHorizontal: 6,
   },
   sectionHeadLeft: {
     flexDirection: 'row',
@@ -1455,27 +1429,82 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 8,
   },
+  // Redesigned Category Cards: Square photo on top, writing on bottom, borderless with box shadow
   categoryCard: {
-    backgroundColor: '#0F1E36',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 0,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: KIOSK_BRAND_BORDER,
-    shadowColor: '#0D60AE',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
     elevation: 5,
   },
   cardBoxFillWrapper: {
     flex: 1,
     width: '100%',
     height: '100%',
-    position: 'relative',
-    justifyContent: 'space-between',
-    padding: 12,
+    flexDirection: 'column',
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
     borderRadius: 14,
+    padding: 0,
+  },
+  cardSquarePhotoWrapper: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  cardActivePhotoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(13, 96, 174, 0.12)',
+  },
+  cardBottomWriting: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 62,
+  },
+  cardBottomTextCol: {
+    flex: 1,
+    marginRight: 6,
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  cardBottomTitle: {
+    color: kioskColors.brandNavy,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    includeFontPadding: false,
+  },
+  cardBottomTitleActive: {
+    color: kioskColors.accentBlue,
+  },
+  cardBottomArrowCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBottomArrowCircleActive: {
+    backgroundColor: '#EFF6FF',
   },
   cardActiveGlowBorder: {
     position: 'absolute',
@@ -1483,76 +1512,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: '#38BDF8',
     borderRadius: 14,
     zIndex: 10,
     pointerEvents: 'none',
-  },
-  cardMainContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-    zIndex: 5,
-  },
-  cardHeaderArea: {
-    width: '100%',
-  },
-  cardHeadingTitle: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    letterSpacing: -0.2,
-    includeFontPadding: false,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 3,
-  },
-  cardHeadingDivider: {
-    height: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
-    marginVertical: 6,
-    width: '100%',
-    borderRadius: 1,
-  },
-  cardDescriptionText: {
-    color: 'rgba(255, 255, 255, 0.94)',
-    fontWeight: '400',
-    letterSpacing: 0.1,
-    includeFontPadding: false,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  cardFooterOverlayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  cardCategoryBadge: {
-    backgroundColor: 'rgba(13, 96, 174, 0.85)',
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: kioskRadii.full,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.5)',
-  },
-  cardCategoryBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    includeFontPadding: false,
-  },
-  cardArrowCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#0D60AE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2.5,
-    elevation: 3,
   },
   cardArrowCircleActive: {
     backgroundColor: '#0284C7',
@@ -1741,6 +1705,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 6,
     position: 'relative',
+    borderTopLeftRadius: kioskRadii.md,
+    borderTopRightRadius: kioskRadii.md,
+    overflow: 'hidden',
   },
   productImg: {
     width: '90%',
@@ -1774,6 +1741,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.04)',
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderBottomLeftRadius: kioskRadii.md,
+    borderBottomRightRadius: kioskRadii.md,
   },
   productCardTextCol: {
     flex: 1,
@@ -1782,7 +1751,7 @@ const styles = StyleSheet.create({
   productCardTitle: {
     fontWeight: '700',
     fontSize: 13,
-    color: kioskColors.textPrimary,
+    color: kioskColors.brandNavy,
     lineHeight: 16,
     letterSpacing: -0.2,
     includeFontPadding: false,
