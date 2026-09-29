@@ -549,12 +549,68 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
       const subCatName = p.sub_category?.name || '';
       const subCategoryKey = subCatCode || subCatId || '';
 
+      // Parse features safely
+      let parsedFeatures: any[] = [];
+      if (typeof p.features === 'string') {
+        try { parsedFeatures = JSON.parse(p.features); } catch (e) {}
+      } else if (Array.isArray(p.features)) {
+        parsedFeatures = p.features;
+      }
+
+      // Parse certifications safely
+      let parsedCerts: any[] = [];
+      if (typeof p.certifications === 'string') {
+        try { parsedCerts = JSON.parse(p.certifications); } catch (e) {}
+      } else if (Array.isArray(p.certifications)) {
+        parsedCerts = p.certifications;
+      }
+
+      // Parse in-house tests safely
+      let parsedTests: any[] = [];
+      if (typeof p.in_house_tests === 'string') {
+        try { parsedTests = JSON.parse(p.in_house_tests); } catch (e) {}
+      } else if (Array.isArray(p.in_house_tests)) {
+        parsedTests = p.in_house_tests;
+      }
+
+      // Parse applicable areas safely
+      let parsedAreas: string[] = [];
+      if (typeof p.applicable_areas === 'string') {
+        try { parsedAreas = JSON.parse(p.applicable_areas); } catch (e) {}
+      } else if (Array.isArray(p.applicable_areas)) {
+        parsedAreas = p.applicable_areas;
+      }
+
       // Fallback image if product image is empty
       const finalImage =
         fixedImg ||
         (p.category?.image_url
           ? sanitizeMediaUrl(p.category.image_url, cleanUrl)
           : 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80');
+
+      // Map product variants
+      const mappedVariants = Array.isArray(p.variants)
+        ? p.variants.map((v: any) => {
+            const vRawImg = v.image_url || v.image || '';
+            const vFixedImg = vRawImg ? sanitizeMediaUrl(vRawImg, cleanUrl) : '';
+            return {
+              id: String(v.id || Math.random()),
+              productId: String(p.id),
+              name: v.name || 'Variant',
+              sku: v.sku || '',
+              price: parseFloat(v.price) || 0,
+              stock: typeof v.stock === 'number' ? v.stock : 100,
+              image: vFixedImg || finalImage,
+              specifications: v.specifications && typeof v.specifications === 'object' ? v.specifications : {},
+              features: Array.isArray(v.features) ? v.features : [],
+              certifications: Array.isArray(v.certifications) ? v.certifications : [],
+              inHouseTests: Array.isArray(v.in_house_tests) ? v.in_house_tests : [],
+              applicableAreas: Array.isArray(v.applicable_areas) ? v.applicable_areas : [],
+              displayOrder: v.display_order || 0,
+              isActive: v.is_active !== false,
+            };
+          })
+        : [];
 
       return {
         id: String(p.id || Math.random()),
@@ -577,6 +633,13 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
         description: p.description || '',
         image: finalImage,
         specifications: specs,
+        features: parsedFeatures,
+        certifications: parsedCerts,
+        inHouseTests: parsedTests,
+        applicableAreas: parsedAreas,
+        applications: parsedAreas, // Backwards compatibility
+        standards: parsedCerts.map((c: any) => typeof c === 'string' ? c : (c.title || '')), // Backwards compatibility
+        variants: mappedVariants,
         price: parseFloat(p.price) || 0,
         stock: typeof p.stock === 'number' ? p.stock : 100,
         mediaAssets: mappedAssets,
@@ -584,6 +647,7 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
         techSheetUrl: techSheetAsset?.file_url,
       };
     });
+
 
     if (mapped.length > 0) {
       // Resolve any available offline cached media URIs

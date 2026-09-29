@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Platform, NativeModules, Text, AppState, Image } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -136,58 +137,60 @@ export default function App() {
 
 
   return (
-    <KioskErrorBoundary>
-      <InactivityTracker
-        inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers screensaver/ads even before login
-        onInactivity={() => {
-          if (!showSplash && !isCheckingAuth) {
-            // Instantly activate screensaver using already-cached, pre-warmed slides
-            setIsScreensaverActive(true);
-          }
-        }}
-        enabled={!showSplash && !isCheckingAuth}
-      >
-        <View style={styles.container}>
-          <StatusBar hidden style="light" />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KioskErrorBoundary>
+        <InactivityTracker
+          inactivityTimeoutMs={30000} // Dynamic 30s inactivity triggers screensaver/ads even before login
+          onInactivity={() => {
+            if (!showSplash && !isCheckingAuth) {
+              // Instantly activate screensaver using already-cached, pre-warmed slides
+              setIsScreensaverActive(true);
+            }
+          }}
+          enabled={!showSplash && !isCheckingAuth}
+        >
+          <View style={styles.container}>
+            <StatusBar hidden style="light" />
 
-          {/* Dynamic Screensaver Overlay (Plays after 30s inactivity even if not logged in) */}
-          {isScreensaverActive && (
-            <AttractLoop
-              metrics={responsiveMetrics}
-              screensavers={screensavers}
-              onDismiss={() => setIsScreensaverActive(false)}
-            />
-          )}
+            {/* Dynamic Screensaver Overlay (Plays after 30s inactivity even if not logged in) */}
+            {isScreensaverActive && (
+              <AttractLoop
+                metrics={responsiveMetrics}
+                screensavers={screensavers}
+                onDismiss={() => setIsScreensaverActive(false)}
+              />
+            )}
 
-          {/* Animated Splash Screen Overlay */}
-          {showSplash ? (
-            <AnimatedSplashScreen onFinish={() => setShowSplash(false)} />
-          ) : isCheckingAuth ? (
-            <View style={styles.loadingContainer}>
-              <Image
-                source={require('./assets/excel_since_logo.png')}
-                style={styles.loadingCrestLogo}
-                resizeMode="contain"
-              />
-              <Image
-                source={require('./assets/excel_corporate_logo.png')}
-                style={styles.loadingCorporateLogo}
-                resizeMode="contain"
-              />
-              <Text style={styles.loadingTitle}>Excel Earthing Kiosk App</Text>
-              <Text style={styles.loadingSub}>Initializing Terminal & Security...</Text>
-              <ActivityIndicator size="large" color="#FFC107" style={{ marginTop: 18 }} />
-            </View>
-          ) : isAuthenticated ? (
-            /* Product Details & Full Catalog: Accessible ONLY when authenticated/logged in */
-            <HomeScreen onLogout={handleLogout} isScreensaverActive={isScreensaverActive} />
-          ) : (
-            /* Login Screen: Displayed when not authenticated */
-            <KioskLoginScreen onLoginSuccess={handleLoginSuccess} />
-          )}
-        </View>
-      </InactivityTracker>
-    </KioskErrorBoundary>
+            {/* Animated Splash Screen Overlay */}
+            {showSplash ? (
+              <AnimatedSplashScreen onFinish={() => setShowSplash(false)} />
+            ) : isCheckingAuth ? (
+              <View style={styles.loadingContainer}>
+                <Image
+                  source={require('./assets/excel_since_logo.png')}
+                  style={styles.loadingCrestLogo}
+                  resizeMode="contain"
+                />
+                <Image
+                  source={require('./assets/excel_corporate_logo.png')}
+                  style={styles.loadingCorporateLogo}
+                  resizeMode="contain"
+                />
+                <Text style={styles.loadingTitle}>Excel Earthing Kiosk App</Text>
+                <Text style={styles.loadingSub}>Initializing Terminal & Security...</Text>
+                <ActivityIndicator size="large" color="#FFC107" style={{ marginTop: 18 }} />
+              </View>
+            ) : isAuthenticated ? (
+              /* Product Details & Full Catalog: Accessible ONLY when authenticated/logged in */
+              <HomeScreen onLogout={handleLogout} isScreensaverActive={isScreensaverActive} />
+            ) : (
+              /* Login Screen: Displayed when not authenticated */
+              <KioskLoginScreen onLoginSuccess={handleLoginSuccess} />
+            )}
+          </View>
+        </InactivityTracker>
+      </KioskErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 

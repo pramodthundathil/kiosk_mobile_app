@@ -7,6 +7,7 @@ export type InteractionType =
   | 'CLICK'
   | 'VIEW_DETAIL'
   | 'SPEC_TAB_CLICK'
+  | 'VARIANT_SELECT'
   | 'BROCHURE_VIEW'
   | 'WHITEBOARD_OPEN'
   | 'SEARCH_SELECT'

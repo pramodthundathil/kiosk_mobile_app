@@ -53,6 +53,38 @@ export interface ProductMediaAsset {
   description?: string;
 }
 
+export interface FeaturePointItem {
+  point: string;
+  sub_points?: string[];
+}
+
+export interface CertificationPointItem {
+  title: string;
+  sub_points?: string[];
+}
+
+export interface InHouseTestPointItem {
+  title: string;
+  sub_points?: string[];
+}
+
+export interface KioskProductVariant {
+  id: string;
+  productId?: string;
+  name: string;
+  sku?: string;
+  price?: number;
+  stock?: number;
+  image?: string;
+  specifications?: Record<string, string>;
+  features?: (FeaturePointItem | string)[];
+  certifications?: (CertificationPointItem | string)[];
+  inHouseTests?: (InHouseTestPointItem | string)[];
+  applicableAreas?: string[];
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
 export interface KioskProduct {
   id: string;
   name: string;
@@ -70,9 +102,13 @@ export interface KioskProduct {
   description: string;
   image: string;
   specifications: Record<string, string>;
-  features?: string[];
-  applications?: string[];
-  standards?: string[];
+  features?: (FeaturePointItem | string)[];
+  certifications?: (CertificationPointItem | string)[];
+  inHouseTests?: (InHouseTestPointItem | string)[];
+  applicableAreas?: string[];
+  applications?: string[]; // Backwards compatibility alias
+  standards?: string[];    // Backwards compatibility alias
+  variants?: KioskProductVariant[];
   badge?: string;
   price?: number; // Optional reference price if provided by API
   stock?: number;
@@ -81,6 +117,7 @@ export interface KioskProduct {
   techSheetUrl?: string;
   isPopular?: boolean;
 }
+
 
 
 export interface KioskScreensaver {

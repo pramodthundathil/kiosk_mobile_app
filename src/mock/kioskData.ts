@@ -269,24 +269,128 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
     id: 'p1',
     name: 'Copper Bonded Earthing Electrode',
     sku: 'EX-CBR-16MM-3M',
-    subtitle: 'High tensile low carbon steel core with 254 micron copper bonding',
+    subtitle: 'High tensile low carbon steel core with molecular copper bonding (100 & 250 Microns)',
     category: 'electrodes',
     categoryName: 'Earthing Electrodes',
-    description: 'High performance copper bonded earthing electrode designed for long life, low resistance and superior corrosion protection. Ideal for all types of soil conditions.',
+    description: 'High performance copper bonded earthing electrode designed for long life, low resistance and superior corrosion protection. Manufactured in accordance with IEC 62561-2 and UL 467 international standards.',
     image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
     specifications: {
-      'Material': 'Low Carbon Steel with 99.9% Copper Bonded',
-      'Diameter': '14 mm - 25 mm (varies by model)',
-      'Length': '1.2 m / 1.5 m / 3.0 m (customizable)',
-      'Coating Thickness': 'Minimum 254 microns',
-      'Standards': 'IEC 62561, IS 3043',
-      'Application': 'Substation, Buildings, Industrial, Solar, Telecom',
+      'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+      'Base Coating Material': 'Nickel',
+      'Coating Material': '99.9% Pure Electrolytic Grade Copper Anode (Mitsubishi Luvata Japan)',
+      'Available Coating Thickness': '250/100 Microns (avg.)',
+      'Available Diameter (mm)': '14.2, 16, 17.2, 20, 25, 32, 40, 50',
+      'Available Length (m)': '1.2 to 3.0',
+      'V Strip Dimension (optional)': '50mm x 5mm x 150mm Long',
+      'T-Strip Dimension (optional)': '32mm x 5mm x 150mm Long',
+      'Connectors': 'SS 304 Grade Nut Bolts',
+      'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80 / IS 3043'
     },
     features: [
-      'Molecular bond prevents peeling or slipping during deep soil driving',
-      'Low carbon steel core ensures high strength for mechanical driving',
-      '250 micron thick copper shell guarantees 30+ years of maintenance-free service',
-      'Tested to withstand high impulse surge currents'
+      {
+        point: 'Superior Electrical, Mechanical and Thermal Properties (IEEE 837).',
+        sub_points: [
+          'High fault current dissipation capability',
+          'Excellent thermal withstand without degradation under repeated lightning surges'
+        ]
+      },
+      {
+        point: 'Fast Dissipation of Fault Current.',
+        sub_points: [
+          'Rapidly conducts high-energy transients and lightning currents safely into ground',
+          'Minimizes step and touch potential for personnel safety'
+        ]
+      },
+      {
+        point: 'No joints beneath the soil as in Plate Electrodes.',
+        sub_points: [
+          'Single continuous monolithic construction eliminates high-resistance joint points',
+          'Zero corrosion failure at underground connection points'
+        ]
+      },
+      {
+        point: 'Good Corrosion Resistance than Cast Iron / Hot Dip GI Electrodes.',
+        sub_points: [
+          'Over 30 years expected service life in aggressive soil chemistries',
+          'Electro-molecular copper jacket prevents soil moisture ingress and galvanic rusting'
+        ]
+      }
+    ],
+    certifications: [
+      {
+        title: 'IEC 62561-2:2018 Lightning Protection System Components - Part 2: Requirements for Conductors and Earth Electrodes (TC No.: C2/0000032498, D211105006/D211105006-10)',
+        sub_points: [
+          'Adhesion Test',
+          'Bend Test',
+          'Electrical Resistivity Test',
+          'Tensile Strength',
+          'Yield / Tensile Ratio',
+          'Coating Thickness Test',
+          'Environmental Test'
+        ]
+      },
+      {
+        title: 'ISI Marked [IS 1772] : Electroplated Coatings of Copper (CM/L : 6400125807)',
+        sub_points: [
+          'Thickness of Copper Coating',
+          'Corrosion Resistance Test - Copper Accelerated Acetic Acid Salt Spray',
+          'Adhesion Test'
+        ]
+      },
+      {
+        title: 'Short Circuit Current Tested from Central Power Research Institute Bangalore (TC No.: SC15357B, SC15357A)',
+        sub_points: [
+          'Tested under extreme fault impulse current conditions without thermal peel'
+        ]
+      },
+      {
+        title: 'ASTM B499:2014 - Measurement of Copper Coating Thickness (TC No.: ML/23835/4/20-21)',
+        sub_points: [
+          'Microscopic and magnetic thickness verification across electrode body'
+        ]
+      }
+    ],
+    inHouseTests: [
+      {
+        title: 'Coating Thickness Test as per Clause 9.6.1 UL 467',
+        sub_points: [
+          'Calibrated magnetic thickness gage verification across entire length'
+        ]
+      },
+      {
+        title: 'Adhesion Test as per Clause 9.7.1 UL 467',
+        sub_points: [
+          'Drive test through cutting and clamping dies to ensure molecular cohesion'
+        ]
+      },
+      {
+        title: 'Bend Test as per Clause 9.7.2 UL 467',
+        sub_points: [
+          '90-degree cold bend test around mandrel with zero copper separation or cracking'
+        ]
+      },
+      {
+        title: 'Corrosion Resistance Test - Copper Accelerated Acetic Acid Salt Spray Test as per Clause 4.5 IS 1772:1973',
+        sub_points: [
+          'Continuous accelerated exposure under salt fog chamber without pitting'
+        ]
+      },
+      {
+        title: 'Environmental Test as per Clause 5.3.5 IEC 62561-2:2018',
+        sub_points: [
+          'Sulfur dioxide weathering and artificial humid atmosphere exposure'
+        ]
+      }
+    ],
+    applicableAreas: [
+      'Substations & High Voltage Transmission Lines',
+      'Telecommunication & Microwave Towers',
+      'Oil, Gas & Petrochemical Refineries',
+      'Data Centers & Mission Critical IT Facilities',
+      'Solar PV & Wind Energy Farms',
+      'Heavy Industrial Manufacturing Facilities',
+      'Commercial & High-Rise Residential Buildings',
+      'Railways & Metro Transit Infrastructure'
     ],
     applications: [
       'High Voltage Electrical Substations',
@@ -295,6 +399,120 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'IT Data Centers & Heavy Industrial Complexes'
     ],
     standards: ['IEC 62561-2', 'UL 467', 'IEEE 80', 'IS 3043'],
+    variants: [
+      {
+        id: 'var-cbr-250',
+        name: 'Copper Bonded Rod 250 Microns',
+        sku: 'EX-CBR-250M',
+        displayOrder: 1,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+          'Coating Material': '99.9% Pure Electrolytic Copper Anode',
+          'Coating Thickness': '250 Microns (avg.)',
+          'Available Diameter': '14.2mm, 16mm, 17.2mm, 20mm, 25mm, 32mm',
+          'Available Length': '1.2m - 3.0m',
+          'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80',
+        }
+      },
+      {
+        id: 'var-cbr-100',
+        name: 'Copper Bonded Rod 100 Microns',
+        sku: 'EX-CBR-100M',
+        displayOrder: 2,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+          'Coating Material': '99.9% Pure Electrolytic Copper Anode',
+          'Coating Thickness': '100 Microns (avg.)',
+          'Available Diameter': '14.2mm, 16mm, 17.2mm, 20mm, 25mm',
+          'Available Length': '1.2m - 3.0m',
+          'Standards Compliance': 'IEC 62561-2 / IS 3043',
+        }
+      },
+      {
+        id: 'var-cbr-v100',
+        name: 'With V Strip 100 Microns',
+        sku: 'EX-CBR-V100',
+        displayOrder: 3,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+          'Base Coating Material': 'Nickel',
+          'Coating Material': '99.9% Pure Electrolytic Grade Copper Anode',
+          'Coating Thickness': '100 Microns (avg.)',
+          'Available Diameter (mm)': '14.2, 16, 17.2, 20, 25, 32, 40, 50',
+          'Available Length (m)': '1.2 to 3.0',
+          'V Strip Dimension': '50mm x 5mm x 150mm Long',
+          'Connectors': 'SS 304 Grade Nut Bolts',
+          'Standards Compliance': 'IEC 62561-2 / UL 467',
+        }
+      },
+      {
+        id: 'var-cbr-t100',
+        name: 'With T Strip 100 Microns',
+        sku: 'EX-CBR-T100',
+        displayOrder: 4,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+          'Coating Material': '99.9% Pure Electrolytic Copper Anode',
+          'Coating Thickness': '100 Microns (avg.)',
+          'T Strip Dimension': '32mm x 5mm x 150mm Long',
+          'Connectors': 'SS 304 Grade Nut Bolts',
+          'Standards Compliance': 'IEC 62561-2 / IS 3043',
+        }
+      },
+      {
+        id: 'var-cbr-t250',
+        name: 'With T Strip 250 Microns',
+        sku: 'EX-CBR-T250',
+        displayOrder: 5,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+          'Coating Material': '99.9% Pure Electrolytic Copper Anode',
+          'Coating Thickness': '250 Microns (avg.)',
+          'T Strip Dimension': '32mm x 5mm x 150mm Long',
+          'Connectors': 'SS 304 Grade Nut Bolts',
+          'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80',
+        }
+      },
+      {
+        id: 'var-cbr-plain',
+        name: 'Plain Rod',
+        sku: 'EX-CBR-PLAIN',
+        displayOrder: 6,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (High Tensile ≥ 600 N/mm²)',
+          'Coating Material': '99.9% Pure Electrolytic Copper Anode',
+          'Coating Thickness': '250/100 Microns',
+          'Configuration': 'Pointed driving tip with flat driving head',
+          'Standards Compliance': 'IEC 62561-2',
+        }
+      },
+      {
+        id: 'var-cbr-th1',
+        name: 'Plain Threaded on One Side',
+        sku: 'EX-CBR-TH1',
+        displayOrder: 7,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+          'Coating Material': '99.9% Pure Electrolytic Copper',
+          'Thread Type': 'Cold-rolled continuous thread on top end',
+          'Application': 'Extension with brass/copper couplers for deep earth drilling',
+          'Standards Compliance': 'IEC 62561-2 / UL 467',
+        }
+      },
+      {
+        id: 'var-cbr-th2',
+        name: 'Plain Threaded on Two Side',
+        sku: 'EX-CBR-TH2',
+        displayOrder: 8,
+        specifications: {
+          'Base Material': 'Low Carbon Steel (Tata/Jindal/Vizag)',
+          'Coating Material': '99.9% Pure Electrolytic Copper',
+          'Thread Type': 'Cold-rolled continuous thread on both ends',
+          'Application': 'Multi-rod tandem coupling for deep bore grounding',
+          'Standards Compliance': 'IEC 62561-2 / UL 467',
+        }
+      }
+    ],
     mediaAssets: [
       {
         id: 'm-3d-1',
@@ -313,6 +531,7 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
         description: 'Official Excel Earthings technical specification datasheet and IEC compliance test report.',
       },
     ],
+
   },
   {
     id: 'p2',
