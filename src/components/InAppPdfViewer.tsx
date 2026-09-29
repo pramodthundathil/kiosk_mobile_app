@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -129,8 +129,124 @@ export const InAppPdfViewer: React.FC<InAppPdfViewerProps> = ({
     pdfUrl || 'https://excel.byteboot.in'
   )}`;
 
-  // Google Docs Embedded Viewer URL for Android & Web fallback
-  // Provides high-performance in-app rendering of remote PDFs
+  // Fast HTML-based Mozilla PDF.js rendering for Android with instant fallback
+  const pdfJsHtml = useMemo(() => {
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0B1528;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow-x: hidden;
+    }
+    #container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 900px;
+      padding: 0 12px;
+    }
+    .page-card {
+      margin-bottom: 20px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #FFFFFF;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    #status {
+      color: #60A5FA;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 30px;
+      letter-spacing: 0.2px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">⚡ Rendering Document Pages...</div>
+  <div id="container"></div>
+  <script>
+    const pdfUrl = ${JSON.stringify(pdfUrl)};
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    function notifyLoaded() {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOADED' }));
+      }
+    }
+
+    function fallbackGoogleDocs() {
+      window.location.replace('https://docs.google.com/gview?embedded=true&url=' + encodeURIComponent(pdfUrl));
+    }
+
+    try {
+      const loadingTask = pdfjsLib.getDocument({
+        url: pdfUrl,
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true,
+      });
+
+      loadingTask.promise.then(async function(pdf) {
+        const statusEl = document.getElementById('status');
+        if (statusEl) statusEl.style.display = 'none';
+        notifyLoaded();
+
+        const container = document.getElementById('container');
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          try {
+            const page = await pdf.getPage(pageNum);
+            const scale = 2.0;
+            const viewport = page.getViewport({ scale: scale });
+            const card = document.createElement('div');
+            card.className = 'page-card';
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            card.appendChild(canvas);
+            container.appendChild(card);
+
+            const renderContext = {
+              canvasContext: canvas.getContext('2d'),
+              viewport: viewport
+            };
+            await page.render(renderContext).promise;
+          } catch (e) {
+            console.error('Page render error:', e);
+          }
+        }
+      }).catch(function(err) {
+        console.warn('PDF.js load failed, falling back to Google Docs:', err);
+        fallbackGoogleDocs();
+      });
+    } catch (e) {
+      fallbackGoogleDocs();
+    }
+  </script>
+</body>
+</html>`;
+  }, [pdfUrl]);
+
+  // Google Docs Embedded Viewer URL for Web fallback or direct iOS
   const isDirectWebOrIos = Platform.OS === 'ios' || Platform.OS === 'web' || (typeof pdfUrl === 'string' && pdfUrl.startsWith('file://'));
   const resolvedViewerUrl = isDirectWebOrIos
     ? pdfUrl
@@ -297,7 +413,7 @@ export const InAppPdfViewer: React.FC<InAppPdfViewerProps> = ({
           <NativeWebView
             key={viewerKey}
             ref={webViewRef}
-            source={{ uri: resolvedViewerUrl }}
+            source={isDirectWebOrIos ? { uri: resolvedViewerUrl } : { html: pdfJsHtml, baseUrl: 'https://localhost' }}
             style={styles.nativeWebView}
             originWhitelist={['*']}
             mixedContentMode="always"
@@ -311,6 +427,14 @@ export const InAppPdfViewer: React.FC<InAppPdfViewerProps> = ({
             allowsInlineMediaPlayback={true}
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => setIsLoading(false)}
+            onMessage={(event: any) => {
+              try {
+                const data = JSON.parse(event.nativeEvent.data);
+                if (data.type === 'LOADED') {
+                  setIsLoading(false);
+                }
+              } catch (e) {}
+            }}
             onError={(e: any) => {
               console.warn('[InAppPdfViewer] Native WebView error:', e?.nativeEvent);
               setIsLoading(false);

@@ -593,7 +593,17 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
           'Available Diameter': '14.2mm, 16mm, 17.2mm, 20mm, 25mm, 32mm',
           'Available Length': '1.2m - 3.0m',
           'Standards Compliance': 'IEC 62561-2 / UL 467 / IEEE 80',
-        }
+        },
+        mediaAssets: [
+          {
+            id: 'm-3d-var',
+            title: '3D Copper Bonded Rod Model',
+            asset_type: 'THREE_D',
+            asset_type_display: '3D Interactive Model',
+            file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/copper-bonded-earth-rod_JPxKz56.glb',
+            description: 'Interactive 3D model of the copper bonded earthing electrode. 360-degree rotation and zoom enabled.',
+          },
+        ],
       },
       {
         id: 'var-cbr-100',
@@ -702,7 +712,6 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
         asset_type_display: '3D Interactive Model',
         file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/copper-bonded-earth-rod_JPxKz56.glb',
         description: 'Interactive 3D model of the copper bonded earthing electrode. 360-degree rotation and zoom enabled.',
-        variantId: 'var-cbr-250',
       },
       {
         id: 'm-pdf-1',

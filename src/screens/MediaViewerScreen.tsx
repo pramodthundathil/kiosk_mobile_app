@@ -342,40 +342,65 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
         });
       });
 
-    // 5. PDF Brochures & Tech Sheets
+    // 5. PDF Brochures & Tech Sheets (Strictly deduplicated so only 1 unique doc is displayed if only 1 is available)
+    const pdfCandidates: {
+      id: string;
+      title: string;
+      url: string;
+      description?: string;
+    }[] = [];
+
     assets
-      .filter((a) => (a.asset_type === 'PDF_BROCHURE' || a.asset_type === 'TECH_SHEET') && a.file_url)
+      .filter((a) => (a.asset_type === 'PDF_BROCHURE' || a.asset_type === 'TECH_SHEET' || (a.asset_type as string) === 'PDF' || a.file_url?.toLowerCase().endsWith('.pdf')) && a.file_url)
       .forEach((a) => {
-        items.push({
+        pdfCandidates.push({
           id: a.id,
           title: a.title || (a.asset_type === 'PDF_BROCHURE' ? 'Official Brochure' : 'Technical Sheet'),
-          type: 'PDF',
-          typeLabel: 'PDF Doc',
           url: a.file_url!,
           description: a.description || 'Certified engineering datasheet and test specifications',
         });
       });
 
-    // 6. Direct brochure / techSheet URLs if not already in mediaAssets
-    if (product.brochureUrl && !items.some((i) => i.url === product.brochureUrl)) {
-      items.push({
+    if (product.brochureUrl) {
+      pdfCandidates.push({
         id: 'brochure-doc',
         title: 'Product Brochure',
-        type: 'PDF',
-        typeLabel: 'Brochure',
         url: product.brochureUrl,
         description: 'Comprehensive product catalog brochure',
       });
     }
 
-    if (product.techSheetUrl && !items.some((i) => i.url === product.techSheetUrl)) {
-      items.push({
+    if (product.techSheetUrl) {
+      pdfCandidates.push({
         id: 'techsheet-doc',
         title: 'Technical Data Sheet',
-        type: 'PDF',
-        typeLabel: 'Datasheet',
         url: product.techSheetUrl,
         description: 'Engineering specifications and compliance ratings',
+      });
+    }
+
+    // Deduplicate PDF candidates strictly by URL and clean filename
+    const seenPdfUrls = new Set<string>();
+    const seenPdfFiles = new Set<string>();
+
+    for (const p of pdfCandidates) {
+      if (!p.url || p.url.trim().length === 0) continue;
+      const cleanUrl = p.url.trim();
+      const cleanFile = cleanUrl.split('?')[0].split('#')[0].split('/').pop()?.toLowerCase() || '';
+
+      if (seenPdfUrls.has(cleanUrl) || (cleanFile && seenPdfFiles.has(cleanFile))) {
+        continue;
+      }
+      seenPdfUrls.add(cleanUrl);
+      if (cleanFile) seenPdfFiles.add(cleanFile);
+
+      items.push({
+        id: p.id,
+        title: p.title,
+        type: 'PDF',
+        typeLabel: 'Datasheet',
+        url: cleanUrl,
+        description: p.description || 'Certified engineering datasheet and test specifications',
       });
     }
 

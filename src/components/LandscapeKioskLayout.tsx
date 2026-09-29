@@ -715,25 +715,27 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                       ]}
                     >
                       {(active) => (
-                        <View style={styles.cardBoxFillWrapper}>
-                          {/* 1. Full-bleed Picture */}
-                          <Image
-                            source={{ uri: imageUrl }}
-                            style={StyleSheet.absoluteFill}
-                            resizeMode="cover"
-                            fadeDuration={0}
-                          />
+                        <View style={styles.subCatCardWrapper}>
+                          {/* 1. Contained Subcategory Image Area */}
+                          <View style={styles.subCatImgArea}>
+                            <Image
+                              source={{ uri: imageUrl }}
+                              style={styles.subCatImgContain}
+                              resizeMode="contain"
+                              fadeDuration={0}
+                            />
+                          </View>
 
                           {/* 2. Active Touch Tint Feedback */}
                           {active && <View style={styles.cardActivePhotoOverlay} />}
 
-                          {/* 3. Bottom Scattered Gradient matching picture's color */}
+                          {/* 3. Bottom Gradient Strip */}
                           <LinearGradient
                             colors={getCategoryGradientColors(subCat)}
                             locations={KIOSK_CARD_GRADIENT_LOCATIONS}
-                            style={styles.cardGradientOverlay}
+                            style={styles.subCatBottomBar}
                           >
-                            {/* 4. Writing of the category on top of the gradient */}
+                            {/* 4. Writing of the subcategory on top of the gradient */}
                             <View style={styles.cardBottomWriting}>
                               <View style={styles.cardBottomTextCol}>
                                 <Text
@@ -741,8 +743,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                                   style={[
                                     styles.cardBottomTitle,
                                     {
-                                      fontSize: scaleFont(is4K ? 21 : screenWidth >= 1200 ? 15.5 : 14),
-                                      lineHeight: scaleFont(is4K ? 27 : screenWidth >= 1200 ? 21 : 19),
+                                      fontSize: scaleFont(is4K ? 20 : screenWidth >= 1200 ? 15 : 13.5),
+                                      lineHeight: scaleFont(is4K ? 26 : screenWidth >= 1200 ? 20 : 18),
                                     },
                                   ]}
                                   {...crispTextProps}
@@ -1448,6 +1450,36 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 14,
     padding: 0,
+  },
+  subCatCardWrapper: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  subCatImgArea: {
+    flex: 1,
+    width: '100%',
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  subCatImgContain: {
+    width: '100%',
+    height: '100%',
+  },
+  subCatBottomBar: {
+    width: '100%',
+    paddingTop: 6,
+    paddingBottom: 4,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    zIndex: 3,
   },
   cardActivePhotoOverlay: {
     position: 'absolute',

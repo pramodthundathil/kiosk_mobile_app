@@ -130,7 +130,7 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
   }, [product.image, product.id, product.name, product.variants, mediaAssets]);
 
   const docAssets = useMemo(() => {
-    const docs = mediaAssets.filter(
+    const rawDocs = mediaAssets.filter(
       (a) =>
         (a.asset_type?.toUpperCase() === 'PDF_BROCHURE' ||
           a.asset_type?.toUpperCase() === 'TECH_SHEET' ||
@@ -139,25 +139,45 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
         typeof a.file_url === 'string' &&
         a.file_url.trim().length > 0
     );
-    if (docs.length === 0) {
-      if (product.brochureUrl && product.brochureUrl.trim().length > 0) {
-        docs.push({
-          id: 'brochure',
-          title: `${product.name} Brochure`,
-          asset_type: 'PDF_BROCHURE' as const,
-          file_url: product.brochureUrl.trim(),
-        });
-      }
-      if (product.techSheetUrl && product.techSheetUrl.trim().length > 0) {
-        docs.push({
-          id: 'tech_sheet',
-          title: `${product.name} Technical Datasheet`,
-          asset_type: 'TECH_SHEET' as const,
-          file_url: product.techSheetUrl.trim(),
-        });
-      }
+
+    const candidates: ProductMediaAsset[] = [...rawDocs];
+
+    if (product.brochureUrl && product.brochureUrl.trim().length > 0) {
+      candidates.push({
+        id: 'brochure',
+        title: `${product.name} Brochure`,
+        asset_type: 'PDF_BROCHURE' as const,
+        file_url: product.brochureUrl.trim(),
+      });
     }
-    return docs;
+    if (product.techSheetUrl && product.techSheetUrl.trim().length > 0) {
+      candidates.push({
+        id: 'tech_sheet',
+        title: `${product.name} Technical Datasheet`,
+        asset_type: 'TECH_SHEET' as const,
+        file_url: product.techSheetUrl.trim(),
+      });
+    }
+
+    // Deduplicate candidates by clean filename and exact URL
+    const seenUrls = new Set<string>();
+    const seenFiles = new Set<string>();
+    const uniqueDocs: ProductMediaAsset[] = [];
+
+    for (const d of candidates) {
+      if (!d.file_url) continue;
+      const url = d.file_url.trim();
+      const cleanFile = url.split('?')[0].split('#')[0].split('/').pop()?.toLowerCase() || '';
+
+      if (seenUrls.has(url) || (cleanFile && seenFiles.has(cleanFile))) {
+        continue;
+      }
+      seenUrls.add(url);
+      if (cleanFile) seenFiles.add(cleanFile);
+      uniqueDocs.push(d);
+    }
+
+    return uniqueDocs;
   }, [mediaAssets, product.brochureUrl, product.techSheetUrl, product.name]);
 
   // Initial tab selection

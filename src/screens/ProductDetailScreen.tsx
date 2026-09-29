@@ -362,43 +362,100 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     return [];
   }, [activeVariant, product.applicableAreas, product.applications]);
 
+  // Helper to extract clean base filename for robust deduplication
+  const getCleanMediaFilename = (url?: string) => {
+    if (!url) return '';
+    const clean = url.split('?')[0].split('#')[0];
+    return clean.substring(clean.lastIndexOf('/') + 1).toLowerCase();
+  };
+
   // Resolved Media Assets for the current selection
   const resolvedMediaAssets: ProductMediaAsset[] = useMemo(() => {
-    // 1. If child variant is selected and has explicit media assets:
-    if (!isParentSelected && activeVariant && Array.isArray(activeVariant.mediaAssets) && activeVariant.mediaAssets.length > 0) {
-      return activeVariant.mediaAssets;
-    }
-
     const allProductMedia = product.mediaAssets || [];
-    if (allProductMedia.length === 0) {
-      return [];
-    }
+    let candidateAssets: ProductMediaAsset[] = [];
 
     if (isParentSelected) {
       // For base/parent product, include media that is NOT tagged with a child variant id or matches product.id
-      return allProductMedia.filter((a) => !a.variantId || a.variantId === product.id);
+      candidateAssets = allProductMedia.filter((a) => !a.variantId || a.variantId === product.id);
     } else {
       // For a specific child variant:
-      // Include assets explicitly tagged for this variantId
-      const variantTagged = allProductMedia.filter((a) => a.variantId === selectedVariantId);
-      if (variantTagged.length > 0) {
-        // Also allow general PDF brochures if variant doesn't have its own
-        const generalPdfs = allProductMedia.filter(
-          (a) => !a.variantId && (a.asset_type?.toUpperCase().includes('PDF') || a.asset_type?.toUpperCase().includes('TECH'))
-        );
-        return [...variantTagged, ...generalPdfs];
-      }
-      // If variant has no specific tagged media, STRICTLY DO NOT leak 3D models assigned to other variants!
-      // Only keep general photos & PDFs that are NOT 3D
-      return allProductMedia.filter(
+      const explicitVariantAssets = (activeVariant && Array.isArray(activeVariant.mediaAssets)) ? activeVariant.mediaAssets : [];
+      const taggedFromAll = allProductMedia.filter((a) => a.variantId === selectedVariantId);
+      const combinedVariantAssets = [...explicitVariantAssets, ...taggedFromAll];
+
+      // Check if this variant has its own 3D model
+      const variantHas3D = combinedVariantAssets.some(
         (a) =>
-          !a.variantId &&
-          a.asset_type?.toUpperCase() !== 'THREE_D' &&
-          a.asset_type?.toUpperCase() !== '3D' &&
-          !a.file_url?.toLowerCase().endsWith('.glb') &&
-          !a.file_url?.toLowerCase().endsWith('.gltf')
+          a.asset_type?.toUpperCase() === 'THREE_D' ||
+          a.asset_type?.toUpperCase() === '3D' ||
+          a.file_url?.toLowerCase().endsWith('.glb') ||
+          a.file_url?.toLowerCase().endsWith('.gltf')
       );
+
+      // Check if variant has its own PDF
+      const variantHasPdf = combinedVariantAssets.some(
+        (a) =>
+          a.asset_type?.toUpperCase().includes('PDF') ||
+          a.asset_type?.toUpperCase().includes('TECH') ||
+          a.file_url?.toLowerCase().endsWith('.pdf')
+      );
+
+      // Allow general parent PDF brochures if variant doesn't have its own
+      const generalPdfs = !variantHasPdf
+        ? allProductMedia.filter(
+            (a) =>
+              !a.variantId &&
+              (a.asset_type?.toUpperCase().includes('PDF') ||
+                a.asset_type?.toUpperCase().includes('TECH') ||
+                a.file_url?.toLowerCase().endsWith('.pdf'))
+          )
+        : [];
+
+      // Variant assets + general parent photos (if variant has none) + general parent PDFs
+      const generalPhotos = combinedVariantAssets.length === 0
+        ? allProductMedia.filter(
+            (a) =>
+              !a.variantId &&
+              a.asset_type?.toUpperCase() !== 'THREE_D' &&
+              a.asset_type?.toUpperCase() !== '3D' &&
+              !a.file_url?.toLowerCase().endsWith('.glb') &&
+              !a.file_url?.toLowerCase().endsWith('.gltf') &&
+              !a.file_url?.toLowerCase().endsWith('.pdf')
+          )
+        : [];
+
+      candidateAssets = [...combinedVariantAssets, ...generalPhotos, ...generalPdfs];
     }
+
+    // Strictly deduplicate PDF assets so only 1 unique PDF is ever shown if only 1 is available
+    const seenPdfKeys = new Set<string>();
+    const seenAssetIds = new Set<string>();
+    const deduplicated: ProductMediaAsset[] = [];
+
+    for (const a of candidateAssets) {
+      if (a.id && seenAssetIds.has(a.id)) {
+        continue;
+      }
+      if (a.id) seenAssetIds.add(a.id);
+
+      const isPdf =
+        a.asset_type?.toUpperCase().includes('PDF') ||
+        a.asset_type?.toUpperCase().includes('TECH') ||
+        a.file_url?.toLowerCase().endsWith('.pdf');
+
+      if (isPdf && a.file_url) {
+        const cleanFile = getCleanMediaFilename(a.file_url);
+        if (seenPdfKeys.has(a.file_url) || (cleanFile && seenPdfKeys.has(cleanFile))) {
+          continue; // Skip duplicate PDF
+        }
+        seenPdfKeys.add(a.file_url);
+        if (cleanFile) seenPdfKeys.add(cleanFile);
+      }
+
+      deduplicated.push(a);
+    }
+
+    return deduplicated;
   }, [product.mediaAssets, activeVariant, isParentSelected, selectedVariantId, product.id]);
 
   // Virtual product with active variant parameters for gallery / media
