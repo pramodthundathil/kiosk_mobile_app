@@ -70,7 +70,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
       ]);
 
       if (cachedProds && cachedProds.length > 0) {
-        setProducts(cachedProds);
+        setProducts(cachedProds.filter((p) => !p.parentId));
       }
       if (cachedCats && cachedCats.length > 0) {
         setCategories([DEFAULT_CATEGORY, ...cachedCats]);

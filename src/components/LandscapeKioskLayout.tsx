@@ -332,6 +332,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   );
 
   const categoryProductsCount = products.filter((p) => {
+    if (p.parentId) return false;
     if (!activeCategoryObj) return false;
     const catTarget = (activeCategoryObj.id || activeCategoryObj.code || activeCategoryObj.name).toLowerCase();
     return (
@@ -345,6 +346,9 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
 
   // Filter products based on active category, active sub-category, and search
   const filteredProducts = products.filter((p) => {
+    // Child products (variants) must never be displayed in the product listing
+    if (p.parentId) return false;
+
     const query = searchQuery.trim().toLowerCase();
     if (query) {
       return (
@@ -984,6 +988,16 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                             <Text numberOfLines={2} style={[styles.productCardTitle, { color: combo.textColor, fontSize: scaleFont(13) }]} {...crispTextProps}>
                               {item.name}
                             </Text>
+                            {item.variants && item.variants.length > 0 ? (
+                              <View style={styles.cardVariantsRow}>
+                                <Text numberOfLines={1} style={[styles.cardVariantsText, { fontSize: scaleFont(9.5) }]} {...crispTextProps}>
+                                  <Text style={{ fontWeight: '800', color: combo.arrowBg }}>
+                                    {item.variants.length} {item.variants.length === 1 ? 'Variant' : 'Variants'}:{' '}
+                                  </Text>
+                                  {item.variants.map((v: any) => v.name).join(', ')}
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
                           <View style={[styles.arrowCircle, { backgroundColor: combo.arrowBg }]}>
                             <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.6} />
@@ -1761,6 +1775,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: kioskColors.textMuted,
     marginTop: 1,
+    includeFontPadding: false,
+  },
+  cardVariantsRow: {
+    marginTop: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    backgroundColor: 'rgba(13, 96, 174, 0.08)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(13, 96, 174, 0.15)',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  cardVariantsText: {
+    color: '#0D60AE',
+    fontWeight: '600',
     includeFontPadding: false,
   },
   arrowCircle: {

@@ -258,6 +258,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   );
 
   const categoryProductsCount = products.filter((p) => {
+    if (p.parentId) return false;
     if (!activeCategoryObj) return false;
     const catTarget = (activeCategoryObj.id || activeCategoryObj.code || activeCategoryObj.name).toLowerCase();
     return (
@@ -271,6 +272,9 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
 
   // Filter products by category, sub-category, and search
   const filteredProducts = products.filter((p) => {
+    // Child products (variants) must never be displayed in the product listing
+    if (p.parentId) return false;
+
     const query = searchQuery.trim().toLowerCase();
     if (query) {
       return (
@@ -904,6 +908,16 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                           <Text numberOfLines={2} style={[styles.cardTitleText, { fontSize: scaleFont(13) }]} {...crispTextProps}>
                             {prod.name}
                           </Text>
+                          {prod.variants && prod.variants.length > 0 ? (
+                            <View style={styles.cardVariantsRow}>
+                              <Text numberOfLines={1} style={[styles.cardVariantsText, { fontSize: scaleFont(9.5) }]} {...crispTextProps}>
+                                <Text style={{ fontWeight: '800', color: combo.arrowBg }}>
+                                  {prod.variants.length} {prod.variants.length === 1 ? 'Variant' : 'Variants'}:{' '}
+                                </Text>
+                                {prod.variants.map((v: any) => v.name).join(', ')}
+                              </Text>
+                            </View>
+                          ) : null}
                         </View>
                         <View style={[styles.arrowCircleBtn, { backgroundColor: combo.arrowBg }]}>
                           <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
@@ -1508,11 +1522,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardFooterRow: {
-    height: 48,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
+    paddingVertical: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
@@ -1520,12 +1535,27 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
   },
   cardTitleText: {
-    flex: 1,
     fontWeight: '800',
     fontSize: 14,
     color: kioskColors.brandNavy,
     letterSpacing: -0.2,
     marginRight: 6,
+    includeFontPadding: false,
+  },
+  cardVariantsRow: {
+    marginTop: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    backgroundColor: 'rgba(13, 96, 174, 0.08)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(13, 96, 174, 0.15)',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  cardVariantsText: {
+    color: '#0D60AE',
+    fontWeight: '600',
     includeFontPadding: false,
   },
   cardFooterTextCol: {

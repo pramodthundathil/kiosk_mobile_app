@@ -81,14 +81,14 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const getAssetBadgeIcon = () => {
     switch (assetType) {
       case 'THREE_D':
-        return <Box size={scaleFont(16)} color="#38BDF8" strokeWidth={2.4} />;
+        return <Box size={scaleFont(16)} color="#93C5FD" strokeWidth={2.4} />;
       case 'VIDEO':
-        return <Video size={scaleFont(16)} color="#F43F5E" strokeWidth={2.4} />;
+        return <Video size={scaleFont(16)} color="#FCA5A5" strokeWidth={2.4} />;
       case 'PDF_BROCHURE':
       case 'TECH_SHEET':
-        return <FileText size={scaleFont(16)} color="#10B981" strokeWidth={2.4} />;
+        return <FileText size={scaleFont(16)} color="#6EE7B7" strokeWidth={2.4} />;
       default:
-        return <FileText size={scaleFont(16)} color="#38BDF8" strokeWidth={2.4} />;
+        return <FileText size={scaleFont(16)} color="#93C5FD" strokeWidth={2.4} />;
     }
   };
 
@@ -159,7 +159,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 <View style={styles.docCard}>
                   <View style={styles.docHeader}>
                     <View style={styles.docIconBox}>
-                      <FileText size={scaleFont(36)} color="#10B981" strokeWidth={2} />
+                      <FileText size={scaleFont(36)} color={kioskColors.accentBlue} strokeWidth={2} />
                     </View>
                     <View style={styles.docInfo}>
                       <Text style={[styles.docTitle, { fontSize: scaleFont(18) }]}>
@@ -186,7 +186,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     </View>
                     <View style={styles.qrTextCol}>
                       <View style={styles.qrHeadlineRow}>
-                        <QrCode size={scaleFont(18)} color="#0284C7" strokeWidth={2.2} />
+                        <QrCode size={scaleFont(18)} color={kioskColors.accentBlue} strokeWidth={2.2} />
                         <Text style={[styles.qrTitle, { fontSize: scaleFont(15) }]}>
                           Scan to Download to Phone
                         </Text>
@@ -231,7 +231,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(2, 6, 23, 0.92)',
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 18,
@@ -241,10 +241,10 @@ const styles = StyleSheet.create({
     maxWidth: 960,
     height: '90%',
     maxHeight: 760,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
     borderRadius: kioskRadii.xl,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.25)',
+    borderColor: kioskColors.surfaceBorder,
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -252,13 +252,13 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 64,
-    backgroundColor: '#1E293B',
+    backgroundColor: kioskColors.brandNavy,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomWidth: 2,
+    borderBottomColor: kioskColors.accentBlue,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -270,15 +270,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingVertical: 5,
     paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
   },
   badgeText: {
-    color: '#E2E8F0',
+    color: '#FFFFFF',
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -287,36 +287,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titleText: {
-    color: '#F8FAFC',
+    color: '#FFFFFF',
     fontWeight: '700',
   },
   productSub: {
-    color: '#94A3B8',
+    color: '#93C5FD',
     marginTop: 2,
+    fontWeight: '500',
   },
   closeBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
   },
   contentArea: {
     flex: 1,
-    backgroundColor: '#0B1329',
+    backgroundColor: '#F8FAFC',
   },
   threeDContainer: {
     flex: 1,
     width: '100%',
     height: '100%',
+    backgroundColor: '#F1F5F9',
   },
   videoWrapper: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: '#0F172A',
   },
   videoPlayerContainer: {
     width: '100%',
@@ -333,6 +337,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    backgroundColor: '#F8FAFC',
   },
   fullImage: {
     width: '100%',
@@ -343,16 +348,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: '100%',
+    backgroundColor: '#F8FAFC',
   },
   docCard: {
     width: '100%',
     maxWidth: 720,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: kioskRadii.lg,
     padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: kioskColors.surfaceBorder,
     gap: 24,
+    ...kioskShadows.card,
   },
   docHeader: {
     flexDirection: 'row',
@@ -363,9 +370,9 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 16,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    backgroundColor: 'rgba(13, 96, 174, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(13, 96, 174, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -373,33 +380,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   docTitle: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    color: kioskColors.brandNavy,
+    fontWeight: '800',
   },
   docDescription: {
-    color: '#94A3B8',
+    color: kioskColors.textSecondary,
     marginTop: 6,
     lineHeight: 20,
   },
   docFileTag: {
-    color: '#10B981',
-    fontWeight: '600',
+    color: kioskColors.accentBlue,
+    fontWeight: '700',
     marginTop: 8,
   },
   qrSection: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: '#F8FAFC',
     borderRadius: kioskRadii.md,
     padding: 20,
     gap: 20,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.2)',
+    borderColor: '#E2E8F0',
   },
   qrImageFrame: {
     padding: 10,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
     ...kioskShadows.card,
@@ -418,11 +427,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   qrTitle: {
-    color: '#38BDF8',
-    fontWeight: '700',
+    color: kioskColors.brandNavy,
+    fontWeight: '800',
   },
   qrExplainer: {
-    color: '#CBD5E1',
+    color: kioskColors.textSecondary,
     lineHeight: 18,
   },
   actionButtonsRow: {
@@ -434,10 +443,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    backgroundColor: kioskColors.accentBlue,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: kioskRadii.md,
+    ...kioskShadows.card,
   },
   openDocButtonText: {
     color: '#FFFFFF',

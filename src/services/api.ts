@@ -375,7 +375,9 @@ export async function getCachedCatalogProducts(): Promise<KioskProduct[]> {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((p: KioskProduct) => ({
+        const mainOnly = parsed.filter((p: KioskProduct) => !p.parentId);
+        const listToReturn = mainOnly.length > 0 ? mainOnly : parsed;
+        return listToReturn.map((p: KioskProduct) => ({
           ...p,
           image: mediaCacheService.resolveCachedImageUri(p.image),
           mediaAssets: Array.isArray(p.mediaAssets)
@@ -503,7 +505,8 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
     const json = await response.json();
     if (!Array.isArray(json)) return await getCachedCatalogProducts();
 
-    const mapped: KioskProduct[] = json.map((p: any) => {
+    const mainProducts = json.filter((p: any) => !p.parent_id && !p.parent);
+    const mapped: KioskProduct[] = mainProducts.map((p: any) => {
       const rawImg = p.image_url || p.image || '';
       const fixedImg = rawImg ? sanitizeMediaUrl(rawImg, cleanUrl) : '';
 
@@ -593,6 +596,42 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
         ? p.variants.map((v: any) => {
             const vRawImg = v.image_url || v.image || '';
             const vFixedImg = vRawImg ? sanitizeMediaUrl(vRawImg, cleanUrl) : '';
+
+            let vSpecs: Record<string, string> = {};
+            if (typeof v.specifications === 'string') {
+              try { vSpecs = JSON.parse(v.specifications); } catch (e) {}
+            } else if (v.specifications && typeof v.specifications === 'object') {
+              vSpecs = v.specifications;
+            }
+
+            let vFeatures: any[] = [];
+            if (typeof v.features === 'string') {
+              try { vFeatures = JSON.parse(v.features); } catch (e) {}
+            } else if (Array.isArray(v.features)) {
+              vFeatures = v.features;
+            }
+
+            let vCerts: any[] = [];
+            if (typeof v.certifications === 'string') {
+              try { vCerts = JSON.parse(v.certifications); } catch (e) {}
+            } else if (Array.isArray(v.certifications)) {
+              vCerts = v.certifications;
+            }
+
+            let vTests: any[] = [];
+            if (typeof v.in_house_tests === 'string') {
+              try { vTests = JSON.parse(v.in_house_tests); } catch (e) {}
+            } else if (Array.isArray(v.in_house_tests)) {
+              vTests = v.in_house_tests;
+            }
+
+            let vAreas: string[] = [];
+            if (typeof v.applicable_areas === 'string') {
+              try { vAreas = JSON.parse(v.applicable_areas); } catch (e) {}
+            } else if (Array.isArray(v.applicable_areas)) {
+              vAreas = v.applicable_areas;
+            }
+
             return {
               id: String(v.id || Math.random()),
               productId: String(p.id),
@@ -601,11 +640,12 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
               price: parseFloat(v.price) || 0,
               stock: typeof v.stock === 'number' ? v.stock : 100,
               image: vFixedImg || finalImage,
-              specifications: v.specifications && typeof v.specifications === 'object' ? v.specifications : {},
-              features: Array.isArray(v.features) ? v.features : [],
-              certifications: Array.isArray(v.certifications) ? v.certifications : [],
-              inHouseTests: Array.isArray(v.in_house_tests) ? v.in_house_tests : [],
-              applicableAreas: Array.isArray(v.applicable_areas) ? v.applicable_areas : [],
+              description: v.description || '',
+              specifications: vSpecs,
+              features: vFeatures,
+              certifications: vCerts,
+              inHouseTests: vTests,
+              applicableAreas: vAreas,
               displayOrder: v.display_order || 0,
               isActive: v.is_active !== false,
             };

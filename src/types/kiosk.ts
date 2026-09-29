@@ -76,6 +76,7 @@ export interface KioskProductVariant {
   price?: number;
   stock?: number;
   image?: string;
+  description?: string;
   specifications?: Record<string, string>;
   features?: (FeaturePointItem | string)[];
   certifications?: (CertificationPointItem | string)[];

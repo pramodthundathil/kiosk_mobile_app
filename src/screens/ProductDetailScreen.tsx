@@ -60,28 +60,85 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
-  // Active Variant Selection (defaults to first variant if present, otherwise null)
-  const variants = useMemo(() => product.variants || [], [product.variants]);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
-    variants.length > 0 ? variants[0].id : null
-  );
+  // Active Variant Selection
+  // Combine Parent Product and all Child Variants so both are available in the variant selector
+  const allVariants = useMemo<KioskProductVariant[]>(() => {
+    if (!product.variants || product.variants.length === 0) {
+      return [];
+    }
+
+    const parentAsVariant: KioskProductVariant = {
+      id: product.id,
+      productId: product.id,
+      name: product.name,
+      sku: product.sku,
+      price: product.price,
+      stock: product.stock,
+      image: product.image,
+      description: product.description,
+      specifications: product.specifications || {},
+      features: product.features || [],
+      certifications: product.certifications || [],
+      inHouseTests: product.inHouseTests || [],
+      applicableAreas: product.applicableAreas || [],
+      isActive: true,
+    };
+
+    return [parentAsVariant, ...product.variants];
+  }, [product]);
+
+  // Selected variant id - defaults to the parent product (product.id)
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(product.id);
 
   // Active Information Tab
   const [activeTab, setActiveTab] = useState<DetailTabKey>('features');
 
-  // If product changes, reset selected variant to first variant if available
+  // If product changes, reset selected variant to the parent product
   useEffect(() => {
-    if (variants.length > 0) {
-      setSelectedVariantId(variants[0].id);
-    } else {
-      setSelectedVariantId(null);
-    }
-  }, [product.id, variants]);
+    setSelectedVariantId(product.id);
+  }, [product.id]);
 
-  const activeVariant: KioskProductVariant | null = useMemo(() => {
-    if (!selectedVariantId) return variants[0] || null;
-    return variants.find((v) => v.id === selectedVariantId) || variants[0] || null;
-  }, [variants, selectedVariantId]);
+  const isParentSelected = (!selectedVariantId || selectedVariantId === product.id);
+
+  const activeVariant: KioskProductVariant = useMemo(() => {
+    if (isParentSelected) {
+      return {
+        id: product.id,
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        price: product.price,
+        stock: product.stock,
+        image: product.image,
+        description: product.description,
+        specifications: product.specifications || {},
+        features: product.features || [],
+        certifications: product.certifications || [],
+        inHouseTests: product.inHouseTests || [],
+        applicableAreas: product.applicableAreas || [],
+        isActive: true,
+      };
+    }
+    const found = product.variants?.find((v) => v.id === selectedVariantId);
+    return (
+      found || {
+        id: product.id,
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        price: product.price,
+        stock: product.stock,
+        image: product.image,
+        description: product.description,
+        specifications: product.specifications || {},
+        features: product.features || [],
+        certifications: product.certifications || [],
+        inHouseTests: product.inHouseTests || [],
+        applicableAreas: product.applicableAreas || [],
+        isActive: true,
+      }
+    );
+  }, [product, selectedVariantId, isParentSelected]);
 
   // Track dwell time spent exploring this product
   useEffect(() => {
@@ -129,20 +186,21 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   };
 
   // Resolved dynamic values with fallback to parent product
-  const resolvedName = activeVariant ? activeVariant.name : product.name;
-  const resolvedSku = (activeVariant && activeVariant.sku) ? activeVariant.sku : product.sku;
+  const resolvedName = activeVariant.name;
+  const resolvedSku = activeVariant.sku || product.sku;
+  const resolvedDescription = activeVariant.description || product.description;
 
-  // Resolved specifications dictionary
+  // Resolved specifications dictionary - when a child variant is selected, use that child variant's specifications
   const resolvedSpecs: Record<string, string> = useMemo(() => {
-    const variantSpecs = activeVariant?.specifications;
+    if (isParentSelected) {
+      return { ...(product.specifications || {}) };
+    }
+    const variantSpecs = activeVariant.specifications;
     if (variantSpecs && Object.keys(variantSpecs).length > 0) {
       return { ...variantSpecs };
     }
-    if (product.specifications && Object.keys(product.specifications).length > 0) {
-      return { ...product.specifications };
-    }
     return {};
-  }, [activeVariant, product.specifications]);
+  }, [isParentSelected, activeVariant.specifications, product.specifications]);
 
   // Resolved Features (with points and sub-points)
   const resolvedFeatures: FeaturePointItem[] = useMemo(() => {
@@ -278,27 +336,15 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         <KioskBackButton onPress={onBack} label="Back to Catalog" />
 
         <View style={styles.headerTitleBox}>
-          <View style={styles.headerBadgesRow}>
-            <View style={styles.headerCategoryPill}>
-              <Text style={styles.headerCategoryText}>
-                {product.categoryName || 'Catalog'}
-              </Text>
-            </View>
-            {product.subCategoryName ? (
-              <View style={[styles.headerCategoryPill, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                <Text style={[styles.headerCategoryText, { color: '#16A34A' }]}>
-                  {product.subCategoryName}
-                </Text>
-              </View>
-            ) : null}
-            {activeVariant && (
+          {!isParentSelected && (
+            <View style={styles.headerBadgesRow}>
               <View style={[styles.headerCategoryPill, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
                 <Text style={[styles.headerCategoryText, { color: '#1D4ED8' }]}>
-                  Variant: {activeVariant.name}
+                  Variant: {resolvedName}
                 </Text>
               </View>
-            )}
-          </View>
+            </View>
+          )}
           <Text
             numberOfLines={1}
             style={[styles.headerTitleText, { fontSize: scaleFont(14) }]}
@@ -377,36 +423,16 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             </View>
           </View>
 
-          {/* Right Panel: Title, Variant Selector, Segmented Tabs, and Rich Content */}
+          {/* Right Panel: Variant Selector (top), Overview, Segmented Tabs, and Rich Content */}
           <View style={styles.rightPanel}>
-            {/* Product Overview Header */}
-            <View style={styles.overviewCard}>
-              <Text style={[styles.productTitleMain, { fontSize: scaleFont(22) }]}>
-                {resolvedName}
-              </Text>
-              {product.name !== resolvedName ? (
-                <Text style={[styles.productBaseNameText, { fontSize: scaleFont(12.5) }]}>
-                  Base Model: {product.name}
-                </Text>
-              ) : null}
-              {product.subtitle ? (
-                <Text style={[styles.productSubtitleText, { fontSize: scaleFont(13.5) }]}>
-                  {product.subtitle}
-                </Text>
-              ) : null}
-              <Text style={[styles.productDescText, { fontSize: scaleFont(12.5) }]}>
-                {product.description || 'Precision-engineered industrial earthing and grounding equipment manufactured under stringent international quality control.'}
-              </Text>
-            </View>
-
-            {/* PRODUCT VARIANTS SELECTOR PILLS */}
-            {variants.length > 0 && (
+            {/* PRODUCT VARIANTS SELECTOR PILLS (SHOWN AT TOP) */}
+            {allVariants.length > 0 && (
               <View style={styles.variantsCard}>
                 <View style={styles.variantsHeaderRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Layers size={scaleFont(15)} color={kioskColors.brandNavy} strokeWidth={2.2} />
                     <Text style={[styles.variantsSectionTitle, { fontSize: scaleFont(13.5) }]}>
-                      Available Variants ({variants.length})
+                      Available Models & Variants ({allVariants.length})
                     </Text>
                   </View>
                   <Text style={[styles.variantsTapHint, { fontSize: scaleFont(11) }]}>
@@ -419,8 +445,9 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.variantsScrollContent}
                 >
-                  {variants.map((v) => {
-                    const isSelected = (activeVariant?.id === v.id);
+                  {allVariants.map((v) => {
+                    const isSelected = selectedVariantId === v.id || (isParentSelected && v.id === product.id);
+                    const isParent = (v.id === product.id);
                     return (
                       <TouchableOpacity
                         key={v.id}
@@ -440,7 +467,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                             { fontSize: scaleFont(12) },
                           ]}
                         >
-                          {v.name}
+                          {isParent ? `${v.name} (Base Model)` : v.name}
                         </Text>
                         {isSelected && (
                           <View style={styles.variantSelectedCheck}>
@@ -453,6 +480,26 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 </ScrollView>
               </View>
             )}
+
+            {/* Product Overview Header */}
+            <View style={styles.overviewCard}>
+              <Text style={[styles.productTitleMain, { fontSize: scaleFont(22) }]}>
+                {resolvedName}
+              </Text>
+              {!isParentSelected ? (
+                <Text style={[styles.productBaseNameText, { fontSize: scaleFont(12.5) }]}>
+                  Base Model: {product.name}
+                </Text>
+              ) : null}
+              {product.subtitle ? (
+                <Text style={[styles.productSubtitleText, { fontSize: scaleFont(13.5) }]}>
+                  {product.subtitle}
+                </Text>
+              ) : null}
+              <Text style={[styles.productDescText, { fontSize: scaleFont(12.5) }]}>
+                {resolvedDescription || 'Precision-engineered industrial earthing and grounding equipment manufactured under stringent international quality control.'}
+              </Text>
+            </View>
 
             {/* 5-TAB SEGMENTED CONTROLLER */}
             <View style={styles.tabsContainer}>
@@ -489,7 +536,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     strokeWidth={2.2}
                   />
                   <Text style={[styles.tabButtonText, activeTab === 'specifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
-                    Technical Specifications
+                    Technical Specifications ({Object.keys(resolvedSpecs).length})
                   </Text>
                 </TouchableOpacity>
 
