@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Platform,
 } from 'react-native';
 import {
   Box,
@@ -14,10 +13,11 @@ import {
   Video,
   FileText,
   Maximize2,
-  Sparkles,
+  ChevronLeft,
   ChevronRight,
   QrCode,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { kioskColors, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 import { KioskProduct, ProductMediaAsset } from '../types/kiosk';
 import { ThreeDModelViewer } from './ThreeDModelViewer';
@@ -27,6 +27,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 interface ProductMediaGalleryProps {
   product: KioskProduct;
   height?: number;
+  isLandscape?: boolean;
   scaleFont?: (size: number, min?: number) => number;
   scaleSpacing?: (size: number) => number;
   onOpenMediaViewer?: (asset?: ProductMediaAsset) => void;
@@ -68,71 +69,115 @@ const InlineVideoCard: React.FC<{ url: string; onExpand: () => void; scaleFont: 
 
 export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
   product,
-  height = 320,
+  height = 290,
+  isLandscape = false,
   scaleFont = (s) => s,
   scaleSpacing = (s) => s,
   onOpenMediaViewer,
 }) => {
   const mediaAssets = product.mediaAssets || [];
 
-  // Categorize assets
+  // Categorize assets (require valid non-empty file_url)
   const threeDAsset = useMemo(
-    () => mediaAssets.find((a) => a.asset_type === 'THREE_D'),
+    () =>
+      mediaAssets.find(
+        (a) =>
+          (a.asset_type?.toUpperCase() === 'THREE_D' ||
+            a.asset_type?.toUpperCase() === '3D' ||
+            a.file_url?.toLowerCase().endsWith('.glb') ||
+            a.file_url?.toLowerCase().endsWith('.gltf')) &&
+          typeof a.file_url === 'string' &&
+          a.file_url.trim().length > 0
+      ) || null,
     [mediaAssets]
   );
 
   const videoAssets = useMemo(
-    () => mediaAssets.filter((a) => a.asset_type === 'VIDEO'),
+    () =>
+      mediaAssets.filter(
+        (a) =>
+          (a.asset_type?.toUpperCase() === 'VIDEO' ||
+            a.file_url?.toLowerCase().endsWith('.mp4') ||
+            a.file_url?.toLowerCase().endsWith('.mov')) &&
+          typeof a.file_url === 'string' &&
+          a.file_url.trim().length > 0
+      ),
     [mediaAssets]
   );
 
   const photoAssets = useMemo(() => {
     const list: { id: string; url: string; title: string }[] = [];
     if (product.image) {
-      list.push({ id: 'main', url: product.image, title: 'Main Photo' });
+      list.push({ id: `main-${product.id}`, url: product.image, title: product.name || 'Product Photo' });
     }
-    mediaAssets
-      .filter((a) => a.asset_type === 'IMAGE' && a.file_url && a.file_url !== product.image)
-      .forEach((a) => {
-        list.push({ id: a.id, url: a.file_url!, title: a.title || 'Product Photo' });
+    // Include additional images explicitly defined in mediaAssets
+    if (Array.isArray(mediaAssets)) {
+      mediaAssets
+        .filter((a) => (a.asset_type === 'IMAGE' || (a.asset_type as string) === 'PHOTO') && a.file_url && a.file_url.trim().length > 0 && a.file_url !== product.image)
+        .forEach((a) => {
+          list.push({ id: a.id, url: a.file_url!.trim(), title: a.title || 'Product Photo' });
+        });
+    }
+    // Also include variant images if available
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach((v) => {
+        if (v.image && v.image.trim().length > 0 && !list.some((item) => item.url === v.image)) {
+          list.push({ id: `var-${v.id}`, url: v.image.trim(), title: v.name });
+        }
       });
+    }
     return list;
-  }, [product.image, mediaAssets]);
+  }, [product.image, product.id, product.name, product.variants, mediaAssets]);
 
   const docAssets = useMemo(() => {
     const docs = mediaAssets.filter(
-      (a) => a.asset_type === 'PDF_BROCHURE' || a.asset_type === 'TECH_SHEET'
+      (a) =>
+        (a.asset_type?.toUpperCase() === 'PDF_BROCHURE' ||
+          a.asset_type?.toUpperCase() === 'TECH_SHEET' ||
+          a.asset_type?.toUpperCase() === 'PDF' ||
+          a.file_url?.toLowerCase().endsWith('.pdf')) &&
+        typeof a.file_url === 'string' &&
+        a.file_url.trim().length > 0
     );
-    // If not in mediaAssets but brochureUrl or techSheetUrl exists
     if (docs.length === 0) {
-      if (product.brochureUrl) {
+      if (product.brochureUrl && product.brochureUrl.trim().length > 0) {
         docs.push({
           id: 'brochure',
-          title: 'Product Brochure PDF',
-          asset_type: 'PDF_BROCHURE',
-          file_url: product.brochureUrl,
+          title: `${product.name} Brochure`,
+          asset_type: 'PDF_BROCHURE' as const,
+          file_url: product.brochureUrl.trim(),
         });
       }
-      if (product.techSheetUrl) {
+      if (product.techSheetUrl && product.techSheetUrl.trim().length > 0) {
         docs.push({
           id: 'tech_sheet',
-          title: 'Technical Data Sheet',
-          asset_type: 'TECH_SHEET',
-          file_url: product.techSheetUrl,
+          title: `${product.name} Technical Datasheet`,
+          asset_type: 'TECH_SHEET' as const,
+          file_url: product.techSheetUrl.trim(),
         });
       }
     }
     return docs;
-  }, [mediaAssets, product.brochureUrl, product.techSheetUrl]);
+  }, [mediaAssets, product.brochureUrl, product.techSheetUrl, product.name]);
 
-  // Initial tab selection: if product has 3D asset, showcase it proudly; otherwise default to photo
-  const [activeTab, setActiveTab] = useState<MediaTabType>(
-    threeDAsset ? 'three_d' : 'photo'
-  );
+  // Initial tab selection
+  const [activeTab, setActiveTab] = useState<MediaTabType>('photo');
 
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [selectedVideoIndex, setSelectedVideoIndex] = useState(0);
   const [fullscreenAsset, setFullscreenAsset] = useState<ProductMediaAsset | null>(null);
+
+  useEffect(() => {
+    setSelectedPhotoIndex(0);
+    setSelectedVideoIndex(0);
+    if (activeTab === 'three_d' && !threeDAsset) {
+      setActiveTab('photo');
+    } else if (activeTab === 'brochure' && docAssets.length === 0) {
+      setActiveTab('photo');
+    } else if (activeTab === 'video' && videoAssets.length === 0) {
+      setActiveTab('photo');
+    }
+  }, [product.id, product.name, product.image, threeDAsset, docAssets.length, videoAssets.length]);
 
   const handleOpenFullscreen = (asset: ProductMediaAsset) => {
     if (onOpenMediaViewer) {
@@ -167,6 +212,41 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
     }
   };
 
+  const handlePrevPhoto = () => {
+    if (photoAssets.length <= 1) return;
+    try { Haptics.selectionAsync(); } catch (e) {}
+    setSelectedPhotoIndex((prev) => (prev > 0 ? prev - 1 : photoAssets.length - 1));
+  };
+
+  const handleNextPhoto = () => {
+    if (photoAssets.length <= 1) return;
+    try { Haptics.selectionAsync(); } catch (e) {}
+    setSelectedPhotoIndex((prev) => (prev < photoAssets.length - 1 ? prev + 1 : 0));
+  };
+
+  // Render thumbnail item
+  const renderThumbnail = (item: { id: string; url: string; title: string }, idx: number) => {
+    const isSelected = selectedPhotoIndex === idx;
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={[
+          styles.thumbnailCard,
+          isSelected && styles.thumbnailCardActive,
+        ]}
+        onPress={() => {
+          try { Haptics.selectionAsync(); } catch (e) {}
+          setSelectedPhotoIndex(idx);
+          if (activeTab !== 'photo') setActiveTab('photo');
+        }}
+        activeOpacity={0.85}
+        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+      >
+        <Image source={{ uri: item.url }} style={styles.thumbnailImg} resizeMode="contain" />
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Fullscreen Inspector Modal (Fallback if onOpenMediaViewer not wired) */}
@@ -180,220 +260,246 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
         />
       )}
 
-      {/* Modern Media Tab Switcher */}
-      <View style={styles.tabBar}>
-        {/* Photo Tab */}
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'photo' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('photo')}
-          activeOpacity={0.85}
-        >
-          <ImageIcon
-            size={scaleFont(13)}
-            color={activeTab === 'photo' ? '#FFFFFF' : '#94A3B8'}
-            strokeWidth={2.2}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'photo' && styles.tabTextActive,
-              { fontSize: scaleFont(12) },
-            ]}
-          >
-            Photos ({photoAssets.length})
-          </Text>
-        </TouchableOpacity>
-
-        {/* 3D Asset Tab (Prominently Highlighted with glow if available) */}
-        {threeDAsset && (
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              styles.tabButton3D,
-              activeTab === 'three_d' && styles.tabButton3DActive,
-            ]}
-            onPress={() => setActiveTab('three_d')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.pulseDot} />
-            <Box
-              size={scaleFont(13)}
-              color={activeTab === 'three_d' ? '#FFFFFF' : '#38BDF8'}
-              strokeWidth={2.4}
-            />
-            <Text
-              style={[
-                styles.tabText,
-                styles.tabText3D,
-                activeTab === 'three_d' && styles.tabTextActive,
-                { fontSize: scaleFont(12) },
-              ]}
-            >
-              3D Interactive View
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Video Tab */}
-        {videoAssets.length > 0 && (
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'video' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('video')}
-            activeOpacity={0.85}
-          >
-            <Video
-              size={scaleFont(13)}
-              color={activeTab === 'video' ? '#FFFFFF' : '#94A3B8'}
-              strokeWidth={2.2}
-            />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'video' && styles.tabTextActive,
-                { fontSize: scaleFont(12) },
-              ]}
-            >
-              Videos ({videoAssets.length})
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Documents / Brochure Tab */}
-        {docAssets.length > 0 && (
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'brochure' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('brochure')}
-            activeOpacity={0.85}
-          >
-            <FileText
-              size={scaleFont(13)}
-              color={activeTab === 'brochure' ? '#FFFFFF' : '#94A3B8'}
-              strokeWidth={2.2}
-            />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'brochure' && styles.tabTextActive,
-                { fontSize: scaleFont(12) },
-              ]}
-            >
-              Brochures ({docAssets.length})
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Main Display Stage */}
-      <View style={[styles.stageWrapper, { height }]}>
-        {activeTab === 'three_d' && threeDAsset ? (
-          <View style={styles.stageContent}>
-            <ThreeDModelViewer
-              modelUrl={threeDAsset.file_url || ''}
-              posterUrl={product.image}
-              title={threeDAsset.title || product.name}
-              autoRotate={true}
-              showControls={true}
-              isFullscreen={false}
-              onToggleFullscreen={handleOpenActiveFullscreen}
-              scaleFont={scaleFont}
-            />
-          </View>
-        ) : activeTab === 'video' && videoAssets[selectedVideoIndex] ? (
-          <View style={styles.stageContent}>
-            <InlineVideoCard
-              url={videoAssets[selectedVideoIndex].file_url || ''}
-              onExpand={handleOpenActiveFullscreen}
-              scaleFont={scaleFont}
-            />
-          </View>
-        ) : activeTab === 'brochure' && docAssets[0] ? (
-          <View style={styles.docStageContent}>
-            <View style={styles.docStageIconBox}>
-              <FileText size={scaleFont(32)} color="#10B981" strokeWidth={2} />
-            </View>
-            <Text style={[styles.docStageTitle, { fontSize: scaleFont(14.5) }]}>
-              {docAssets[0].title || 'Product Technical Brochure'}
-            </Text>
-            <Text style={[styles.docStageSub, { fontSize: scaleFont(12) }]}>
-              Official engineering datasheets and test certificates
-            </Text>
+      {/* Top Toggle Pill Row: Only renders options that ACTUALLY exist */}
+      <View style={styles.topToggleRow}>
+        <View style={styles.pillToggleWrapper}>
+          {photoAssets.length > 0 && (
             <TouchableOpacity
-              style={styles.docStageButton}
-              onPress={() => handleOpenFullscreen(docAssets[0])}
-              activeOpacity={0.85}
+              style={[
+                styles.pillToggleBtn,
+                activeTab === 'photo' && styles.pillToggleBtnActive,
+              ]}
+              onPress={() => {
+                try { Haptics.selectionAsync(); } catch (e) {}
+                setActiveTab('photo');
+              }}
+              activeOpacity={0.88}
             >
-              <QrCode size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.2} />
-              <Text style={[styles.docStageButtonText, { fontSize: scaleFont(12.5) }]}>
-                View PDF & Scan QR
+              <ImageIcon
+                size={scaleFont(13)}
+                color={activeTab === 'photo' ? '#FFFFFF' : '#475569'}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={[
+                  styles.pillToggleText,
+                  activeTab === 'photo' && styles.pillToggleTextActive,
+                  { fontSize: scaleFont(12) },
+                ]}
+              >
+                Photos ({photoAssets.length})
               </Text>
             </TouchableOpacity>
-          </View>
-        ) : (
-          // Default Photo View
-          <TouchableOpacity
-            style={styles.stageContent}
-            onPress={handleOpenActiveFullscreen}
-            activeOpacity={0.92}
-          >
-            <Image
-              source={{ uri: photoAssets[selectedPhotoIndex]?.url || product.image }}
-              style={styles.mainPhoto}
-              resizeMode="contain"
-            />
-            {/* Fullscreen Expansion Button */}
-            <View style={styles.expandButton}>
-              <Maximize2 size={scaleFont(15)} color="#38BDF8" strokeWidth={2.4} />
-            </View>
-          </TouchableOpacity>
-        )}
+          )}
+
+          {threeDAsset && (
+            <TouchableOpacity
+              style={[
+                styles.pillToggleBtn,
+                activeTab === 'three_d' && styles.pillToggleBtnActive,
+              ]}
+              onPress={() => {
+                try { Haptics.selectionAsync(); } catch (e) {}
+                setActiveTab('three_d');
+              }}
+              activeOpacity={0.88}
+            >
+              <Box
+                size={scaleFont(13)}
+                color={activeTab === 'three_d' ? '#FFFFFF' : '#475569'}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={[
+                  styles.pillToggleText,
+                  activeTab === 'three_d' && styles.pillToggleTextActive,
+                  { fontSize: scaleFont(12) },
+                ]}
+              >
+                3D View
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {docAssets.length > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.pillToggleBtn,
+                activeTab === 'brochure' && styles.pillToggleBtnActive,
+              ]}
+              onPress={() => {
+                try { Haptics.selectionAsync(); } catch (e) {}
+                setActiveTab('brochure');
+              }}
+              activeOpacity={0.88}
+            >
+              <FileText
+                size={scaleFont(13)}
+                color={activeTab === 'brochure' ? '#FFFFFF' : '#475569'}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={[
+                  styles.pillToggleText,
+                  activeTab === 'brochure' && styles.pillToggleTextActive,
+                  { fontSize: scaleFont(12) },
+                ]}
+              >
+                PDF Document
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {videoAssets.length > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.pillToggleBtn,
+                activeTab === 'video' && styles.pillToggleBtnActive,
+              ]}
+              onPress={() => {
+                try { Haptics.selectionAsync(); } catch (e) {}
+                setActiveTab('video');
+              }}
+              activeOpacity={0.88}
+            >
+              <Video
+                size={scaleFont(13)}
+                color={activeTab === 'video' ? '#FFFFFF' : '#475569'}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={[
+                  styles.pillToggleText,
+                  activeTab === 'video' && styles.pillToggleTextActive,
+                  { fontSize: scaleFont(12) },
+                ]}
+              >
+                Video
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* Thumbnails Row if Multiple Photos Exist */}
-      {activeTab === 'photo' && photoAssets.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.thumbnailRow}
-        >
-          {photoAssets.map((item, idx) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.thumbnailItem,
-                selectedPhotoIndex === idx && styles.thumbnailItemActive,
-              ]}
-              onPress={() => setSelectedPhotoIndex(idx)}
-              activeOpacity={0.8}
-            >
-              <Image source={{ uri: item.url }} style={styles.thumbnailImg} resizeMode="cover" />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+      {/* Media Content Stage with Side or Bottom Thumbnails */}
+      <View style={[styles.stageAndThumbsRow, { flexDirection: isLandscape ? 'row' : 'column' }]}>
+        {/* Main Display Stage */}
+        <View style={[styles.stageWrapper, { height, flex: 1 }]}>
+          {activeTab === 'three_d' && threeDAsset ? (
+            <View style={styles.stageContent}>
+              <ThreeDModelViewer
+                modelUrl={threeDAsset.file_url || ''}
+                posterUrl={product.image}
+                title={threeDAsset.title || product.name}
+                autoRotate={true}
+                showControls={true}
+                isFullscreen={false}
+                onToggleFullscreen={handleOpenActiveFullscreen}
+                scaleFont={scaleFont}
+              />
+            </View>
+          ) : activeTab === 'video' && videoAssets[selectedVideoIndex] ? (
+            <View style={styles.stageContent}>
+              <InlineVideoCard
+                url={videoAssets[selectedVideoIndex].file_url || ''}
+                onExpand={handleOpenActiveFullscreen}
+                scaleFont={scaleFont}
+              />
+            </View>
+          ) : activeTab === 'brochure' && docAssets[0] ? (
+            <View style={styles.docStageContent}>
+              <View style={styles.docStageIconBox}>
+                <FileText size={scaleFont(32)} color="#10B981" strokeWidth={2} />
+              </View>
+              <Text style={[styles.docStageTitle, { fontSize: scaleFont(14.5) }]}>
+                {docAssets[0].title || 'Product Technical Brochure'}
+              </Text>
+              <Text style={[styles.docStageSub, { fontSize: scaleFont(12) }]}>
+                Official engineering datasheets and test certificates
+              </Text>
+              <TouchableOpacity
+                style={styles.docStageButton}
+                onPress={() => handleOpenFullscreen(docAssets[0])}
+                activeOpacity={0.85}
+              >
+                <QrCode size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.2} />
+                <Text style={[styles.docStageButtonText, { fontSize: scaleFont(12.5) }]}>
+                  View PDF & Scan QR
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // Default Photo View
+            <View style={styles.stageContent}>
+              <Image
+                source={{ uri: photoAssets[selectedPhotoIndex]?.url || product.image }}
+                style={styles.mainPhoto}
+                resizeMode="contain"
+              />
 
-      {/* Quick Launch Bar for 3D if in Photo mode */}
-      {activeTab !== 'three_d' && threeDAsset && (
-        <TouchableOpacity
-          style={styles.quickLaunch3DBar}
-          onPress={() => setActiveTab('three_d')}
-          activeOpacity={0.88}
-        >
-          <View style={styles.quickLaunch3DLeft}>
-            <View style={styles.quickLaunch3DIcon}>
-              <Box size={scaleFont(15)} color="#38BDF8" strokeWidth={2.4} />
+              {/* Floating Left Arrow */}
+              {photoAssets.length > 1 && (
+                <TouchableOpacity
+                  style={styles.floatingArrowLeft}
+                  onPress={handlePrevPhoto}
+                  activeOpacity={0.85}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <ChevronLeft size={scaleFont(16)} color="#0D60AE" strokeWidth={2.6} />
+                </TouchableOpacity>
+              )}
+
+              {/* Floating Right Arrow */}
+              {photoAssets.length > 1 && (
+                <TouchableOpacity
+                  style={styles.floatingArrowRight}
+                  onPress={handleNextPhoto}
+                  activeOpacity={0.85}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <ChevronRight size={scaleFont(16)} color="#0D60AE" strokeWidth={2.6} />
+                </TouchableOpacity>
+              )}
+
+              {/* Floating Fullscreen Expand Button at bottom right */}
+              <TouchableOpacity
+                style={styles.floatingExpandBtn}
+                onPress={handleOpenActiveFullscreen}
+                activeOpacity={0.85}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Maximize2 size={scaleFont(15)} color="#0D60AE" strokeWidth={2.4} />
+              </TouchableOpacity>
             </View>
-            <View>
-              <Text style={[styles.quickLaunch3DTitle, { fontSize: scaleFont(12.5) }]}>
-                Interactive 3D Model Available
-              </Text>
-              <Text style={[styles.quickLaunch3DSub, { fontSize: scaleFont(11) }]}>
-                Tap to rotate 360&deg; and inspect internal engineering
-              </Text>
+          )}
+        </View>
+
+        {/* Thumbnails: Vertical for Landscape, Horizontal for Portrait */}
+        {activeTab === 'photo' && photoAssets.length > 1 && (
+          isLandscape ? (
+            <View style={styles.verticalThumbnailCol}>
+              {photoAssets.slice(0, 4).map((item, idx) => renderThumbnail(item, idx))}
             </View>
-          </View>
-          <ChevronRight size={scaleFont(16)} color="#38BDF8" strokeWidth={2.4} />
-        </TouchableOpacity>
-      )}
+          ) : (
+            <View style={styles.portraitThumbnailsWrapper}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.thumbnailRow}
+              >
+                {photoAssets.map((item, idx) => renderThumbnail(item, idx))}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.thumbnailNextCircle}
+                onPress={handleNextPhoto}
+                activeOpacity={0.85}
+              >
+                <ChevronRight size={scaleFont(14)} color="#0D60AE" strokeWidth={2.6} />
+              </TouchableOpacity>
+            </View>
+          )
+        )}
+      </View>
     </View>
   );
 };
@@ -402,65 +508,66 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: kioskRadii.xl,
-    padding: 14,
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    ...kioskShadows.card,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  tabBar: {
+  topToggleRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  pillToggleWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-    flexWrap: 'wrap',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 24,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 2,
   },
-  tabButton: {
+  pillToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: 'transparent',
   },
-  tabButtonActive: {
+  pillToggleBtnActive: {
     backgroundColor: '#0D60AE',
-    borderColor: '#0D60AE',
+    shadowColor: '#0D60AE',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  tabButton3D: {
-    backgroundColor: '#F0F9FF',
-    borderColor: 'rgba(56, 189, 248, 0.4)',
-  },
-  tabButton3DActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
-  },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#38BDF8',
-  },
-  tabText: {
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
+  pillToggleText: {
+    color: '#475569',
     fontWeight: '700',
   },
-  tabText3D: {
-    color: '#0284C7',
+  pillToggleTextActive: {
+    color: '#FFFFFF',
+  },
+  stageAndThumbsRow: {
+    gap: 10,
   },
   stageWrapper: {
     width: '100%',
-    borderRadius: kioskRadii.lg,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#0B1329',
+    backgroundColor: '#FFFFFF',
     position: 'relative',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   stageContent: {
     width: '100%',
@@ -468,25 +575,118 @@ const styles = StyleSheet.create({
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   mainPhoto: {
-    width: '90%',
-    height: '90%',
+    width: '88%',
+    height: '88%',
   },
-  expandButton: {
+  floatingArrowLeft: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    left: 8,
+    top: '48%',
+    marginTop: -16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    ...kioskShadows.subtle,
+    borderColor: '#E2E8F0',
+  },
+  floatingArrowRight: {
+    position: 'absolute',
+    right: 8,
+    top: '48%',
+    marginTop: -16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  floatingExpandBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  portraitThumbnailsWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    gap: 8,
+    marginTop: 6,
+  },
+  thumbnailNextCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  thumbnailRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  verticalThumbnailCol: {
+    width: 64,
+    gap: 8,
+    justifyContent: 'flex-start',
+  },
+  thumbnailCard: {
+    width: 58,
+    height: 58,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbnailCardActive: {
+    borderWidth: 2,
+    borderColor: '#0D60AE',
+  },
+  thumbnailImg: {
+    width: '100%',
+    height: '100%',
   },
   inlineVideoWrapper: {
     width: '100%',
@@ -552,59 +752,5 @@ const styles = StyleSheet.create({
   docStageButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
-  },
-  thumbnailRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-    paddingBottom: 2,
-  },
-  thumbnailItem: {
-    width: 60,
-    height: 60,
-    borderRadius: kioskRadii.md,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-    backgroundColor: '#F8FAFC',
-  },
-  thumbnailItemActive: {
-    borderColor: '#0284C7',
-  },
-  thumbnailImg: {
-    width: '100%',
-    height: '100%',
-  },
-  quickLaunch3DBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    padding: 12,
-    borderRadius: kioskRadii.md,
-    backgroundColor: '#F0F9FF',
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.35)',
-  },
-  quickLaunch3DLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  quickLaunch3DIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(2, 132, 199, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickLaunch3DTitle: {
-    color: '#0369A1',
-    fontWeight: '700',
-  },
-  quickLaunch3DSub: {
-    color: '#64748B',
   },
 });

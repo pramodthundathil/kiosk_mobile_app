@@ -11,6 +11,54 @@ export const KIOSK_DEFAULT_CARD_GRADIENT = [
   'rgba(10, 25, 47, 0.86)',
 ] as const;
 
+export const KIOSK_CARD_GRADIENT_LOCATIONS = [0, 0.32, 0.70, 1.0] as const;
+
+/**
+ * Derives a smooth 4-stop scattered gradient matching the specific theme color of the category's picture.
+ * Diffuses from transparent at the top to a rich, deep base tone at the bottom for crisp lettering.
+ */
+export function getCategoryGradientColors(
+  cat?: Partial<KioskCategory | KioskSubCategory> | null
+): [string, string, string, string] {
+  let hex = ((cat as Partial<KioskCategory>)?.color || '').trim();
+  if (!hex || !hex.startsWith('#')) {
+    const key = `${cat?.name || ''} ${cat?.code || ''} ${cat?.id || ''}`.toLowerCase();
+    if (key.includes('lightning') || key.includes('strike')) {
+      hex = '#D9531E';
+    } else if (key.includes('cable') || key.includes('tray') || key.includes('ladder')) {
+      hex = '#0D9488';
+    } else if (key.includes('enclosure') || key.includes('pit') || key.includes('box')) {
+      hex = '#2563EB';
+    } else {
+      hex = '#0D60AE';
+    }
+  }
+
+  let cleanHex = hex.replace('#', '').trim();
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map((c: string) => c + c).join('');
+  }
+  const num = parseInt(cleanHex, 16);
+  const r = !isNaN(num) && cleanHex.length === 6 ? (num >> 16) & 255 : 13;
+  const g = !isNaN(num) && cleanHex.length === 6 ? (num >> 8) & 255 : 96;
+  const b = !isNaN(num) && cleanHex.length === 6 ? num & 255 : 174;
+
+  const darkR = Math.round(r * 0.48);
+  const darkG = Math.round(g * 0.48);
+  const darkB = Math.round(b * 0.48);
+
+  const deepestR = Math.round(r * 0.20);
+  const deepestG = Math.round(g * 0.20);
+  const deepestB = Math.round(b * 0.20);
+
+  return [
+    'transparent',
+    `rgba(${r}, ${g}, ${b}, 0.38)`,
+    `rgba(${darkR}, ${darkG}, ${darkB}, 0.86)`,
+    `rgba(${deepestR}, ${deepestG}, ${deepestB}, 0.98)`,
+  ];
+}
+
 /**
  * Curated high-resolution industrial fallback imagery matching the 4 primary Kiosk categories.
  */

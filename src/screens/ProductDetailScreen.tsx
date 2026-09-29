@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,23 +7,26 @@ import {
   Image,
   ImageBackground,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
-  ShieldCheck,
-  CheckCircle2,
   Building2,
   FileText,
   Zap,
   Edit3,
-  Maximize2,
-  Sparkles,
   Award,
   ClipboardCheck,
   Layers,
   Check,
-  CheckCheck,
+  CheckCircle2,
+  Search,
+  Home,
+  Globe,
+  ChevronDown,
+  ChevronRight,
+  X,
 } from 'lucide-react-native';
 import { kioskColors, kioskIcons, kioskRadii } from '../theme/kioskTheme';
 import {
@@ -59,6 +62,27 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   const { isLandscape, scaleFont, scaleSpacing, crispTextProps } = metrics;
   const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // ScrollView refs for smooth horizontal scroll affordances
+  const variantsScrollRef = useRef<ScrollView>(null);
+  const tabsScrollRef = useRef<ScrollView>(null);
+
+  // Live Clock state for landscape footer
+  const [currentTime, setCurrentTime] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+      setCurrentDate(now.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Active Variant Selection
   // Combine Parent Product and all Child Variants so both are available in the variant selector
@@ -160,7 +184,6 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     analyticsService.trackProductClick(product, 'VARIANT_SELECT', {
       variant_id: variant.id,
       variant_name: variant.name,
-      variant_sku: variant.sku,
     });
   };
 
@@ -187,7 +210,6 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
 
   // Resolved dynamic values with fallback to parent product
   const resolvedName = activeVariant.name;
-  const resolvedSku = activeVariant.sku || product.sku;
   const resolvedDescription = activeVariant.description || product.description;
 
   // Resolved specifications dictionary - when a child variant is selected, use that child variant's specifications
@@ -285,11 +307,10 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     return {
       ...product,
       name: resolvedName,
-      sku: resolvedSku,
       image: activeVariant?.image || product.image,
       specifications: resolvedSpecs,
     };
-  }, [product, resolvedName, resolvedSku, activeVariant, resolvedSpecs]);
+  }, [product, resolvedName, activeVariant, resolvedSpecs]);
 
   return (
     <View style={styles.rootContainer}>
@@ -304,63 +325,159 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       {/* Interactive Digital Whiteboard Modal */}
       <WhiteboardModal visible={isWhiteboardOpen} onClose={() => setIsWhiteboardOpen(false)} />
 
-      {/* Top Earth Header Background in Portrait Mode */}
-      {!isLandscape && (
-        <ImageBackground
-          source={require('../../assets/portrait_earth_header.png')}
-          style={[styles.portraitHeaderBg, { minHeight: scaleSpacing(110) }]}
-          imageStyle={styles.portraitHeaderBgImage}
-          resizeMode="cover"
-        >
-          <View style={styles.portraitHeaderTopRow}>
-            <Image
-              source={require('../../assets/excel_logo_white.png')}
-              style={styles.portraitLogoImg}
-              resizeMode="contain"
-            />
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleOpenWhiteboard}
-              style={styles.portraitHeaderWhiteboardBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={[styles.portraitHeaderWhiteboardBtnText, { fontSize: scaleFont(12) }]}>Whiteboard</Text>
-            </TouchableOpacity>
-          </View>
-        </ImageBackground>
-      )}
+      {/* ── HEADER INHERITED FROM OTHER PAGES ── */}
+      {isLandscape ? (
+        <>
+          {/* LANDSCAPE TOP HEADER */}
+          <ImageBackground
+            source={require('../../assets/portrait_earth_header.png')}
+            style={styles.landscapeTopHeader}
+            imageStyle={styles.topHeaderBgImage}
+            resizeMode="cover"
+          >
+            <View style={styles.logoSection}>
+              <Image
+                source={require('../../assets/excel_since_logo.png')}
+                style={{ width: scaleSpacing(38), height: scaleSpacing(36), marginRight: scaleSpacing(10) }}
+                resizeMode="contain"
+              />
+              <Image
+                source={require('../../assets/excel_logo_white.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+            </View>
 
-      {/* Top Page Header Bar */}
-      <View style={styles.headerBar}>
-        <KioskBackButton onPress={onBack} label="Back to Catalog" />
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={onBack}
+                style={styles.homeBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Home size={16} color="#FFFFFF" strokeWidth={kioskIcons.strokeWidth} />
+              </TouchableOpacity>
 
-        <View style={styles.headerTitleBox}>
-          {!isParentSelected && (
-            <View style={styles.headerBadgesRow}>
-              <View style={[styles.headerCategoryPill, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
-                <Text style={[styles.headerCategoryText, { color: '#1D4ED8' }]}>
-                  Variant: {resolvedName}
+              <View style={styles.landscapeSearchContainer}>
+                <Search size={scaleFont(14)} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search products..."
+                  placeholderTextColor={kioskColors.textLightMuted}
+                  style={[styles.landscapeSearchInput, { fontSize: scaleFont(13) }]}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
+                    <X size={scaleFont(13)} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={handleOpenWhiteboard}
+                style={styles.landscapeWhiteboardBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                <Text style={[styles.landscapeWhiteboardBtnText, { fontSize: scaleFont(13) }]} {...crispTextProps}>
+                  Whiteboard
                 </Text>
+              </TouchableOpacity>
+            </View>
+          </ImageBackground>
+
+          {/* LANDSCAPE SUB-HEADER */}
+          <View style={styles.productSubHeader}>
+            <KioskBackButton onPress={onBack} label="Back to Catalog" />
+            <View style={styles.subHeaderDivider} />
+            <Text numberOfLines={1} style={[styles.productSubHeaderTitle, { fontSize: scaleFont(15) }]} {...crispTextProps}>
+              {resolvedName}
+            </Text>
+          </View>
+        </>
+      ) : (
+        <>
+          {/* PORTRAIT EXPANDED TOP HEADER */}
+          <ImageBackground
+            source={require('../../assets/portrait_earth_header.png')}
+            style={[styles.portraitExpandedHeaderBg, { minHeight: scaleSpacing(110) }]}
+            imageStyle={styles.portraitExpandedHeaderBgImage}
+            resizeMode="cover"
+          >
+            <View style={styles.portraitHeaderTopRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(8) }}>
+                <Image
+                  source={require('../../assets/excel_since_logo.png')}
+                  style={{ width: scaleSpacing(34), height: scaleSpacing(32) }}
+                  resizeMode="contain"
+                />
+                <Image
+                  source={require('../../assets/excel_logo_white.png')}
+                  style={styles.portraitOfficialWhiteLogoImg}
+                  resizeMode="contain"
+                />
+              </View>
+
+              <View style={styles.portraitHeaderActionsRow}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setIsSearchOpen((prev) => !prev)}
+                  style={styles.portraitHeaderPillBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Search size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                  <Text style={[styles.portraitHeaderPillBtnText, { fontSize: scaleFont(12) }]}>Search</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={handleOpenWhiteboard}
+                  style={styles.portraitHeaderPillBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+                  <Text style={[styles.portraitHeaderPillBtnText, { fontSize: scaleFont(12) }]}>Whiteboard</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ImageBackground>
+
+          {/* Expandable Search Input in Portrait */}
+          {isSearchOpen && (
+            <View style={styles.portraitSearchBarWrapper}>
+              <View style={styles.portraitSearchContainer}>
+                <Search size={14} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search earthing products..."
+                  placeholderTextColor={kioskColors.textLightMuted}
+                  autoFocus={isSearchOpen}
+                  style={styles.portraitSearchInput}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
+                    <X size={14} color={kioskColors.textMuted} strokeWidth={kioskIcons.strokeWidth} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           )}
-          <Text
-            numberOfLines={1}
-            style={[styles.headerTitleText, { fontSize: scaleFont(14) }]}
-          >
-            {resolvedName}
-          </Text>
-        </View>
 
-        <View style={styles.headerSkuBadge}>
-          <Text style={[styles.headerSkuText, { fontSize: scaleFont(11.5) }]}>
-            SKU: {resolvedSku}
-          </Text>
-        </View>
-      </View>
+          {/* PORTRAIT SUB-HEADER */}
+          <View style={styles.productSubHeader}>
+            <KioskBackButton onPress={onBack} label="Back to Catalog" />
+            <View style={styles.subHeaderDivider} />
+            <Text numberOfLines={1} style={[styles.productSubHeaderTitle, { fontSize: scaleFont(15) }]} {...crispTextProps}>
+              {resolvedName}
+            </Text>
+          </View>
+        </>
+      )}
 
-      {/* Full Page Content ScrollView */}
+      {/* ── FULL PAGE CONTENT SCROLLVIEW ── */}
       <KioskScrollContainer
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -369,128 +486,30 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         ]}
       >
         <View style={[styles.contentLayoutRow, { flexDirection: isLandscape ? 'row' : 'column' }]}>
-          {/* Left Panel: Media Gallery, Fullscreen Viewer Button, and Quick Standards */}
+          {/* Left Panel: Media Gallery */}
           <View style={[styles.leftPanel, { width: isLandscape ? 440 : '100%' }]}>
             <ProductMediaGallery
               product={displayedProduct}
-              height={isLandscape ? 340 : 280}
+              height={isLandscape ? 360 : 300}
+              isLandscape={isLandscape}
               scaleFont={scaleFont}
               scaleSpacing={scaleSpacing}
               onOpenMediaViewer={(asset) => handleLaunchMediaViewer(asset?.id)}
             />
-
-            {/* Quick Launch Full Page Media Viewer */}
-            <TouchableOpacity
-              style={styles.openFullMediaPageBtn}
-              onPress={() => handleLaunchMediaViewer()}
-              activeOpacity={0.88}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <View style={styles.openFullMediaPageBtnLeft}>
-                <View style={styles.openFullMediaPageIconWrap}>
-                  <Maximize2 size={scaleFont(15)} color="#0D60AE" strokeWidth={2.4} />
-                </View>
-                <View>
-                  <Text style={[styles.openFullMediaPageBtnTitle, { fontSize: scaleFont(13) }]}>
-                    Interactive 3D & Media Gallery
-                  </Text>
-                  <Text style={[styles.openFullMediaPageBtnSub, { fontSize: scaleFont(11) }]}>
-                    Explore 360° 3D, High-Res Photos & PDF Specs
-                  </Text>
-                </View>
-              </View>
-              <Sparkles size={scaleFont(16)} color="#FFC107" strokeWidth={2.4} />
-            </TouchableOpacity>
-
-            {/* Key Quality Standards Badges */}
-            <View style={styles.standardsCard}>
-              <View style={styles.cardHeaderRow}>
-                <ShieldCheck size={scaleFont(16)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-                <Text style={[styles.cardHeaderTitle, { fontSize: scaleFont(13) }]}>
-                  Quality & Standards Compliance
-                </Text>
-              </View>
-              <View style={styles.standardsTagRow}>
-                {resolvedCertifications.slice(0, 4).map((c, idx) => (
-                  <View key={idx} style={styles.standardTag}>
-                    <CheckCheck size={13} color="#16A34A" strokeWidth={2.2} />
-                    <Text numberOfLines={1} style={styles.standardTagText}>
-                      {c.title.split(':')[0].slice(0, 32)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
           </View>
 
-          {/* Right Panel: Variant Selector (top), Overview, Segmented Tabs, and Rich Content */}
+          {/* Right Panel: Overview, Variants Selector, Segmented Tabs, and Content */}
           <View style={styles.rightPanel}>
-            {/* PRODUCT VARIANTS SELECTOR PILLS (SHOWN AT TOP) */}
-            {allVariants.length > 0 && (
-              <View style={styles.variantsCard}>
-                <View style={styles.variantsHeaderRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Layers size={scaleFont(15)} color={kioskColors.brandNavy} strokeWidth={2.2} />
-                    <Text style={[styles.variantsSectionTitle, { fontSize: scaleFont(13.5) }]}>
-                      Available Models & Variants ({allVariants.length})
-                    </Text>
-                  </View>
-                  <Text style={[styles.variantsTapHint, { fontSize: scaleFont(11) }]}>
-                    Tap to switch model specs & features
-                  </Text>
-                </View>
-
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.variantsScrollContent}
-                >
-                  {allVariants.map((v) => {
-                    const isSelected = selectedVariantId === v.id || (isParentSelected && v.id === product.id);
-                    const isParent = (v.id === product.id);
-                    return (
-                      <TouchableOpacity
-                        key={v.id}
-                        activeOpacity={0.88}
-                        onPress={() => handleSelectVariant(v)}
-                        style={[
-                          styles.variantPill,
-                          isSelected ? styles.variantPillActive : styles.variantPillInactive,
-                        ]}
-                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                      >
-                        <View style={[styles.variantDot, isSelected && styles.variantDotActive]} />
-                        <Text
-                          style={[
-                            styles.variantPillText,
-                            isSelected ? styles.variantPillTextActive : styles.variantPillTextInactive,
-                            { fontSize: scaleFont(12) },
-                          ]}
-                        >
-                          {isParent ? `${v.name} (Base Model)` : v.name}
-                        </Text>
-                        {isSelected && (
-                          <View style={styles.variantSelectedCheck}>
-                            <Check size={11} color="#FFFFFF" strokeWidth={3} />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-
             {/* Product Overview Header */}
             <View style={styles.overviewCard}>
               <Text style={[styles.productTitleMain, { fontSize: scaleFont(22) }]}>
                 {resolvedName}
               </Text>
-              {!isParentSelected ? (
-                <Text style={[styles.productBaseNameText, { fontSize: scaleFont(12.5) }]}>
+              {!isParentSelected && (
+                <Text style={[styles.productBaseNameText, { fontSize: scaleFont(12) }]}>
                   Base Model: {product.name}
                 </Text>
-              ) : null}
+              )}
               {product.subtitle ? (
                 <Text style={[styles.productSubtitleText, { fontSize: scaleFont(13.5) }]}>
                   {product.subtitle}
@@ -501,9 +520,86 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               </Text>
             </View>
 
+            {/* PRODUCT VARIANTS SELECTOR CARDS (MATCHING UPLOADED DESIGN) */}
+            {allVariants.length > 0 && (
+              <View style={styles.variantsCard}>
+                <View style={styles.variantsHeaderRow}>
+                  <View style={styles.variantsHeaderLeft}>
+                    <Layers size={scaleFont(15)} color={kioskColors.brandNavy} strokeWidth={2.2} />
+                    <Text style={[styles.variantsSectionTitle, { fontSize: scaleFont(13.5) }]}>
+                      Available Variants
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.variantsScrollWrapper}>
+                  <ScrollView
+                    ref={variantsScrollRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.variantsScrollContent}
+                  >
+                    {allVariants.map((v) => {
+                      const isSelected = selectedVariantId === v.id || (isParentSelected && v.id === product.id);
+                      const isParent = (v.id === product.id);
+                      const variantImage = v.image || product.image;
+                      return (
+                        <TouchableOpacity
+                          key={v.id}
+                          activeOpacity={0.88}
+                          onPress={() => handleSelectVariant(v)}
+                          style={[
+                            styles.variantCard,
+                            isSelected ? styles.variantCardActive : styles.variantCardInactive,
+                          ]}
+                          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                        >
+                          <View style={styles.variantThumbWrapper}>
+                            {variantImage ? (
+                              <Image
+                                source={typeof variantImage === 'string' ? { uri: variantImage } : variantImage}
+                                style={styles.variantThumbImg}
+                                resizeMode="contain"
+                              />
+                            ) : (
+                              <Layers size={18} color={kioskColors.accentBlue} strokeWidth={1.8} />
+                            )}
+                          </View>
+                          <View style={styles.variantInfoCol}>
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.variantNameText,
+                                isSelected ? styles.variantNameTextActive : styles.variantNameTextInactive,
+                                { fontSize: scaleFont(12) },
+                              ]}
+                            >
+                              {isParent ? `${v.name} (Base)` : v.name}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  {allVariants.length > 2 && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => variantsScrollRef.current?.scrollTo({ x: 260, animated: true })}
+                      style={styles.variantScrollArrowBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel="Scroll variants right"
+                    >
+                      <ChevronRight size={scaleFont(16)} color="#0D60AE" strokeWidth={2.6} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* 5-TAB SEGMENTED CONTROLLER */}
             <View style={styles.tabsContainer}>
               <ScrollView
+                ref={tabsScrollRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.tabsRow}
@@ -536,7 +632,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     strokeWidth={2.2}
                   />
                   <Text style={[styles.tabButtonText, activeTab === 'specifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
-                    Technical Specifications ({Object.keys(resolvedSpecs).length})
+                    Specifications ({Object.keys(resolvedSpecs).length})
                   </Text>
                 </TouchableOpacity>
 
@@ -568,7 +664,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     strokeWidth={2.2}
                   />
                   <Text style={[styles.tabButtonText, activeTab === 'in_house_tests' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
-                    In-House Tests ({resolvedInHouseTests.length})
+                    Testing ({resolvedInHouseTests.length})
                   </Text>
                 </TouchableOpacity>
 
@@ -588,6 +684,17 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                   </Text>
                 </TouchableOpacity>
               </ScrollView>
+
+              {/* Right side arrow to identify more tabs are available on sliding */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => tabsScrollRef.current?.scrollTo({ x: 260, animated: true })}
+                style={styles.tabsScrollArrowBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Scroll tabs right"
+              >
+                <ChevronRight size={scaleFont(16)} color="#0D60AE" strokeWidth={2.6} />
+              </TouchableOpacity>
             </View>
 
             {/* TAB CONTENT PANEL */}
@@ -650,33 +757,33 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                   <View style={styles.tabSectionTitleRow}>
                     <FileText size={scaleFont(16)} color={kioskColors.brandNavy} strokeWidth={2.2} />
                     <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5) }]}>
-                      Technical Specifications & Parameters
+                      Technical Specifications
                     </Text>
                   </View>
                   <Text style={[styles.tabSectionSub, { fontSize: scaleFont(11.5) }]}>
-                    Material composition, dimensional tolerances, and coating parameters for {resolvedName}.
+                    Verified dimensional data, material compliance, and metallurgical specs.
                   </Text>
 
                   {Object.keys(resolvedSpecs).length === 0 ? (
                     <View style={styles.emptyTabBox}>
                       <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5) }]}>
-                        No technical specifications configured for this item.
+                        No specifications configured for this model.
                       </Text>
                     </View>
                   ) : (
-                    <View style={styles.specTableWrapper}>
+                    <View style={styles.specsTableContainer}>
                       {Object.entries(resolvedSpecs).map(([key, val], idx) => (
                         <View
                           key={idx}
                           style={[
-                            styles.specTableRow,
-                            idx % 2 === 0 ? styles.specRowEven : styles.specRowOdd,
+                            styles.specsTableRow,
+                            idx % 2 === 0 ? styles.specsRowEven : styles.specsRowOdd,
                           ]}
                         >
-                          <Text style={[styles.specKeyText, { fontSize: scaleFont(12.5) }]}>
+                          <Text style={[styles.specsKeyText, { fontSize: scaleFont(12) }]}>
                             {key}
                           </Text>
-                          <Text style={[styles.specValText, { fontSize: scaleFont(12.5) }]}>
+                          <Text style={[styles.specsValText, { fontSize: scaleFont(12) }]}>
                             {val}
                           </Text>
                         </View>
@@ -686,54 +793,51 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 </View>
               )}
 
-              {/* TAB 3: CERTIFICATIONS (Standards & Test Sub-Points) */}
+              {/* TAB 3: CERTIFICATIONS */}
               {activeTab === 'certifications' && (
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
-                    <Award size={scaleFont(16)} color="#2563EB" strokeWidth={2.2} />
+                    <Award size={scaleFont(16)} color="#D97706" strokeWidth={2.2} />
                     <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5) }]}>
-                      International Certifications & Compliance
+                      International Standards & Certifications
                     </Text>
                   </View>
                   <Text style={[styles.tabSectionSub, { fontSize: scaleFont(11.5) }]}>
-                    Accredited test certificates and compliance reports from global testing authorities.
+                    Accredited third-party compliance, safety approvals, and global electrical certifications.
                   </Text>
 
                   {resolvedCertifications.length === 0 ? (
                     <View style={styles.emptyTabBox}>
                       <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5) }]}>
-                        No certificates configured for this item.
+                        No certifications configured for this item.
                       </Text>
                     </View>
                   ) : (
                     <View style={styles.certsListContainer}>
-                      {resolvedCertifications.map((cert, idx) => (
+                      {resolvedCertifications.map((item, idx) => (
                         <View key={idx} style={styles.certCard}>
                           <View style={styles.certHeaderRow}>
                             <View style={styles.certBadgeWrap}>
-                              <Award size={16} color="#1D4ED8" strokeWidth={2.2} />
+                              <Award size={15} color="#D97706" strokeWidth={2.2} />
                             </View>
                             <Text style={[styles.certTitleText, { fontSize: scaleFont(13) }]}>
-                              {cert.title}
+                              {item.title}
                             </Text>
                           </View>
 
-                          {/* Test Sub-points */}
-                          {cert.sub_points && cert.sub_points.length > 0 && (
-                            <View style={styles.certTestsContainer}>
-                              <Text style={[styles.certTestsHeader, { fontSize: scaleFont(11) }]}>
-                                Verified Laboratory Tests:
-                              </Text>
-                              <View style={styles.certTestsWrap}>
-                                {cert.sub_points.map((test, tIdx) => (
-                                  <View key={tIdx} style={styles.certTestPill}>
-                                    <Check size={11} color="#16A34A" strokeWidth={2.5} />
-                                    <Text style={[styles.certTestPillText, { fontSize: scaleFont(11.5) }]}>
-                                      {test}
-                                    </Text>
+                          {/* Cert sub-points */}
+                          {item.sub_points && item.sub_points.length > 0 && (
+                            <View style={styles.certSubPointsWrapper}>
+                              {item.sub_points.map((sub, sIdx) => (
+                                <View key={sIdx} style={styles.certSubPointRow}>
+                                  <View style={styles.certSubPointCheck}>
+                                    <Check size={10} color="#D97706" strokeWidth={2.5} />
                                   </View>
-                                ))}
-                              </View>
+                                  <Text style={[styles.certSubPointText, { fontSize: scaleFont(12) }]}>
+                                    {sub}
+                                  </Text>
+                                </View>
+                              ))}
                             </View>
                           )}
                         </View>
@@ -743,7 +847,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 </View>
               )}
 
-              {/* TAB 4: IN-HOUSE TESTS (Pointed & Sub-Points) */}
+              {/* TAB 4: IN-HOUSE TESTS */}
               {activeTab === 'in_house_tests' && (
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
@@ -834,7 +938,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               )}
             </View>
 
-            {/* Action Bar for Kiosk Touch Ergonomics */}
+            {/* Bottom Ergonomic Action Buttons */}
             <View style={styles.detailActionFooter}>
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -863,12 +967,44 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         </View>
       </KioskScrollContainer>
 
-      {/* Fixed Bottom Banner in Portrait Mode */}
-      {!isLandscape && (
+      {/* ── FOOTER INHERITED FROM OTHER PAGES ── */}
+      {isLandscape ? (
+        /* LANDSCAPE BOTTOM FOOTER */
+        <View style={styles.landscapeBottomFooter}>
+          <TouchableOpacity style={styles.languageBtn} activeOpacity={0.8}>
+            <Globe size={scaleFont(13)} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
+            <Text style={[styles.languageBtnText, { fontSize: scaleFont(12) }]} {...crispTextProps}>
+              English
+            </Text>
+            <ChevronDown size={scaleFont(11)} color={kioskColors.textSecondary} strokeWidth={kioskIcons.strokeWidth} />
+          </TouchableOpacity>
+
+          <View style={styles.footerRightRow}>
+            <View style={styles.clockSection}>
+              <Text style={[styles.clockTime, { fontSize: scaleFont(13) }]} {...crispTextProps}>
+                {currentTime}
+              </Text>
+              <View style={styles.clockDivider} />
+              <Text style={[styles.clockDate, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                {currentDate}
+              </Text>
+            </View>
+
+            <View style={styles.clockDivider} />
+
+            <View style={styles.footerVersionContainer}>
+              <Text style={[styles.footerVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
+                {appVersion.startsWith('v') ? appVersion : 'v' + appVersion}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : (
+        /* PORTRAIT BOTTOM FOOTER */
         <>
           <View style={styles.portraitVersionBar}>
-            <Text style={[styles.portraitVersionText, { fontSize: scaleFont(11.5) }]} {...crispTextProps}>
-              v{appVersion} • Excel Earthings Kiosk
+            <Text style={[styles.portraitVersionText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
+              {appVersion.startsWith('v') ? appVersion : 'v' + appVersion}
             </Text>
           </View>
           <View style={styles.fixedBottomAdWrapper}>
@@ -889,15 +1025,109 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  portraitHeaderBg: {
+
+  // ── LANDSCAPE HEADER STYLES (MATCHING LandscapeKioskLayout) ──
+  landscapeTopHeader: {
+    backgroundColor: '#020D22',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 52,
+    overflow: 'hidden',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  topHeaderBgImage: {
     width: '100%',
-    minHeight: 110,
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  logoSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImg: {
+    width: 142,
+    height: 38,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  homeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: kioskRadii.md,
+    backgroundColor: kioskColors.accentBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: kioskColors.accentBlue,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  landscapeSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: kioskRadii.md,
+    paddingHorizontal: 10,
+    height: 36,
+    width: 230,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  landscapeSearchInput: {
+    flex: 1,
+    color: kioskColors.textPrimary,
+    fontWeight: '600',
+    marginLeft: 6,
+    includeFontPadding: false,
+  },
+  clearBtn: {
+    padding: 3,
+  },
+  landscapeWhiteboardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 13,
+    height: 36,
+    borderRadius: kioskRadii.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  landscapeWhiteboardBtnText: {
+    color: kioskColors.textPrimary,
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+
+  // ── PORTRAIT HEADER STYLES (MATCHING PortraitKioskLayout) ──
+  portraitExpandedHeaderBg: {
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
     backgroundColor: '#020D22',
   },
-  portraitHeaderBgImage: {
+  portraitExpandedHeaderBgImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
@@ -911,105 +1141,93 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
   },
-  portraitLogoImg: {
-    width: 175,
-    height: 48,
+  portraitOfficialWhiteLogoImg: {
+    width: 130,
+    height: 36,
   },
-  portraitHeaderWhiteboardBtn: {
+  portraitHeaderActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  portraitHeaderPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    height: 38,
+    paddingHorizontal: 12,
+    height: 36,
     borderRadius: kioskRadii.full,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
     elevation: 3,
   },
-  portraitHeaderWhiteboardBtnText: {
+  portraitHeaderPillBtnText: {
     color: kioskColors.textPrimary,
     fontWeight: '700',
-    fontSize: 12,
   },
-  fixedBottomAdWrapper: {
+  portraitSearchBarWrapper: {
     width: '100%',
-    overflow: 'hidden',
-    backgroundColor: '#0F172A',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 4,
+    backgroundColor: '#0D60AE',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#CBD5E1',
   },
-  fixedBottomAdImg: {
-    width: '100%',
-    height: 68,
-  },
-  headerBar: {
-    backgroundColor: '#FFFFFF',
+  portraitSearchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: kioskRadii.full,
+    paddingHorizontal: 14,
+    height: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  portraitSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: kioskColors.textPrimary,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+
+  // ── STANDARDIZED SUB-HEADER ──
+  productSubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    height: 56,
+    paddingVertical: 9,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    gap: 10,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 3,
-    elevation: 3,
-    zIndex: 10,
+    elevation: 2,
   },
-  headerTitleBox: {
+  subHeaderDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: '#CBD5E1',
+    marginHorizontal: 2,
+  },
+  productSubHeaderTitle: {
     flex: 1,
-    marginHorizontal: 12,
-    justifyContent: 'center',
-    gap: 2,
-  },
-  headerBadgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  headerCategoryPill: {
-    backgroundColor: kioskColors.badgeBackground,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: kioskRadii.xs,
-    borderWidth: 1,
-    borderColor: kioskColors.badgeBorder,
-  },
-  headerCategoryText: {
-    color: kioskColors.accentBlue,
     fontWeight: '800',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    includeFontPadding: false,
-  },
-  headerTitleText: {
     color: kioskColors.textPrimary,
-    fontWeight: '800',
     letterSpacing: -0.2,
     includeFontPadding: false,
   },
-  headerSkuBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: kioskRadii.xs,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  headerSkuText: {
-    color: kioskColors.textMuted,
-    fontWeight: '700',
-    includeFontPadding: false,
-  },
+
+  // ── CONTENT LAYOUT ──
   scrollBody: {
     flexGrow: 1,
   },
@@ -1023,89 +1241,8 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 14,
   },
-  openFullMediaPageBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#BFDBFE',
-    borderRadius: kioskRadii.lg,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#0D60AE',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  openFullMediaPageBtnLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  openFullMediaPageIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: kioskRadii.sm,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  openFullMediaPageBtnTitle: {
-    color: '#0F172A',
-    fontWeight: '800',
-  },
-  openFullMediaPageBtnSub: {
-    color: '#0D60AE',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  standardsCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 14,
-    borderRadius: kioskRadii.lg,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 10,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cardHeaderTitle: {
-    fontWeight: '800',
-    color: kioskColors.textPrimary,
-  },
-  standardsTagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  standardTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: kioskRadii.xs,
-  },
-  standardTagText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#166534',
-  },
+
+  // ── PRODUCT OVERVIEW ──
   overviewCard: {
     backgroundColor: '#FFFFFF',
     padding: 18,
@@ -1139,98 +1276,140 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 2,
   },
-  /* VARIANTS SELECTOR STYLING */
+
+  // ── AVAILABLE VARIANTS CARDS (MATCHING UPLOADED DESIGN) ──
   variantsCard: {
     backgroundColor: '#FFFFFF',
     padding: 14,
     borderRadius: kioskRadii.lg,
-    borderWidth: 1.5,
-    borderColor: '#BFDBFE',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     gap: 10,
-    shadowColor: '#0D60AE',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   variantsHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
+  },
+  variantsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   variantsSectionTitle: {
     fontWeight: '800',
     color: kioskColors.brandNavy,
+    letterSpacing: -0.2,
   },
-  variantsTapHint: {
-    color: '#64748B',
-    fontWeight: '600',
+  variantsScrollWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   variantsScrollContent: {
     flexDirection: 'row',
     gap: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 2,
+    paddingVertical: 2,
   },
-  variantPill: {
+  variantCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    minHeight: 44, // Minimum 44dp touch target standard
-    borderRadius: kioskRadii.full,
-    borderWidth: 1.5,
-  },
-  variantPillActive: {
-    backgroundColor: kioskColors.brandNavy,
-    borderColor: kioskColors.brandNavy,
-    shadowColor: kioskColors.brandNavy,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  variantPillInactive: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#CBD5E1',
-  },
-  variantDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#94A3B8',
-  },
-  variantDotActive: {
-    backgroundColor: '#38BDF8',
-  },
-  variantPillText: {
-    fontWeight: '700',
-  },
-  variantPillTextActive: {
-    color: '#FFFFFF',
-  },
-  variantPillTextInactive: {
-    color: '#334155',
-  },
-  variantSelectedCheck: {
-    width: 16,
-    height: 16,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minHeight: 46,
     borderRadius: 8,
-    backgroundColor: '#0284C7',
+    backgroundColor: '#FFFFFF',
+  },
+  variantCardActive: {
+    borderWidth: 2,
+    borderColor: '#0284C7',
+    backgroundColor: '#F0F9FF',
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  variantCardInactive: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  variantThumbWrapper: {
+    width: 26,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
-  /* 5-TAB SEGMENTED CONTROLLER STYLING */
+  variantThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  variantInfoCol: {
+    justifyContent: 'center',
+  },
+  variantNameText: {
+    fontWeight: '700',
+  },
+  variantNameTextActive: {
+    color: '#0284C7',
+  },
+  variantNameTextInactive: {
+    color: '#334155',
+  },
+  variantScrollArrowBtn: {
+    width: 32,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginLeft: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+
+  // ── 5-TAB SEGMENTED CONTROLLER ──
   tabsContainer: {
     backgroundColor: '#F1F5F9',
     borderRadius: kioskRadii.md,
     padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   tabsRow: {
     flexDirection: 'row',
     gap: 4,
+    paddingRight: 4,
+  },
+  tabsScrollArrowBtn: {
+    width: 32,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: kioskRadii.sm,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginLeft: 4,
+    marginRight: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tabButton: {
     flexDirection: 'row',
@@ -1252,22 +1431,25 @@ const styles = StyleSheet.create({
   tabButtonText: {
     fontWeight: '700',
     color: kioskColors.textSecondary,
+    includeFontPadding: false,
   },
   tabButtonTextActive: {
     color: '#FFFFFF',
   },
-  /* TAB CONTENT PANEL STYLING */
+
+  // ── TAB CONTENT PANEL ──
   tabContentCard: {
     backgroundColor: '#FFFFFF',
-    padding: 18,
     borderRadius: kioskRadii.lg,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
+    minHeight: 220,
   },
   tabSection: {
     gap: 12,
@@ -1280,28 +1462,24 @@ const styles = StyleSheet.create({
   tabSectionTitle: {
     fontWeight: '800',
     color: kioskColors.brandNavy,
+    letterSpacing: -0.2,
   },
   tabSectionSub: {
-    color: '#64748B',
+    color: kioskColors.textMuted,
     marginTop: -4,
+    lineHeight: 16,
   },
   emptyTabBox: {
-    paddingVertical: 28,
-    paddingHorizontal: 16,
+    padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: kioskRadii.md,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 6,
   },
   emptyTabText: {
-    color: '#64748B',
-    fontWeight: '600',
-    textAlign: 'center',
+    color: kioskColors.textMuted,
+    fontStyle: 'italic',
   },
-  /* FEATURES STYLING (Points & Sub-Points) */
+
+  // Features list
   featuresListContainer: {
     gap: 10,
     marginTop: 4,
@@ -1309,10 +1487,10 @@ const styles = StyleSheet.create({
   featureItemCard: {
     backgroundColor: '#F8FAFC',
     borderRadius: kioskRadii.md,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 12,
-    gap: 8,
+    gap: 6,
   },
   featureMainRow: {
     flexDirection: 'row',
@@ -1320,138 +1498,123 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   featureCheckIconWrap: {
-    marginTop: 2,
+    marginTop: 1,
   },
   featureMainPointText: {
-    flex: 1,
-    fontWeight: '800',
+    fontWeight: '700',
     color: kioskColors.textPrimary,
-    lineHeight: 19,
+    flex: 1,
+    lineHeight: 18,
   },
   featureSubPointsWrapper: {
-    marginLeft: 26,
-    gap: 6,
-    borderLeftWidth: 2,
-    borderLeftColor: '#CBD5E1',
-    paddingLeft: 12,
-    paddingTop: 2,
+    paddingLeft: 26,
+    gap: 4,
+    marginTop: 4,
   },
   featureSubPointRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
   },
   subPointDisc: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: kioskColors.accentBlue,
-    marginTop: 6,
+    backgroundColor: '#64748B',
   },
   featureSubPointText: {
-    flex: 1,
     color: '#475569',
-    lineHeight: 18,
+    flex: 1,
+    lineHeight: 16,
   },
-  /* SPECIFICATIONS TABLE STYLING */
-  specTableWrapper: {
+
+  // Specs Table
+  specsTableContainer: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: kioskRadii.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
     marginTop: 4,
   },
-  specTableRow: {
+  specsTableRow: {
     flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
   },
-  specRowEven: {
+  specsRowEven: {
     backgroundColor: '#FFFFFF',
   },
-  specRowOdd: {
+  specsRowOdd: {
     backgroundColor: '#F8FAFC',
   },
-  specKeyText: {
-    flex: 1.1,
-    fontWeight: '700',
+  specsKeyText: {
+    color: kioskColors.textMuted,
+    fontWeight: '600',
+    flex: 1,
+  },
+  specsValText: {
     color: kioskColors.brandNavy,
+    fontWeight: '700',
+    flex: 1.2,
+    textAlign: 'right',
   },
-  specValText: {
-    flex: 1.5,
-    color: '#334155',
-    fontWeight: '500',
-    lineHeight: 18,
-  },
-  /* CERTIFICATIONS STYLING */
+
+  // Certifications list
   certsListContainer: {
     gap: 10,
     marginTop: 4,
   },
   certCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFBEB',
     borderRadius: kioskRadii.md,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 14,
-    gap: 10,
+    borderColor: '#FDE68A',
+    gap: 6,
   },
   certHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    gap: 8,
   },
   certBadgeWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#EFF6FF',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    marginTop: 1,
   },
   certTitleText: {
-    flex: 1,
     fontWeight: '800',
-    color: kioskColors.brandNavy,
-    lineHeight: 19,
+    color: '#92400E',
+    flex: 1,
   },
-  certTestsContainer: {
-    marginLeft: 38,
-    gap: 6,
+  certSubPointsWrapper: {
+    paddingLeft: 34,
+    gap: 4,
+    marginTop: 4,
   },
-  certTestsHeader: {
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  certTestsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  certTestPill: {
+  certSubPointRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: kioskRadii.xs,
+    gap: 6,
   },
-  certTestPillText: {
-    fontWeight: '700',
-    color: '#166534',
+  certSubPointCheck: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  /* IN-HOUSE TESTS STYLING */
+  certSubPointText: {
+    color: '#78350F',
+    flex: 1,
+  },
+
+  // In-House Tests list
   testsListContainer: {
     gap: 10,
     marginTop: 4,
@@ -1459,15 +1622,15 @@ const styles = StyleSheet.create({
   testCard: {
     backgroundColor: '#F0FDFA',
     borderRadius: kioskRadii.md,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#CCFBF1',
-    padding: 14,
-    gap: 8,
+    borderColor: '#99F6E4',
+    gap: 6,
   },
   testHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    gap: 8,
   },
   testBadgeWrap: {
     width: 26,
@@ -1476,32 +1639,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#CCFBF1',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 1,
   },
   testTitleText: {
-    flex: 1,
     fontWeight: '800',
-    color: '#0F766E',
-    lineHeight: 19,
+    color: '#115E59',
+    flex: 1,
   },
   testSubPointsWrapper: {
-    marginLeft: 36,
-    gap: 5,
+    paddingLeft: 34,
+    gap: 4,
+    marginTop: 4,
   },
   testSubPointRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 6,
   },
   testSubPointCheck: {
-    marginTop: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#CCFBF1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   testSubPointText: {
-    flex: 1,
     color: '#134E4A',
-    lineHeight: 17,
+    flex: 1,
   },
-  /* APPLICABLE AREAS STYLING */
+
+  // Applicable Areas grid
   areasGridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1512,60 +1679,64 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: '#BFDBFE',
     borderRadius: kioskRadii.md,
-    minHeight: 44,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    minWidth: 140,
   },
   areaIconBox: {
     width: 28,
     height: 28,
-    borderRadius: 6,
-    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
   },
   areaCardText: {
     fontWeight: '700',
-    color: kioskColors.textPrimary,
+    color: '#1E40AF',
   },
-  /* ACTION FOOTER STYLING */
+
+  // Action Buttons
   detailActionFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginTop: 6,
-    paddingTop: 12,
+    marginTop: 8,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
   detailBackBtn: {
     paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: kioskRadii.md,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
     minHeight: 46,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: kioskRadii.md,
   },
   detailBackBtnText: {
-    color: kioskColors.textPrimary,
     fontWeight: '700',
+    color: kioskColors.textSecondary,
+    includeFontPadding: false,
   },
   detailWhiteboardBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: kioskColors.accentBlue,
     paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: kioskRadii.md,
     minHeight: 46,
     justifyContent: 'center',
-    backgroundColor: kioskColors.accentBlue,
-    borderRadius: kioskRadii.md,
     shadowColor: kioskColors.accentBlue,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1573,16 +1744,105 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   detailWhiteboardBtnText: {
-    color: '#FFFFFF',
     fontWeight: '800',
+    color: '#FFFFFF',
+    includeFontPadding: false,
   },
-  portraitVersionBar: {
+
+  // ── LANDSCAPE FOOTER STYLES (MATCHING LandscapeKioskLayout) ──
+  landscapeBottomFooter: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    backgroundColor: '#0F172A',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    height: 32,
+  },
+  footerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  footerVersionContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  footerVersionText: {
+    color: '#64748B',
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    includeFontPadding: false,
+  },
+  languageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: kioskRadii.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  languageBtnText: {
+    color: kioskColors.textSecondary,
+    fontWeight: '600',
+    fontSize: 12,
+    includeFontPadding: false,
+  },
+  clockSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  clockTime: {
+    fontWeight: '700',
+    fontSize: 13,
+    color: kioskColors.textPrimary,
+    includeFontPadding: false,
+  },
+  clockDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#CBD5E1',
+  },
+  clockDate: {
+    fontWeight: '600',
+    fontSize: 12.5,
+    color: kioskColors.textMuted,
+    includeFontPadding: false,
+  },
+
+  // ── PORTRAIT FOOTER STYLES (MATCHING PortraitKioskLayout) ──
+  portraitVersionBar: {
+    width: '100%',
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    alignItems: 'flex-end',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
   portraitVersionText: {
     color: '#94A3B8',
     fontWeight: '600',
+    letterSpacing: 0.3,
+    includeFontPadding: false,
+  },
+  fixedBottomAdWrapper: {
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  fixedBottomAdImg: {
+    width: '100%',
+    height: 68,
   },
 });

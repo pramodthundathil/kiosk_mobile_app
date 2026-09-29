@@ -46,6 +46,8 @@ import {
   KIOSK_BRAND_BORDER_ACTIVE,
   KIOSK_ACTIVE_BG_DARK_GRADIENT,
   KIOSK_DEFAULT_CARD_GRADIENT,
+  getCategoryGradientColors,
+  KIOSK_CARD_GRADIENT_LOCATIONS,
 } from '../utils/kioskDesignHelper';
 
 // ── Interactive Spring Touch Card Component with Tactile Kiosk Feedback ──
@@ -155,7 +157,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   // Dedicated large category card dimensions for Main Screen in Portrait orientation
   const catColumns = screenWidth >= 1100 ? 3 : 2;
   const catHorizontalPadding = scaleSpacing(16);
-  const catGridGap = scaleSpacing(14);
+  const catGridGap = 12;
   const catTotalGaps = (catColumns - 1) * catGridGap;
   const catAvailableWidth = screenWidth - (catHorizontalPadding * 2);
   const categoryCardWidth = Math.floor((catAvailableWidth - catTotalGaps) / catColumns);
@@ -168,9 +170,9 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   const totalGaps = (numColumns - 1) * gridGap;
   const availableWidth = screenWidth - (horizontalPadding * 2);
   const cardWidth = Math.floor((availableWidth - totalGaps) / numColumns);
-  // Elegant fixed proportions: cardHeight around 175-205px (compact, never stretched)
-  const cardHeight = Math.min(210, Math.max(172, Math.round(cardWidth * 1.04)));
-  const cardImgHeight = cardHeight - 50;
+  // Elegant enlarged proportions: cardHeight around 215-265px (spacious, prominent image display)
+  const cardHeight = Math.min(265, Math.max(215, Math.round(cardWidth * 1.25)));
+  const cardImgHeight = cardHeight - 54;
 
   // Screen transition animation when switching categories, subcategories or search queries
   const contentFadeAnim = useRef(new Animated.Value(1)).current;
@@ -279,7 +281,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
     if (query) {
       return (
         p.name.toLowerCase().includes(query) ||
-        p.sku.toLowerCase().includes(query) ||
+        
         (p.subtitle && p.subtitle.toLowerCase().includes(query)) ||
         (p.description && p.description.toLowerCase().includes(query)) ||
         (p.subCategoryName && p.subCategoryName.toLowerCase().includes(query)) ||
@@ -340,14 +342,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   const getProductSpecs = (prod: KioskProduct): Record<string, string> => {
     const baseSpecs: Record<string, string> = (prod.specifications && Object.keys(prod.specifications).length > 0)
       ? { ...prod.specifications }
-      : {
-          'Material Grade': 'High Conductive Pure Electrolytic Copper (99.9%)',
-          'Manufacturing Standard': 'IEC 62561-2 / UL 467 Certified',
-          'Corrosion Resistance': 'High resistance against aggressive soil chemicals',
-          'Coating Thickness': 'Minimum 254 Microns (Molecular Bonded)',
-          'Service Life': '30+ Years in standard grounding installation',
-          'Testing Method': '4-Terminal Fall-of-Potential & Soil Resistivity',
-        };
+      : {};
     if (prod.subCategoryName) {
       baseSpecs['Sub-Category'] = prod.subCategoryName;
     }
@@ -420,7 +415,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
             <TextInput
               value={searchQuery}
               onChangeText={onSearchChange}
-              placeholder="Search earthing products, SKUs..."
+              placeholder="Search earthing products..."
               placeholderTextColor={kioskColors.textLightMuted}
               autoFocus={isSearchOpen}
               style={styles.searchInput}
@@ -515,38 +510,49 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                   >
                     {(active) => (
                       <View style={styles.cardBoxFillWrapper}>
-                        {/* Top: Square photo filling upper section */}
-                        <View style={styles.cardSquarePhotoWrapper}>
-                          <Image
-                            source={{ uri: imageUrl }}
-                            style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 14, borderTopRightRadius: 14 }]}
-                            resizeMode="cover"
-                            fadeDuration={0}
-                          />
-                          {active && (
-                            <View style={styles.cardActivePhotoOverlay} />
-                          )}
-                        </View>
+                        {/* 1. Full-bleed Picture */}
+                        <Image
+                          source={{ uri: imageUrl }}
+                          style={StyleSheet.absoluteFill}
+                          resizeMode="cover"
+                          fadeDuration={0}
+                        />
 
-                        {/* Bottom: Writing on bottom (dark blue theme color, no description, full name visible) */}
-                        <View style={styles.cardBottomWriting}>
-                          <View style={styles.cardBottomTextCol}>
-                            <Text
-                              numberOfLines={2}
-                              style={[
-                                styles.cardBottomTitle,
-                                { fontSize: scaleFont(15.5), lineHeight: scaleFont(20.5) },
-                                active && styles.cardBottomTitleActive,
-                              ]}
-                              {...crispTextProps}
-                            >
-                              {cat.name}
-                            </Text>
+                        {/* 2. Active Touch Tint Feedback */}
+                        {active && <View style={styles.cardActivePhotoOverlay} />}
+
+                        {/* 3. Bottom Scattered Gradient matching the picture's color */}
+                        <LinearGradient
+                          colors={getCategoryGradientColors(cat)}
+                          locations={KIOSK_CARD_GRADIENT_LOCATIONS}
+                          style={styles.cardGradientOverlay}
+                        >
+                          {/* 4. Writing of the category on top of the gradient */}
+                          <View style={styles.cardBottomWriting}>
+                            <View style={styles.cardBottomTextCol}>
+                              <Text
+                                numberOfLines={2}
+                                style={[
+                                  styles.cardBottomTitle,
+                                  { fontSize: scaleFont(15.5), lineHeight: scaleFont(20.5) },
+                                ]}
+                                {...crispTextProps}
+                              >
+                                {cat.name}
+                              </Text>
+                            </View>
+                            <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
+                              <ChevronRight
+                                size={scaleFont(15)}
+                                color={active ? kioskColors.brandNavy : '#FFFFFF'}
+                                strokeWidth={2.6}
+                              />
+                            </View>
                           </View>
-                          <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
-                            <ChevronRight size={scaleFont(15)} color={active ? kioskColors.accentBlue : kioskColors.brandNavy} strokeWidth={2.6} />
-                          </View>
-                        </View>
+                        </LinearGradient>
+
+                        {/* 5. Active highlight border */}
+                        {active && <View style={styles.cardActiveGlowBorder} />}
                       </View>
                     )}
                   </AnimatedCard>
@@ -641,38 +647,49 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                     >
                       {(active) => (
                         <View style={styles.cardBoxFillWrapper}>
-                          {/* Top: Square photo filling upper section */}
-                          <View style={styles.cardSquarePhotoWrapper}>
-                            <Image
-                              source={{ uri: imageUrl }}
-                              style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 14, borderTopRightRadius: 14 }]}
-                              resizeMode="cover"
-                              fadeDuration={0}
-                            />
-                            {active && (
-                              <View style={styles.cardActivePhotoOverlay} />
-                            )}
-                          </View>
+                          {/* 1. Full-bleed Picture */}
+                          <Image
+                            source={{ uri: imageUrl }}
+                            style={StyleSheet.absoluteFill}
+                            resizeMode="cover"
+                            fadeDuration={0}
+                          />
 
-                          {/* Bottom: Writing on bottom (dark blue theme color, no description, full name visible) */}
-                          <View style={styles.cardBottomWriting}>
-                            <View style={styles.cardBottomTextCol}>
-                              <Text
-                                numberOfLines={2}
-                                style={[
-                                  styles.cardBottomTitle,
-                                  { fontSize: scaleFont(15), lineHeight: scaleFont(20) },
-                                  active && styles.cardBottomTitleActive,
-                                ]}
-                                {...crispTextProps}
-                              >
-                                {subCat.name}
-                              </Text>
+                          {/* 2. Active Touch Tint Feedback */}
+                          {active && <View style={styles.cardActivePhotoOverlay} />}
+
+                          {/* 3. Bottom Scattered Gradient matching picture's color */}
+                          <LinearGradient
+                            colors={getCategoryGradientColors(subCat)}
+                            locations={KIOSK_CARD_GRADIENT_LOCATIONS}
+                            style={styles.cardGradientOverlay}
+                          >
+                            {/* 4. Writing of the category on top of the gradient */}
+                            <View style={styles.cardBottomWriting}>
+                              <View style={styles.cardBottomTextCol}>
+                                <Text
+                                  numberOfLines={2}
+                                  style={[
+                                    styles.cardBottomTitle,
+                                    { fontSize: scaleFont(15), lineHeight: scaleFont(20) },
+                                  ]}
+                                  {...crispTextProps}
+                                >
+                                  {subCat.name}
+                                </Text>
+                              </View>
+                              <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
+                                <ChevronRight
+                                  size={scaleFont(15)}
+                                  color={active ? kioskColors.brandNavy : '#FFFFFF'}
+                                  strokeWidth={2.6}
+                                />
+                              </View>
                             </View>
-                            <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
-                              <ChevronRight size={scaleFont(15)} color={active ? kioskColors.accentBlue : kioskColors.brandNavy} strokeWidth={2.6} />
-                            </View>
-                          </View>
+                          </LinearGradient>
+
+                          {/* 5. Active highlight border */}
+                          {active && <View style={styles.cardActiveGlowBorder} />}
                         </View>
                       )}
                     </AnimatedCard>
@@ -871,18 +888,6 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                     >
                       {/* Dynamic Product Image */}
                       <View style={[styles.cardImgContainer, { height: cardImgHeight }]}>
-                        {prod.mediaAssets?.some((a) => a.asset_type === 'THREE_D') && (
-                          <View style={styles.card3DBadge}>
-                            <Box size={10} color="#0284C7" strokeWidth={2.4} />
-                            <Text style={styles.card3DBadgeText}>3D</Text>
-                          </View>
-                        )}
-                        {prod.mediaAssets?.some((a) => a.asset_type === 'VIDEO') && (
-                          <View style={styles.cardVideoBadge}>
-                            <Video size={10} color="#E11D48" strokeWidth={2.4} />
-                            <Text style={styles.cardVideoBadgeText}>VIDEO</Text>
-                          </View>
-                        )}
                         {prod.image ? (
                           <Image
                             source={{ uri: prod.image }}
@@ -900,24 +905,9 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                       {/* Card Footer */}
                       <View style={styles.cardFooterRow}>
                         <View style={styles.cardFooterTextCol}>
-                          {prod.subCategoryName ? (
-                            <Text numberOfLines={1} style={{ fontSize: scaleFont(10), color: '#059669', fontWeight: '700', textTransform: 'uppercase', marginBottom: 1 }} {...crispTextProps}>
-                              {prod.subCategoryName}
-                            </Text>
-                          ) : null}
-                          <Text numberOfLines={2} style={[styles.cardTitleText, { fontSize: scaleFont(13) }]} {...crispTextProps}>
+                          <Text numberOfLines={2} style={[styles.cardTitleText, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
                             {prod.name}
                           </Text>
-                          {prod.variants && prod.variants.length > 0 ? (
-                            <View style={styles.cardVariantsRow}>
-                              <Text numberOfLines={1} style={[styles.cardVariantsText, { fontSize: scaleFont(9.5) }]} {...crispTextProps}>
-                                <Text style={{ fontWeight: '800', color: combo.arrowBg }}>
-                                  {prod.variants.length} {prod.variants.length === 1 ? 'Variant' : 'Variants'}:{' '}
-                                </Text>
-                                {prod.variants.map((v: any) => v.name).join(', ')}
-                              </Text>
-                            </View>
-                          ) : null}
                         </View>
                         <View style={[styles.arrowCircleBtn, { backgroundColor: combo.arrowBg }]}>
                           <ChevronRight size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
@@ -998,14 +988,35 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
               </View>
 
               {/* Media Action Quick Pills */}
-              {(selectedProductDetail.mediaAssets?.some((a) => a.asset_type === 'THREE_D') ||
+              {(selectedProductDetail.mediaAssets?.some(
+                (a) =>
+                  (a.asset_type === 'THREE_D' ||
+                    a.file_url?.toLowerCase().endsWith('.glb') ||
+                    a.file_url?.toLowerCase().endsWith('.gltf')) &&
+                  typeof a.file_url === 'string' &&
+                  a.file_url.trim().length > 0
+              ) ||
                 selectedProductDetail.mediaAssets?.some((a) => a.asset_type === 'VIDEO')) && (
                 <View style={styles.sheetMediaActionsRow}>
-                  {selectedProductDetail.mediaAssets?.find((a) => a.asset_type === 'THREE_D') && (
+                  {selectedProductDetail.mediaAssets?.find(
+                    (a) =>
+                      (a.asset_type === 'THREE_D' ||
+                        a.file_url?.toLowerCase().endsWith('.glb') ||
+                        a.file_url?.toLowerCase().endsWith('.gltf')) &&
+                      typeof a.file_url === 'string' &&
+                      a.file_url.trim().length > 0
+                  ) && (
                     <TouchableOpacity
                       style={styles.sheet3DBtn}
                       onPress={() => {
-                        const a = selectedProductDetail.mediaAssets?.find((m) => m.asset_type === 'THREE_D');
+                        const a = selectedProductDetail.mediaAssets?.find(
+                          (m) =>
+                            (m.asset_type === 'THREE_D' ||
+                              m.file_url?.toLowerCase().endsWith('.glb') ||
+                              m.file_url?.toLowerCase().endsWith('.gltf')) &&
+                            typeof m.file_url === 'string' &&
+                            m.file_url.trim().length > 0
+                        );
                         if (onOpenMediaViewer) {
                           closeBottomSheet();
                           onOpenMediaViewer(selectedProductDetail, a?.id);
@@ -1185,7 +1196,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
   },
   scrollBodyCentered: {
     justifyContent: 'center',
@@ -1291,39 +1303,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12,
     paddingVertical: 8,
   },
-  // Redesigned Category Cards: Square photo on top, writing on bottom, borderless with box shadow
+  // Redesigned Category Cards: Full-bleed photo, bottom scattered gradient, bold writing on top
   categoryKioskCard: {
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
     borderWidth: 0,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.18,
     shadowRadius: 10,
-    elevation: 5,
+    elevation: 6,
   },
   cardBoxFillWrapper: {
     flex: 1,
     width: '100%',
     height: '100%',
-    flexDirection: 'column',
-    backgroundColor: '#FFFFFF',
+    position: 'relative',
+    backgroundColor: '#0F172A',
     overflow: 'hidden',
     borderRadius: 14,
-  },
-  cardSquarePhotoWrapper: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    overflow: 'hidden',
-    position: 'relative',
   },
   cardActivePhotoOverlay: {
     position: 'absolute',
@@ -1331,45 +1334,60 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(13, 96, 174, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    zIndex: 2,
+  },
+  cardGradientOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '62%',
+    justifyContent: 'flex-end',
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    zIndex: 3,
   },
   cardBottomWriting: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    paddingBottom: 13,
+    paddingTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 64,
   },
   cardBottomTextCol: {
     flex: 1,
-    marginRight: 6,
+    marginRight: 8,
     justifyContent: 'center',
-    paddingVertical: 2,
   },
   cardBottomTitle: {
-    color: kioskColors.brandNavy,
+    color: '#FFFFFF',
     fontWeight: '800',
     letterSpacing: -0.2,
     includeFontPadding: false,
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 3,
   },
   cardBottomTitleActive: {
-    color: kioskColors.accentBlue,
+    color: '#FFFFFF',
   },
   cardBottomArrowCircle: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
   },
   cardBottomArrowCircleActive: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
   cardActiveGlowBorder: {
     position: 'absolute',

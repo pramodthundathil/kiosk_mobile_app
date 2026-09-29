@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  ImageBackground,
   Dimensions,
   Platform,
   Linking,
@@ -26,6 +27,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { kioskColors, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 import { ProductMediaAsset, KioskProduct } from '../types/kiosk';
 import { ThreeDModelViewer } from './ThreeDModelViewer';
+import { InAppPdfViewer } from './InAppPdfViewer';
 
 interface MediaModalProps {
   visible: boolean;
@@ -118,7 +120,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 </Text>
                 {product && (
                   <Text numberOfLines={1} style={[styles.productSub, { fontSize: scaleFont(12) }]}>
-                    {product.name} &bull; {product.sku}
+                    {product.name}
                   </Text>
                 )}
               </View>
@@ -152,65 +154,14 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 <MediaVideoPlayer url={assetUrl} />
               </View>
             ) : assetType === 'PDF_BROCHURE' || assetType === 'TECH_SHEET' ? (
-              <ScrollView
-                contentContainerStyle={styles.documentContainer}
-                showsVerticalScrollIndicator={false}
-              >
-                <View style={styles.docCard}>
-                  <View style={styles.docHeader}>
-                    <View style={styles.docIconBox}>
-                      <FileText size={scaleFont(36)} color={kioskColors.accentBlue} strokeWidth={2} />
-                    </View>
-                    <View style={styles.docInfo}>
-                      <Text style={[styles.docTitle, { fontSize: scaleFont(18) }]}>
-                        {asset.title || 'Technical Brochure & Documentation'}
-                      </Text>
-                      <Text style={[styles.docDescription, { fontSize: scaleFont(13) }]}>
-                        {asset.description ||
-                          'Certified industrial product specifications, engineering schematics, and test compliance reports.'}
-                      </Text>
-                      <Text style={[styles.docFileTag, { fontSize: scaleFont(11.5) }]}>
-                        PDF Document &bull; Verified Technical Reference
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* QR Code Sharing Box for Kiosk Visitors */}
-                  <View style={styles.qrSection}>
-                    <View style={styles.qrImageFrame}>
-                      <Image
-                        source={{ uri: qrCodeUrl }}
-                        style={styles.qrImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                    <View style={styles.qrTextCol}>
-                      <View style={styles.qrHeadlineRow}>
-                        <QrCode size={scaleFont(18)} color={kioskColors.accentBlue} strokeWidth={2.2} />
-                        <Text style={[styles.qrTitle, { fontSize: scaleFont(15) }]}>
-                          Scan to Download to Phone
-                        </Text>
-                      </View>
-                      <Text style={[styles.qrExplainer, { fontSize: scaleFont(12.5) }]}>
-                        Point your mobile phone camera at the QR code to instantly open and download this official PDF brochure on your device.
-                      </Text>
-
-                      <View style={styles.actionButtonsRow}>
-                        <TouchableOpacity
-                          style={styles.openDocButton}
-                          onPress={handleOpenExternal}
-                          activeOpacity={0.85}
-                        >
-                          <ExternalLink size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.2} />
-                          <Text style={[styles.openDocButtonText, { fontSize: scaleFont(13) }]}>
-                            Open PDF Directly
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </ScrollView>
+              <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#FFFFFF' }}>
+                <InAppPdfViewer
+                  pdfUrl={assetUrl}
+                  title={asset.title || 'Technical Brochure & Documentation'}
+                  subtitle={product?.name}
+                  scaleFont={scaleFont}
+                />
+              </View>
             ) : (
               // Default Image Viewer
               <View style={styles.imageContainer}>

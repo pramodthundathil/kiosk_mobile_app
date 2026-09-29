@@ -13,7 +13,7 @@ import {
  */
 export async function resolveOfflineModelUri(url?: string | null): Promise<string> {
   if (!url || typeof url !== 'string' || !url.trim()) {
-    return DEFAULT_OFFLINE_3D_MODEL_DATA_URI;
+    return '';
   }
 
   const trimmed = url.trim();
@@ -27,7 +27,12 @@ export async function resolveOfflineModelUri(url?: string | null): Promise<strin
   const cachedLocalUri = mediaCacheService.resolveCachedImageUri(trimmed);
 
   // If we have a local file:// URI
-  const fileCandidate = cachedLocalUri.startsWith('file://') ? cachedLocalUri : (trimmed.startsWith('file://') ? trimmed : null);
+  const fileCandidate =
+    cachedLocalUri && cachedLocalUri.startsWith('file://')
+      ? cachedLocalUri
+      : trimmed.startsWith('file://')
+      ? trimmed
+      : null;
 
   if (fileCandidate && Platform.OS !== 'web') {
     try {
@@ -46,19 +51,14 @@ export async function resolveOfflineModelUri(url?: string | null): Promise<strin
     }
   }
 
-  // If it's a remote URL and network is offline or file is inaccessible
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    // If the device is offline or if it's the known copper rod 3D asset, use bundled offline model
-    if (
-      trimmed.includes('copper-bonded') ||
-      trimmed.includes('earth-rod') ||
-      trimmed.includes('excelearthing') ||
-      trimmed.endsWith('.glb')
-    ) {
-      return DEFAULT_OFFLINE_3D_MODEL_DATA_URI;
-    }
+  // ONLY for the specific bundled copper rod model, if offline, fallback to bundled offline model
+  if (
+    trimmed.includes('copper-bonded-earth-rod_JPxKz56') ||
+    trimmed.includes('copper-bonded-earth-rod.glb')
+  ) {
+    return DEFAULT_OFFLINE_3D_MODEL_DATA_URI;
   }
 
-  // Return resolved candidate or bundled fallback
-  return fileCandidate || trimmed || DEFAULT_OFFLINE_3D_MODEL_DATA_URI;
+  // For all other products, return their actual local file candidate or remote URL!
+  return fileCandidate || trimmed;
 }

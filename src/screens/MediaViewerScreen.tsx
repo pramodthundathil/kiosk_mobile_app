@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  ImageBackground,
   ScrollView,
   Animated,
   Dimensions,
@@ -306,15 +307,22 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
     const items: UnifiedMediaItem[] = [];
     const assets = product.mediaAssets || [];
 
-    // 1. 3D Model Asset (Prioritize if available)
-    const threeD = assets.find((a) => a.asset_type === 'THREE_D');
-    if (threeD && threeD.file_url) {
+    // 1. 3D Model Asset (Prioritize if available and has valid non-empty URL)
+    const threeD = assets.find(
+      (a) =>
+        (a.asset_type === 'THREE_D' ||
+          a.file_url?.toLowerCase().endsWith('.glb') ||
+          a.file_url?.toLowerCase().endsWith('.gltf')) &&
+        typeof a.file_url === 'string' &&
+        a.file_url.trim().length > 0
+    );
+    if (threeD && threeD.file_url && threeD.file_url.trim().length > 0) {
       items.push({
         id: threeD.id,
         title: threeD.title || '3D Interactive Model',
         type: 'THREE_D',
         typeLabel: '3D Model',
-        url: threeD.file_url,
+        url: threeD.file_url.trim(),
         thumbnailUrl: product.image,
         description: threeD.description || 'Full 360-degree interactive 3D engineering model',
       });
@@ -412,6 +420,16 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
     return mediaList[0]?.id || 'main-photo';
   });
 
+  
+  // Synchronize selectedId when product or initialAssetId changes
+  useEffect(() => {
+    if (initialAssetId && mediaList.some((m) => m.id === initialAssetId)) {
+      setSelectedId(initialAssetId);
+    } else if (mediaList.length > 0) {
+      setSelectedId(mediaList[0].id);
+    }
+  }, [product.id, product.image, initialAssetId]);
+
   const activeItem = useMemo(
     () => mediaList.find((m) => m.id === selectedId) || mediaList[0],
     [mediaList, selectedId]
@@ -487,11 +505,7 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
                   {product.categoryName || 'Technical Catalog'}
                 </Text>
               </View>
-              <View style={styles.skuPill}>
-                <Text style={[styles.skuPillText, { fontSize: scaleFont(10.5) }]}>
-                  SKU: {product.sku}
-                </Text>
-              </View>
+              
             </View>
 
             <Text numberOfLines={1} style={[styles.productHeaderTitle, { fontSize: scaleFont(14.5) }]}>
@@ -652,13 +666,13 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
-    backgroundColor: '#070A11',
+    backgroundColor: '#0B192C',
     display: 'flex',
     flexDirection: 'column',
   },
   headerBar: {
     height: 64,
-    backgroundColor: '#0F172A',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     flexDirection: 'row',

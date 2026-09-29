@@ -51,6 +51,7 @@ export interface ProductMediaAsset {
   asset_type_display?: string;
   file_url?: string;
   description?: string;
+  variantId?: string;
 }
 
 export interface FeaturePointItem {
@@ -84,6 +85,9 @@ export interface KioskProductVariant {
   applicableAreas?: string[];
   displayOrder?: number;
   isActive?: boolean;
+  mediaAssets?: ProductMediaAsset[];
+  brochureUrl?: string;
+  techSheetUrl?: string;
 }
 
 export interface KioskProduct {

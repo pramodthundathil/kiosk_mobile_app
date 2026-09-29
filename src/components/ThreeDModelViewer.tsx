@@ -69,6 +69,13 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   // Resolve offline-capable URI (Base64 data URI or local cached file)
   useEffect(() => {
     let isMounted = true;
+    if (!modelUrl || typeof modelUrl !== 'string' || !modelUrl.trim()) {
+      setIsPreparingModel(false);
+      setIsLoading(false);
+      setResolvedModelUrl('');
+      return;
+    }
+
     setIsPreparingModel(true);
     setIsLoading(true);
     setHasError(false);
@@ -327,6 +334,20 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   const activeHtml = !isPreparingModel && resolvedModelUrl
     ? generateModelViewerHtml(resolvedModelUrl, posterUrl, isAutoRotating)
     : '';
+
+  if (!modelUrl || !modelUrl.trim() || (!isPreparingModel && !resolvedModelUrl)) {
+    return (
+      <View style={[styles.container, style, styles.errorOverlay]}>
+        <Box size={scaleFont(32)} color="#64748B" strokeWidth={1.8} />
+        <Text style={[styles.errorTitle, { fontSize: scaleFont(14), marginTop: 8 }]}>
+          No 3D Model Available
+        </Text>
+        <Text style={[styles.errorSubText, { fontSize: scaleFont(12) }]}>
+          There is no 3D asset available for this product.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, style]}>

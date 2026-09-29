@@ -131,7 +131,7 @@ export const InAppPdfViewer: React.FC<InAppPdfViewerProps> = ({
 
   // Google Docs Embedded Viewer URL for Android & Web fallback
   // Provides high-performance in-app rendering of remote PDFs
-  const isDirectWebOrIos = Platform.OS === 'ios';
+  const isDirectWebOrIos = Platform.OS === 'ios' || Platform.OS === 'web' || (typeof pdfUrl === 'string' && pdfUrl.startsWith('file://'));
   const resolvedViewerUrl = isDirectWebOrIos
     ? pdfUrl
     : `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUrl)}`;
@@ -299,6 +299,11 @@ export const InAppPdfViewer: React.FC<InAppPdfViewerProps> = ({
             ref={webViewRef}
             source={{ uri: resolvedViewerUrl }}
             style={styles.nativeWebView}
+            originWhitelist={['*']}
+            mixedContentMode="always"
+            allowFileAccess={true}
+            allowFileAccessFromFileURLs={true}
+            allowUniversalAccessFromFileURLs={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             startInLoadingState={false}
@@ -306,7 +311,8 @@ export const InAppPdfViewer: React.FC<InAppPdfViewerProps> = ({
             allowsInlineMediaPlayback={true}
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => setIsLoading(false)}
-            onError={() => {
+            onError={(e: any) => {
+              console.warn('[InAppPdfViewer] Native WebView error:', e?.nativeEvent);
               setIsLoading(false);
               setLoadError(true);
             }}

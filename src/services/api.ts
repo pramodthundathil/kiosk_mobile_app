@@ -521,20 +521,52 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
       }
 
       // Map media assets and sanitize URLs
-      const mappedAssets = Array.isArray(p.media_assets)
-        ? p.media_assets.map((m: any) => ({
-            id: String(m.id || Math.random()),
-            title: m.title || 'Media Asset',
-            asset_type: m.asset_type || 'IMAGE',
-            asset_type_display: m.asset_type_display || '',
-            file_url: m.file_url
-              ? sanitizeMediaUrl(m.file_url, cleanUrl)
-              : m.file
-              ? sanitizeMediaUrl(m.file, cleanUrl)
-              : m.external_url || '',
-            description: m.description || '',
-          }))
+      const rawAssets = Array.isArray(p.media_assets)
+        ? p.media_assets
+        : Array.isArray(p.mediaAssets)
+        ? p.mediaAssets
         : [];
+
+      const mappedAssets = rawAssets.map((m: any) => {
+        let rawType = String(m.asset_type || '').toUpperCase();
+        const fileUrl = m.file_url
+          ? sanitizeMediaUrl(m.file_url, cleanUrl)
+          : m.file
+          ? sanitizeMediaUrl(m.file, cleanUrl)
+          : m.external_url || '';
+
+        if (rawType.includes('3D') || rawType.includes('THREE_D') || fileUrl.toLowerCase().endsWith('.glb') || fileUrl.toLowerCase().endsWith('.gltf')) {
+          rawType = 'THREE_D';
+        } else if (rawType.includes('PDF') || rawType.includes('BROCHURE') || fileUrl.toLowerCase().endsWith('.pdf')) {
+          rawType = 'PDF_BROCHURE';
+        } else if (rawType.includes('TECH') || rawType.includes('SHEET')) {
+          rawType = 'TECH_SHEET';
+        } else if (rawType.includes('VIDEO') || fileUrl.toLowerCase().endsWith('.mp4') || fileUrl.toLowerCase().endsWith('.mov')) {
+          rawType = 'VIDEO';
+        } else {
+          rawType = 'IMAGE';
+        }
+
+        const rawVId =
+          m.variant_id ??
+          (typeof m.variant === 'object' && m.variant !== null ? m.variant.id : m.variant) ??
+          m.product_variant_id ??
+          m.variantId;
+        const variantId =
+          rawVId !== undefined && rawVId !== null && String(rawVId).trim() !== ''
+            ? String(rawVId)
+            : undefined;
+
+        return {
+          id: String(m.id || Math.random()),
+          title: m.title || 'Media Asset',
+          asset_type: rawType,
+          asset_type_display: m.asset_type_display || '',
+          file_url: fileUrl,
+          description: m.description || '',
+          variantId,
+        };
+      });
 
       // Extract brochure and tech sheet URLs
       const brochureAsset = mappedAssets.find((a: any) => a.asset_type === 'PDF_BROCHURE');
@@ -552,36 +584,48 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
       const subCatName = p.sub_category?.name || '';
       const subCategoryKey = subCatCode || subCatId || '';
 
-      // Parse features safely
+      // Parse features safely with fallback aliases
+      const rawFeatures = p.features ?? p.engineering_highlights ?? p.highlights;
       let parsedFeatures: any[] = [];
-      if (typeof p.features === 'string') {
-        try { parsedFeatures = JSON.parse(p.features); } catch (e) {}
-      } else if (Array.isArray(p.features)) {
-        parsedFeatures = p.features;
+      if (typeof rawFeatures === 'string') {
+        try { parsedFeatures = JSON.parse(rawFeatures); } catch (e) {
+          parsedFeatures = rawFeatures.split('\n').filter((l: string) => l.trim().length > 0);
+        }
+      } else if (Array.isArray(rawFeatures)) {
+        parsedFeatures = rawFeatures;
       }
 
-      // Parse certifications safely
+      // Parse certifications safely with fallback aliases
+      const rawCerts = p.certifications ?? p.certificates ?? p.standards;
       let parsedCerts: any[] = [];
-      if (typeof p.certifications === 'string') {
-        try { parsedCerts = JSON.parse(p.certifications); } catch (e) {}
-      } else if (Array.isArray(p.certifications)) {
-        parsedCerts = p.certifications;
+      if (typeof rawCerts === 'string') {
+        try { parsedCerts = JSON.parse(rawCerts); } catch (e) {
+          parsedCerts = rawCerts.split('\n').filter((l: string) => l.trim().length > 0);
+        }
+      } else if (Array.isArray(rawCerts)) {
+        parsedCerts = rawCerts;
       }
 
-      // Parse in-house tests safely
+      // Parse in-house tests safely with fallback aliases
+      const rawTests = p.in_house_tests ?? p.inHouseTests ?? p.tests ?? p.testing;
       let parsedTests: any[] = [];
-      if (typeof p.in_house_tests === 'string') {
-        try { parsedTests = JSON.parse(p.in_house_tests); } catch (e) {}
-      } else if (Array.isArray(p.in_house_tests)) {
-        parsedTests = p.in_house_tests;
+      if (typeof rawTests === 'string') {
+        try { parsedTests = JSON.parse(rawTests); } catch (e) {
+          parsedTests = rawTests.split('\n').filter((l: string) => l.trim().length > 0);
+        }
+      } else if (Array.isArray(rawTests)) {
+        parsedTests = rawTests;
       }
 
-      // Parse applicable areas safely
-      let parsedAreas: string[] = [];
-      if (typeof p.applicable_areas === 'string') {
-        try { parsedAreas = JSON.parse(p.applicable_areas); } catch (e) {}
-      } else if (Array.isArray(p.applicable_areas)) {
-        parsedAreas = p.applicable_areas;
+      // Parse applicable areas safely with fallback aliases
+      const rawAreas = p.applicable_areas ?? p.applicableAreas ?? p.applications ?? p.application;
+      let parsedAreas: any[] = [];
+      if (typeof rawAreas === 'string') {
+        try { parsedAreas = JSON.parse(rawAreas); } catch (e) {
+          parsedAreas = rawAreas.split('\n').filter((l: string) => l.trim().length > 0);
+        }
+      } else if (Array.isArray(rawAreas)) {
+        parsedAreas = rawAreas;
       }
 
       // Fallback image if product image is empty
@@ -604,33 +648,75 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
               vSpecs = v.specifications;
             }
 
+            const rawVFeatures = v.features ?? v.engineering_highlights ?? v.highlights;
             let vFeatures: any[] = [];
-            if (typeof v.features === 'string') {
-              try { vFeatures = JSON.parse(v.features); } catch (e) {}
-            } else if (Array.isArray(v.features)) {
-              vFeatures = v.features;
+            if (typeof rawVFeatures === 'string') {
+              try { vFeatures = JSON.parse(rawVFeatures); } catch (e) {
+                vFeatures = rawVFeatures.split('\n').filter((l: string) => l.trim().length > 0);
+              }
+            } else if (Array.isArray(rawVFeatures)) {
+              vFeatures = rawVFeatures;
             }
 
+            const rawVCerts = v.certifications ?? v.certificates ?? v.standards;
             let vCerts: any[] = [];
-            if (typeof v.certifications === 'string') {
-              try { vCerts = JSON.parse(v.certifications); } catch (e) {}
-            } else if (Array.isArray(v.certifications)) {
-              vCerts = v.certifications;
+            if (typeof rawVCerts === 'string') {
+              try { vCerts = JSON.parse(rawVCerts); } catch (e) {
+                vCerts = rawVCerts.split('\n').filter((l: string) => l.trim().length > 0);
+              }
+            } else if (Array.isArray(rawVCerts)) {
+              vCerts = rawVCerts;
             }
 
+            const rawVTests = v.in_house_tests ?? v.inHouseTests ?? v.tests ?? v.testing;
             let vTests: any[] = [];
-            if (typeof v.in_house_tests === 'string') {
-              try { vTests = JSON.parse(v.in_house_tests); } catch (e) {}
-            } else if (Array.isArray(v.in_house_tests)) {
-              vTests = v.in_house_tests;
+            if (typeof rawVTests === 'string') {
+              try { vTests = JSON.parse(rawVTests); } catch (e) {
+                vTests = rawVTests.split('\n').filter((l: string) => l.trim().length > 0);
+              }
+            } else if (Array.isArray(rawVTests)) {
+              vTests = rawVTests;
             }
 
-            let vAreas: string[] = [];
-            if (typeof v.applicable_areas === 'string') {
-              try { vAreas = JSON.parse(v.applicable_areas); } catch (e) {}
-            } else if (Array.isArray(v.applicable_areas)) {
-              vAreas = v.applicable_areas;
+            const rawVAreas = v.applicable_areas ?? v.applicableAreas ?? v.applications ?? v.application;
+            let vAreas: any[] = [];
+            if (typeof rawVAreas === 'string') {
+              try { vAreas = JSON.parse(rawVAreas); } catch (e) {
+                vAreas = rawVAreas.split('\n').filter((l: string) => l.trim().length > 0);
+              }
+            } else if (Array.isArray(rawVAreas)) {
+              vAreas = rawVAreas;
             }
+
+            const rawVAssets = Array.isArray(v.media_assets)
+              ? v.media_assets
+              : Array.isArray(v.mediaAssets)
+              ? v.mediaAssets
+              : [];
+            const mappedVAssets = rawVAssets.map((vm: any) => {
+              let vRawType = String(vm.asset_type || '').toUpperCase();
+              const vFileUrl = vm.file_url ? sanitizeMediaUrl(vm.file_url, cleanUrl) : vm.file ? sanitizeMediaUrl(vm.file, cleanUrl) : vm.external_url || '';
+              if (vRawType.includes('3D') || vRawType.includes('THREE_D') || vFileUrl.toLowerCase().endsWith('.glb') || vFileUrl.toLowerCase().endsWith('.gltf')) {
+                vRawType = 'THREE_D';
+              } else if (vRawType.includes('PDF') || vRawType.includes('BROCHURE') || vFileUrl.toLowerCase().endsWith('.pdf')) {
+                vRawType = 'PDF_BROCHURE';
+              } else if (vRawType.includes('TECH') || vRawType.includes('SHEET')) {
+                vRawType = 'TECH_SHEET';
+              } else if (vRawType.includes('VIDEO') || vFileUrl.toLowerCase().endsWith('.mp4') || vFileUrl.toLowerCase().endsWith('.mov')) {
+                vRawType = 'VIDEO';
+              } else {
+                vRawType = 'IMAGE';
+              }
+              return {
+                id: String(vm.id || Math.random()),
+                title: vm.title || 'Variant Media Asset',
+                asset_type: vRawType,
+                asset_type_display: vm.asset_type_display || '',
+                file_url: vFileUrl,
+                description: vm.description || '',
+                variantId: String(v.id),
+              };
+            });
 
             return {
               id: String(v.id || Math.random()),
@@ -648,6 +734,7 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
               applicableAreas: vAreas,
               displayOrder: v.display_order || 0,
               isActive: v.is_active !== false,
+              mediaAssets: mappedVAssets,
             };
           })
         : [];

@@ -157,14 +157,6 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
     standards: ['IEC 62561-7', 'IEEE 80', 'IS 3043'],
     mediaAssets: [
       {
-        id: 'm-cc-3d',
-        title: '3D Earthing Electrode with Conductive Concrete Bed',
-        asset_type: 'THREE_D',
-        asset_type_display: '3D Interactive Model',
-        file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/copper-bonded-earth-rod_JPxKz56.glb',
-        description: 'Interactive 3D model of the earthing assembly.',
-      },
-      {
         id: 'm-cc-pdf',
         title: 'Conductive Concrete Datasheet',
         asset_type: 'PDF_BROCHURE',
@@ -196,6 +188,16 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Standards': 'IEEE 80 / IS 3043',
     },
     standards: ['IEEE 80', 'IS 3043'],
+    mediaAssets: [
+      {
+        id: 'm-ecm-pdf',
+        title: 'ECM Technical Datasheet & MSDS',
+        asset_type: 'PDF_BROCHURE',
+        asset_type_display: 'PDF Datasheet',
+        file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/Please_share_the_following.pdf',
+        description: 'Official Excel Earthings chemical safety datasheet and RoHS compliance certificate.',
+      },
+    ],
   },
   {
     id: 'p-fee-03',
@@ -218,6 +220,16 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Compliance': 'IEC 62561-7 / IS 3043',
     },
     standards: ['IEC 62561-7', 'IS 3043'],
+    mediaAssets: [
+      {
+        id: 'm-fee-pdf',
+        title: 'FEE Fertilizer Test Report & Datasheet',
+        asset_type: 'PDF_BROCHURE',
+        asset_type_display: 'PDF Brochure',
+        file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/Please_share_the_following.pdf',
+        description: 'Official laboratory conductivity test report and environmental impact declaration.',
+      },
+    ],
   },
   {
     id: 'p-ss-la',
@@ -241,6 +253,16 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Standards': 'UL 96 / IEC 62305 / NFPA 780',
     },
     standards: ['UL 96', 'IEC 62305', 'NFPA 780'],
+    mediaAssets: [
+      {
+        id: 'm-ssla-pdf',
+        title: 'Stainless Steel LA Technical Brochure',
+        asset_type: 'PDF_BROCHURE',
+        asset_type_display: 'PDF Datasheet',
+        file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/Please_share_the_following.pdf',
+        description: 'UL 96 and IEC 62305 lightning protection design calculation guide and tech sheet.',
+      },
+    ],
   },
   {
     id: 'p-cb-la',
@@ -521,6 +543,7 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
         asset_type_display: '3D Interactive Model',
         file_url: 'https://s3.ap-south-1.amazonaws.com/excelearthing-437377029279-ap-south-1-an/media/media_assets/copper-bonded-earth-rod_JPxKz56.glb',
         description: 'Interactive 3D model of the copper bonded earthing electrode. 360-degree rotation and zoom enabled.',
+        variantId: 'var-cbr-250',
       },
       {
         id: 'm-pdf-1',
