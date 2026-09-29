@@ -21,6 +21,8 @@ import {
   parseJwtPayload,
   isKioskAuthenticated,
   ensureKioskSessionValid,
+  verifyKioskStatus,
+  onKioskAuthChange,
 } from './src/services/api';
 import { mediaCacheService } from './src/services/mediaCacheService';
 import { syncService } from './src/services/syncService';
@@ -31,8 +33,25 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
   const [isScreensaverActive, setIsScreensaverActive] = useState(false);
   const [screensavers, setScreensavers] = useState<KioskScreensaver[]>([]);
+
+  // Listen for realtime backend session invalidation (e.g. admin deletes or deactivates kiosk)
+  useEffect(() => {
+    const unsubscribe = onKioskAuthChange((authenticated, reason) => {
+      console.log('[App] Auth state changed event received:', authenticated, reason);
+      setIsAuthenticated(authenticated);
+      if (!authenticated) {
+        if (reason) setAuthErrorMessage(reason);
+        // Continue heartbeat on login screen so hardware MAC is visible to backend
+        startHeartbeatRunner(10000);
+      } else {
+        setAuthErrorMessage(null);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
@@ -54,15 +73,35 @@ export default function App() {
         });
       }
 
-      // 2. Persistent Kiosk Authentication:
-      // Guarantee kiosk stays logged in across device restarts, reboots, crashes, and network loss!
-      const authenticated = await isKioskAuthenticated();
-      setIsAuthenticated(authenticated);
-      setIsCheckingAuth(false);
-
-      if (authenticated) {
-        // Silently verify/refresh token in background without blocking or logging out
-        ensureKioskSessionValid().catch(() => {});
+      // 2. Kiosk Startup Backend Verification:
+      // When the kiosk starts up, hit the backend to check if the kiosk MAC ID is available and active.
+      // If the backend says the kiosk MAC ID is not available (deleted) or deactivated, logout immediately!
+      const locallyAuthenticated = await isKioskAuthenticated();
+      if (!locallyAuthenticated) {
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+      } else {
+        try {
+          const verification = await verifyKioskStatus();
+          if (verification.action === 'LOGOUT' || !verification.available || !verification.active) {
+            console.warn('[App] Startup check rejected by backend: kiosk deleted or deactivated. Logging out.');
+            await logoutKioskDevice();
+            setAuthErrorMessage(verification.message || 'Kiosk device was deleted or deactivated by an administrator.');
+            setIsAuthenticated(false);
+            setIsCheckingAuth(false);
+          } else {
+            setIsAuthenticated(true);
+            setAuthErrorMessage(null);
+            setIsCheckingAuth(false);
+            // Silently verify/refresh token in background
+            ensureKioskSessionValid().catch(() => {});
+          }
+        } catch (verErr) {
+          console.warn('[App] Startup verification notice:', verErr);
+          // If offline network error, maintain previous authenticated state
+          setIsAuthenticated(locallyAuthenticated);
+          setIsCheckingAuth(false);
+        }
       }
 
       // 3. Start 10-second hardware heartbeat runner immediately on device boot/launch
@@ -123,6 +162,7 @@ export default function App() {
   }, [responsiveMetrics.isLandscape]);
 
   const handleLoginSuccess = () => {
+    setAuthErrorMessage(null);
     setIsAuthenticated(true);
     // Send immediate heartbeat update with authenticated state
     startHeartbeatRunner(10000);
@@ -130,6 +170,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await logoutKioskDevice();
+    setAuthErrorMessage(null);
     setIsAuthenticated(false);
     // Continue heartbeat to indicate hardware is alive on the login screen
     startHeartbeatRunner(10000);
@@ -185,7 +226,7 @@ export default function App() {
               <HomeScreen onLogout={handleLogout} isScreensaverActive={isScreensaverActive} />
             ) : (
               /* Login Screen: Displayed when not authenticated */
-              <KioskLoginScreen onLoginSuccess={handleLoginSuccess} />
+              <KioskLoginScreen onLoginSuccess={handleLoginSuccess} initialErrorMessage={authErrorMessage} />
             )}
           </View>
         </InactivityTracker>
