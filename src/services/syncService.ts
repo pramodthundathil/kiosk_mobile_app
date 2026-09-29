@@ -293,6 +293,20 @@ class KioskSyncService {
           if (p.techSheetUrl && p.techSheetUrl.startsWith('http')) {
             mediaToCache.push(p.techSheetUrl);
           }
+          if (Array.isArray(p.variants)) {
+            p.variants.forEach((v) => {
+              if (v.image && v.image.startsWith('http')) {
+                mediaToCache.push(v.image);
+              }
+              if (Array.isArray(v.mediaAssets)) {
+                v.mediaAssets.forEach((vm) => {
+                  if (vm.file_url && vm.file_url.startsWith('http')) {
+                    mediaToCache.push(vm.file_url);
+                  }
+                });
+              }
+            });
+          }
         });
 
         // B. Categories and Sub-categories images

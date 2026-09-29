@@ -126,7 +126,7 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: radial-gradient(circle at 50% 40%, #1e293b 0%, #0b1329 80%, #020617 100%);
+      background: radial-gradient(circle at 50% 40%, #0F203C 0%, #020D22 80%, #010612 100%);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     model-viewer {
@@ -134,71 +134,12 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
       height: 100%;
       --poster-color: transparent;
       outline: none;
-      --progress-bar-color: #0284c7;
+      --progress-bar-color: #0D60AE;
       --progress-bar-height: 3px;
-    }
-    .badge-3d {
-      position: absolute;
-      top: 14px;
-      left: 14px;
-      background: rgba(15, 23, 42, 0.82);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 20px;
-      padding: 6px 14px;
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      color: #38bdf8;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      backdrop-filter: blur(8px);
-      pointer-events: none;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-    }
-    .badge-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #38bdf8;
-      box-shadow: 0 0 8px #38bdf8;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-    .touch-hint {
-      position: absolute;
-      bottom: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 24px;
-      padding: 7px 18px;
-      color: #e2e8f0;
-      font-size: 12px;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      backdrop-filter: blur(10px);
-      pointer-events: none;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-      transition: opacity 0.5s ease;
-    }
-    .touch-hint.fade-out {
-      opacity: 0;
     }
   </style>
 </head>
 <body>
-  <div class="badge-3d">
-    <div class="badge-dot"></div>
-    <span>3D INTERACTIVE MODEL</span>
-  </div>
-
   <model-viewer
     id="viewer"
     src="${url}"
@@ -207,7 +148,7 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
     touch-action="pan-y"
     ${initialAutoRotate ? 'auto-rotate' : ''}
     rotation-per-second="20deg"
-    interaction-prompt="auto"
+    interaction-prompt="none"
     shadow-intensity="1.6"
     shadow-softness="0.7"
     exposure="1.15"
@@ -217,10 +158,6 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
     ar
   >
   </model-viewer>
-
-  <div id="hint" class="touch-hint">
-    <span>🖐️ Touch to Rotate 360° &bull; Pinch to Zoom</span>
-  </div>
 
   <script>
     const viewer = document.getElementById('viewer');
@@ -612,11 +549,11 @@ const styles = StyleSheet.create({
     ...kioskShadows.subtle,
   },
   controlBtnActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
+    backgroundColor: '#0D60AE',
+    borderColor: '#0D60AE',
   },
   fullscreenBtn: {
-    backgroundColor: 'rgba(2, 132, 199, 0.25)',
-    borderColor: 'rgba(56, 189, 248, 0.5)',
+    backgroundColor: 'rgba(13, 96, 174, 0.25)',
+    borderColor: '#0D60AE',
   },
 });

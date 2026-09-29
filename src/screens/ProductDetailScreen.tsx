@@ -32,6 +32,7 @@ import { kioskColors, kioskIcons, kioskRadii } from '../theme/kioskTheme';
 import {
   KioskProduct,
   KioskProductVariant,
+  ProductMediaAsset,
   FeaturePointItem,
   CertificationPointItem,
   InHouseTestPointItem,
@@ -48,6 +49,7 @@ type DetailTabKey = 'features' | 'specifications' | 'certifications' | 'in_house
 
 interface ProductDetailScreenProps {
   product: KioskProduct;
+  allProducts?: KioskProduct[];
   metrics: KioskResponsiveMetrics;
   onBack: () => void;
   onOpenMediaViewer?: (product: KioskProduct, initialAssetId?: string) => void;
@@ -55,6 +57,7 @@ interface ProductDetailScreenProps {
 
 export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   product,
+  allProducts,
   metrics,
   onBack,
   onOpenMediaViewer,
@@ -87,7 +90,62 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   // Active Variant Selection
   // Combine Parent Product and all Child Variants so both are available in the variant selector
   const allVariants = useMemo<KioskProductVariant[]>(() => {
-    if (!product.variants || product.variants.length === 0) {
+    const rawVariants: any[] =
+      (Array.isArray(product.variants) && product.variants.length > 0)
+        ? product.variants
+        : (Array.isArray((product as any).sub_products) && (product as any).sub_products.length > 0)
+        ? (product as any).sub_products
+        : (Array.isArray((product as any).child_variants) && (product as any).child_variants.length > 0)
+        ? (product as any).child_variants
+        : (Array.isArray((product as any).direct_variants) && (product as any).direct_variants.length > 0)
+        ? (product as any).direct_variants
+        : (Array.isArray((product as any).children) && (product as any).children.length > 0)
+        ? (product as any).children
+        : [];
+
+    let combined: KioskProductVariant[] = rawVariants.map((v) => ({
+      id: String(v.id),
+      productId: String(v.productId || product.id),
+      name: v.name || 'Variant',
+      sku: v.sku || '',
+      price: typeof v.price === 'number' ? v.price : parseFloat(v.price) || 0,
+      stock: typeof v.stock === 'number' ? v.stock : 100,
+      image: v.image || v.image_url || product.image,
+      description: v.description || '',
+      specifications: v.specifications || {},
+      features: v.features || [],
+      certifications: v.certifications || [],
+      inHouseTests: v.inHouseTests || [],
+      applicableAreas: v.applicableAreas || [],
+      isActive: v.isActive !== false,
+      mediaAssets: v.mediaAssets || v.media_assets || [],
+    }));
+
+    // If still empty, check allProducts for child items linked by parentId
+    if (combined.length === 0 && allProducts && allProducts.length > 0) {
+      const childProducts = allProducts.filter((p) => p.parentId && String(p.parentId) === String(product.id));
+      if (childProducts.length > 0) {
+        combined = childProducts.map((c) => ({
+          id: String(c.id),
+          productId: String(product.id),
+          name: c.name,
+          sku: c.sku,
+          price: c.price,
+          stock: c.stock,
+          image: c.image,
+          description: c.description,
+          specifications: c.specifications || {},
+          features: c.features || [],
+          certifications: c.certifications || [],
+          inHouseTests: c.inHouseTests || [],
+          applicableAreas: c.applicableAreas || [],
+          isActive: true,
+          mediaAssets: c.mediaAssets,
+        }));
+      }
+    }
+
+    if (combined.length === 0) {
       return [];
     }
 
@@ -106,10 +164,12 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       inHouseTests: product.inHouseTests || [],
       applicableAreas: product.applicableAreas || [],
       isActive: true,
+      mediaAssets: product.mediaAssets,
     };
 
-    return [parentAsVariant, ...product.variants];
-  }, [product]);
+    const hasParent = combined.some((v) => v.id === product.id || v.name.trim().toLowerCase() === product.name.trim().toLowerCase());
+    return hasParent ? combined : [parentAsVariant, ...combined];
+  }, [product, allProducts]);
 
   // Selected variant id - defaults to the parent product (product.id)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(product.id);
@@ -302,6 +362,45 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     return [];
   }, [activeVariant, product.applicableAreas, product.applications]);
 
+  // Resolved Media Assets for the current selection
+  const resolvedMediaAssets: ProductMediaAsset[] = useMemo(() => {
+    // 1. If child variant is selected and has explicit media assets:
+    if (!isParentSelected && activeVariant && Array.isArray(activeVariant.mediaAssets) && activeVariant.mediaAssets.length > 0) {
+      return activeVariant.mediaAssets;
+    }
+
+    const allProductMedia = product.mediaAssets || [];
+    if (allProductMedia.length === 0) {
+      return [];
+    }
+
+    if (isParentSelected) {
+      // For base/parent product, include media that is NOT tagged with a child variant id or matches product.id
+      return allProductMedia.filter((a) => !a.variantId || a.variantId === product.id);
+    } else {
+      // For a specific child variant:
+      // Include assets explicitly tagged for this variantId
+      const variantTagged = allProductMedia.filter((a) => a.variantId === selectedVariantId);
+      if (variantTagged.length > 0) {
+        // Also allow general PDF brochures if variant doesn't have its own
+        const generalPdfs = allProductMedia.filter(
+          (a) => !a.variantId && (a.asset_type?.toUpperCase().includes('PDF') || a.asset_type?.toUpperCase().includes('TECH'))
+        );
+        return [...variantTagged, ...generalPdfs];
+      }
+      // If variant has no specific tagged media, STRICTLY DO NOT leak 3D models assigned to other variants!
+      // Only keep general photos & PDFs that are NOT 3D
+      return allProductMedia.filter(
+        (a) =>
+          !a.variantId &&
+          a.asset_type?.toUpperCase() !== 'THREE_D' &&
+          a.asset_type?.toUpperCase() !== '3D' &&
+          !a.file_url?.toLowerCase().endsWith('.glb') &&
+          !a.file_url?.toLowerCase().endsWith('.gltf')
+      );
+    }
+  }, [product.mediaAssets, activeVariant, isParentSelected, selectedVariantId, product.id]);
+
   // Virtual product with active variant parameters for gallery / media
   const displayedProduct: KioskProduct = useMemo(() => {
     return {
@@ -309,8 +408,9 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       name: resolvedName,
       image: activeVariant?.image || product.image,
       specifications: resolvedSpecs,
+      mediaAssets: resolvedMediaAssets,
     };
-  }, [product, resolvedName, activeVariant, resolvedSpecs]);
+  }, [product, resolvedName, activeVariant, resolvedSpecs, resolvedMediaAssets]);
 
   return (
     <View style={styles.rootContainer}>

@@ -260,126 +260,128 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
         />
       )}
 
-      {/* Top Toggle Pill Row: Only renders options that ACTUALLY exist */}
-      <View style={styles.topToggleRow}>
-        <View style={styles.pillToggleWrapper}>
-          {photoAssets.length > 0 && (
-            <TouchableOpacity
-              style={[
-                styles.pillToggleBtn,
-                activeTab === 'photo' && styles.pillToggleBtnActive,
-              ]}
-              onPress={() => {
-                try { Haptics.selectionAsync(); } catch (e) {}
-                setActiveTab('photo');
-              }}
-              activeOpacity={0.88}
-            >
-              <ImageIcon
-                size={scaleFont(13)}
-                color={activeTab === 'photo' ? '#FFFFFF' : '#475569'}
-                strokeWidth={2.2}
-              />
-              <Text
+      {/* Top Toggle Pill Row: Only renders when 2 or more distinct media types exist */}
+      {((photoAssets.length > 0 ? 1 : 0) + (threeDAsset ? 1 : 0) + (docAssets.length > 0 ? 1 : 0) + (videoAssets.length > 0 ? 1 : 0)) > 1 && (
+        <View style={styles.topToggleRow}>
+          <View style={styles.pillToggleWrapper}>
+            {photoAssets.length > 0 && (
+              <TouchableOpacity
                 style={[
-                  styles.pillToggleText,
-                  activeTab === 'photo' && styles.pillToggleTextActive,
-                  { fontSize: scaleFont(12) },
+                  styles.pillToggleBtn,
+                  activeTab === 'photo' && styles.pillToggleBtnActive,
                 ]}
+                onPress={() => {
+                  try { Haptics.selectionAsync(); } catch (e) {}
+                  setActiveTab('photo');
+                }}
+                activeOpacity={0.88}
               >
-                Photos ({photoAssets.length})
-              </Text>
-            </TouchableOpacity>
-          )}
+                <ImageIcon
+                  size={scaleFont(13)}
+                  color={activeTab === 'photo' ? '#FFFFFF' : '#475569'}
+                  strokeWidth={2.2}
+                />
+                <Text
+                  style={[
+                    styles.pillToggleText,
+                    activeTab === 'photo' && styles.pillToggleTextActive,
+                    { fontSize: scaleFont(12) },
+                  ]}
+                >
+                  Photos
+                </Text>
+              </TouchableOpacity>
+            )}
 
-          {threeDAsset && (
-            <TouchableOpacity
-              style={[
-                styles.pillToggleBtn,
-                activeTab === 'three_d' && styles.pillToggleBtnActive,
-              ]}
-              onPress={() => {
-                try { Haptics.selectionAsync(); } catch (e) {}
-                setActiveTab('three_d');
-              }}
-              activeOpacity={0.88}
-            >
-              <Box
-                size={scaleFont(13)}
-                color={activeTab === 'three_d' ? '#FFFFFF' : '#475569'}
-                strokeWidth={2.2}
-              />
-              <Text
+            {threeDAsset && (
+              <TouchableOpacity
                 style={[
-                  styles.pillToggleText,
-                  activeTab === 'three_d' && styles.pillToggleTextActive,
-                  { fontSize: scaleFont(12) },
+                  styles.pillToggleBtn,
+                  activeTab === 'three_d' && styles.pillToggleBtnActive,
                 ]}
+                onPress={() => {
+                  try { Haptics.selectionAsync(); } catch (e) {}
+                  setActiveTab('three_d');
+                }}
+                activeOpacity={0.88}
               >
-                3D View
-              </Text>
-            </TouchableOpacity>
-          )}
+                <Box
+                  size={scaleFont(13)}
+                  color={activeTab === 'three_d' ? '#FFFFFF' : '#475569'}
+                  strokeWidth={2.2}
+                />
+                <Text
+                  style={[
+                    styles.pillToggleText,
+                    activeTab === 'three_d' && styles.pillToggleTextActive,
+                    { fontSize: scaleFont(12) },
+                  ]}
+                >
+                  3D
+                </Text>
+              </TouchableOpacity>
+            )}
 
-          {docAssets.length > 0 && (
-            <TouchableOpacity
-              style={[
-                styles.pillToggleBtn,
-                activeTab === 'brochure' && styles.pillToggleBtnActive,
-              ]}
-              onPress={() => {
-                try { Haptics.selectionAsync(); } catch (e) {}
-                setActiveTab('brochure');
-              }}
-              activeOpacity={0.88}
-            >
-              <FileText
-                size={scaleFont(13)}
-                color={activeTab === 'brochure' ? '#FFFFFF' : '#475569'}
-                strokeWidth={2.2}
-              />
-              <Text
+            {docAssets.length > 0 && (
+              <TouchableOpacity
                 style={[
-                  styles.pillToggleText,
-                  activeTab === 'brochure' && styles.pillToggleTextActive,
-                  { fontSize: scaleFont(12) },
+                  styles.pillToggleBtn,
+                  activeTab === 'brochure' && styles.pillToggleBtnActive,
                 ]}
+                onPress={() => {
+                  try { Haptics.selectionAsync(); } catch (e) {}
+                  setActiveTab('brochure');
+                }}
+                activeOpacity={0.88}
               >
-                PDF Document
-              </Text>
-            </TouchableOpacity>
-          )}
+                <FileText
+                  size={scaleFont(13)}
+                  color={activeTab === 'brochure' ? '#FFFFFF' : '#475569'}
+                  strokeWidth={2.2}
+                />
+                <Text
+                  style={[
+                    styles.pillToggleText,
+                    activeTab === 'brochure' && styles.pillToggleTextActive,
+                    { fontSize: scaleFont(12) },
+                  ]}
+                >
+                  Datasheet
+                </Text>
+              </TouchableOpacity>
+            )}
 
-          {videoAssets.length > 0 && (
-            <TouchableOpacity
-              style={[
-                styles.pillToggleBtn,
-                activeTab === 'video' && styles.pillToggleBtnActive,
-              ]}
-              onPress={() => {
-                try { Haptics.selectionAsync(); } catch (e) {}
-                setActiveTab('video');
-              }}
-              activeOpacity={0.88}
-            >
-              <Video
-                size={scaleFont(13)}
-                color={activeTab === 'video' ? '#FFFFFF' : '#475569'}
-                strokeWidth={2.2}
-              />
-              <Text
+            {videoAssets.length > 0 && (
+              <TouchableOpacity
                 style={[
-                  styles.pillToggleText,
-                  activeTab === 'video' && styles.pillToggleTextActive,
-                  { fontSize: scaleFont(12) },
+                  styles.pillToggleBtn,
+                  activeTab === 'video' && styles.pillToggleBtnActive,
                 ]}
+                onPress={() => {
+                  try { Haptics.selectionAsync(); } catch (e) {}
+                  setActiveTab('video');
+                }}
+                activeOpacity={0.88}
               >
-                Video
-              </Text>
-            </TouchableOpacity>
-          )}
+                <Video
+                  size={scaleFont(13)}
+                  color={activeTab === 'video' ? '#FFFFFF' : '#475569'}
+                  strokeWidth={2.2}
+                />
+                <Text
+                  style={[
+                    styles.pillToggleText,
+                    activeTab === 'video' && styles.pillToggleTextActive,
+                    { fontSize: scaleFont(12) },
+                  ]}
+                >
+                  Video
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Media Content Stage with Side or Bottom Thumbnails */}
       <View style={[styles.stageAndThumbsRow, { flexDirection: isLandscape ? 'row' : 'column' }]}>
@@ -409,13 +411,13 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
           ) : activeTab === 'brochure' && docAssets[0] ? (
             <View style={styles.docStageContent}>
               <View style={styles.docStageIconBox}>
-                <FileText size={scaleFont(32)} color="#10B981" strokeWidth={2} />
+                <FileText size={scaleFont(30)} color="#0D60AE" strokeWidth={2.2} />
               </View>
               <Text style={[styles.docStageTitle, { fontSize: scaleFont(14.5) }]}>
-                {docAssets[0].title || 'Product Technical Brochure'}
+                Product Technical Datasheet
               </Text>
               <Text style={[styles.docStageSub, { fontSize: scaleFont(12) }]}>
-                Official engineering datasheets and test certificates
+                Official specifications & certified test reports
               </Text>
               <TouchableOpacity
                 style={styles.docStageButton}
@@ -424,7 +426,7 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
               >
                 <QrCode size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.2} />
                 <Text style={[styles.docStageButtonText, { fontSize: scaleFont(12.5) }]}>
-                  View PDF & Scan QR
+                  Open Document
                 </Text>
               </TouchableOpacity>
             </View>
@@ -725,13 +727,13 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 14,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: 'rgba(13, 96, 174, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
   },
   docStageTitle: {
-    color: '#0F172A',
+    color: '#020D22',
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -744,7 +746,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0284C7',
+    backgroundColor: '#0D60AE',
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: kioskRadii.md,

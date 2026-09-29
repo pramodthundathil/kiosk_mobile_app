@@ -31,11 +31,12 @@ import { loginKioskDevice, getSavedServerUrl, DEFAULT_SERVER_URL } from '../serv
 
 interface KioskLoginScreenProps {
   onLoginSuccess: (kioskData: any) => void;
+  initialErrorMessage?: string | null;
 }
 
 const isTV = Platform.isTV;
 
-export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSuccess }) => {
+export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSuccess, initialErrorMessage }) => {
   const responsiveMetrics = useKioskResponsive();
   const { isLandscape, scaleFont, scaleSpacing } = responsiveMetrics;
 
@@ -46,7 +47,13 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
   const [showFullMac, setShowFullMac] = useState<boolean>(false);
   const [showServerConfig, setShowServerConfig] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialErrorMessage || null);
+
+  useEffect(() => {
+    if (initialErrorMessage) {
+      setErrorMessage(initialErrorMessage);
+    }
+  }, [initialErrorMessage]);
 
   useEffect(() => {
     // Auto detect MAC Address on mount

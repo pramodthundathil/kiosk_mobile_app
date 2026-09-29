@@ -249,36 +249,7 @@ const MediaThumbnailCard: React.FC<{
             </View>
           )}
 
-          {/* Type Badge Overlay */}
-          <View
-            style={[
-              styles.thumbnailTypeBadge,
-              isLandscape && styles.thumbnailTypeBadgeLandscape,
-              item.type === 'THREE_D' && styles.badgeBg3D,
-              item.type === 'VIDEO' && styles.badgeBgVideo,
-              item.type === 'PDF' && styles.badgeBgPdf,
-              item.type === 'IMAGE' && styles.badgeBgPhoto,
-            ]}
-          >
-            {renderBadgeIcon()}
-            <Text style={[styles.thumbnailBadgeText, { fontSize: isLandscape ? scaleFont(8) : scaleFont(9.5) }]}>
-              {item.typeLabel}
-            </Text>
-          </View>
         </View>
-
-        {/* 1-Line Title Label */}
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.thumbnailTitle,
-            isLandscape && styles.thumbnailTitleLandscape,
-            isActive && styles.thumbnailTitleActive,
-            { fontSize: isLandscape ? scaleFont(9.5) : scaleFont(10.5) },
-          ]}
-        >
-          {item.title}
-        </Text>
 
         {/* Active Pill Indicator */}
         {isActive && (

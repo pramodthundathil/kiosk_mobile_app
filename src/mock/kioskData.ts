@@ -155,6 +155,44 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Unaffected by drought, freezing, or torrential water runoff',
     ],
     standards: ['IEC 62561-7', 'IEEE 80', 'IS 3043'],
+    variants: [
+      {
+        id: 'var-cc-25',
+        name: '25 kg Moisture-Proof Bag',
+        sku: 'EXE-CC-25KG',
+        displayOrder: 1,
+        specifications: {
+          'Packaging': '25 kg multi-wall moisture-proof bag',
+          'Yield': '0.015 m³ per 25 kg bag',
+          'Compressive Strength': '≥ 25 MPa at 28 days',
+          'Resistivity': '< 0.05 Ohm-m',
+        },
+      },
+      {
+        id: 'var-cc-50',
+        name: '50 kg Heavy Duty Drum',
+        sku: 'EXE-CC-50KG',
+        displayOrder: 2,
+        specifications: {
+          'Packaging': '50 kg weather-sealed industrial drum',
+          'Yield': '0.030 m³ per drum',
+          'Compressive Strength': '≥ 28 MPa at 28 days',
+          'Resistivity': '< 0.04 Ohm-m',
+        },
+      },
+      {
+        id: 'var-cc-rapid',
+        name: 'Rapid Curing High-Early Strength Pack',
+        sku: 'EXE-CC-RAPID',
+        displayOrder: 3,
+        specifications: {
+          'Packaging': '25 kg accelerated cure formula',
+          'Setting Time': '4 hours initial, 24 hours full cure',
+          'Compressive Strength': '≥ 30 MPa at 7 days',
+          'Resistivity': '< 0.05 Ohm-m',
+        },
+      },
+    ],
     mediaAssets: [
       {
         id: 'm-cc-pdf',
@@ -188,6 +226,30 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Standards': 'IEEE 80 / IS 3043',
     },
     standards: ['IEEE 80', 'IS 3043'],
+    variants: [
+      {
+        id: 'var-ecm-10',
+        name: '10 kg Concentrated Pack',
+        sku: 'EXE-ECM-10KG',
+        displayOrder: 1,
+        specifications: {
+          'Packaging': '10 kg sealed container',
+          'Application': 'Single electrode pit conditioning',
+          'pH Value': '7.2 - 8.5',
+        },
+      },
+      {
+        id: 'var-ecm-25',
+        name: '25 kg Standard Bulk Pack',
+        sku: 'EXE-ECM-25KG',
+        displayOrder: 2,
+        specifications: {
+          'Packaging': '25 kg heavy duty moisture-proof container',
+          'Application': 'Substation and industrial earth grid',
+          'pH Value': '7.2 - 8.5',
+        },
+      },
+    ],
     mediaAssets: [
       {
         id: 'm-ecm-pdf',
@@ -220,6 +282,30 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Compliance': 'IEC 62561-7 / IS 3043',
     },
     standards: ['IEC 62561-7', 'IS 3043'],
+    variants: [
+      {
+        id: 'var-fee-20',
+        name: '20 kg Standard Conditioning Pack',
+        sku: 'EXE-FEE-20KG',
+        displayOrder: 1,
+        specifications: {
+          'Packaging': '20 kg moisture sealed sack',
+          'Application': 'Standard commercial and residential earth pit',
+          'Moisture Retention': 'Up to 300% dry weight',
+        },
+      },
+      {
+        id: 'var-fee-40',
+        name: '40 kg Heavy Duty Industrial Pack',
+        sku: 'EXE-FEE-40KG',
+        displayOrder: 2,
+        specifications: {
+          'Packaging': '40 kg twin-wall industrial sack',
+          'Application': 'High-voltage substation and deep bore pit',
+          'Moisture Retention': 'Up to 300% dry weight',
+        },
+      },
+    ],
     mediaAssets: [
       {
         id: 'm-fee-pdf',
@@ -253,6 +339,44 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Standards': 'UL 96 / IEC 62305 / NFPA 780',
     },
     standards: ['UL 96', 'IEC 62305', 'NFPA 780'],
+    variants: [
+      {
+        id: 'var-ssla-1000',
+        name: '1.0 Meter 5-Point Terminal',
+        sku: 'EXE-SS-MS-1M',
+        displayOrder: 1,
+        specifications: {
+          'Height': '1000 mm',
+          'Diameter': '16 mm',
+          'Spikes': '5-point cluster',
+          'Material': 'AISI 316L Stainless Steel',
+        },
+      },
+      {
+        id: 'var-ssla-1500',
+        name: '1.5 Meter 5-Point Terminal',
+        sku: 'EXE-SS-MS-1.5M',
+        displayOrder: 2,
+        specifications: {
+          'Height': '1500 mm',
+          'Diameter': '16 mm / 20 mm',
+          'Spikes': '5-point cluster',
+          'Material': 'AISI 316L Stainless Steel',
+        },
+      },
+      {
+        id: 'var-ssla-2000',
+        name: '2.0 Meter 5-Point Terminal',
+        sku: 'EXE-SS-MS-2M',
+        displayOrder: 3,
+        specifications: {
+          'Height': '2000 mm',
+          'Diameter': '20 mm',
+          'Spikes': '5-point cluster',
+          'Material': 'AISI 316L Stainless Steel',
+        },
+      },
+    ],
     mediaAssets: [
       {
         id: 'm-ssla-pdf',
@@ -285,6 +409,41 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Standards': 'IEC 62561-2 / UL 467',
     },
     standards: ['IEC 62561-2', 'UL 467'],
+    variants: [
+      {
+        id: 'var-cbla-1000',
+        name: '1.0 Meter Multi-Spike Terminal',
+        sku: 'EXE-CB-MS-1M',
+        displayOrder: 1,
+        specifications: {
+          'Height': '1000 mm',
+          'Coating': '254 Microns Molecular Copper',
+          'Spikes': '5-point cluster',
+        },
+      },
+      {
+        id: 'var-cbla-1500',
+        name: '1.5 Meter Multi-Spike Terminal',
+        sku: 'EXE-CB-MS-1.5M',
+        displayOrder: 2,
+        specifications: {
+          'Height': '1500 mm',
+          'Coating': '254 Microns Molecular Copper',
+          'Spikes': '5-point cluster',
+        },
+      },
+      {
+        id: 'var-cbla-2000',
+        name: '2.0 Meter Multi-Spike Terminal',
+        sku: 'EXE-CB-MS-2M',
+        displayOrder: 3,
+        specifications: {
+          'Height': '2000 mm',
+          'Coating': '254 Microns Molecular Copper',
+          'Spikes': '5-point cluster',
+        },
+      },
+    ],
   },
 
   {
@@ -584,6 +743,41 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Housing Societies & Commercial Complexes'
     ],
     standards: ['IS 3043', 'BS 7430'],
+    variants: [
+      {
+        id: 'var-gi-40-2',
+        name: '40mm Dia x 2.0m Length',
+        sku: 'EX-GI-40MM-2M',
+        displayOrder: 1,
+        specifications: {
+          'Diameter': '40 mm',
+          'Length': '2.0 m',
+          'Zinc Coating': '≥ 86 Microns Hot-Dip Galvanized',
+        },
+      },
+      {
+        id: 'var-gi-50-3',
+        name: '50mm Dia x 3.0m Length',
+        sku: 'EX-GI-50MM-3M',
+        displayOrder: 2,
+        specifications: {
+          'Diameter': '50 mm',
+          'Length': '3.0 m',
+          'Zinc Coating': '≥ 86 Microns Hot-Dip Galvanized',
+        },
+      },
+      {
+        id: 'var-gi-80-3',
+        name: '80mm Dia x 3.0m Heavy Duty',
+        sku: 'EX-GI-80MM-3M',
+        displayOrder: 3,
+        specifications: {
+          'Diameter': '80 mm',
+          'Length': '3.0 m',
+          'Zinc Coating': '≥ 100 Microns Heavy Industrial Galvanized',
+        },
+      },
+    ],
   },
   {
     id: 'p3',
@@ -614,6 +808,30 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Broadcast & Transmission Towers'
     ],
     standards: ['IEC 62561-7', 'RoHS Compliant', 'IS 3043'],
+    variants: [
+      {
+        id: 'var-ebc-25',
+        name: '25 kg Moisture Sealed Bag',
+        sku: 'EXE-CEC-25KG',
+        displayOrder: 1,
+        specifications: {
+          'Weight': '25 kg bag',
+          'Resistivity': '< 0.12 Ohm-meter',
+          'pH': 'Neutral 7.0',
+        },
+      },
+      {
+        id: 'var-ebc-50',
+        name: '50 kg Industrial Bulk Pack',
+        sku: 'EXE-CEC-50KG',
+        displayOrder: 2,
+        specifications: {
+          'Weight': '50 kg drum',
+          'Resistivity': '< 0.10 Ohm-meter',
+          'pH': 'Neutral 7.0',
+        },
+      },
+    ],
   },
   {
     id: 'p4',
@@ -642,6 +860,41 @@ export const MOCK_PRODUCTS: KioskProduct[] = [
       'Substation Earthing Grid Junctions'
     ],
     standards: ['BS EN 62561-1', 'UL 467'],
+    variants: [
+      {
+        id: 'var-ec-16',
+        name: 'Type G (Rod to Cable 16-50mm²)',
+        sku: 'EX-EC-G16',
+        displayOrder: 1,
+        specifications: {
+          'Rod Size': '16 mm (5/8")',
+          'Conductor': '16 mm² - 50 mm²',
+          'Material': 'Naval Brass Gunmetal',
+        },
+      },
+      {
+        id: 'var-ec-20',
+        name: 'Type U (Rod to Tape 25x3mm)',
+        sku: 'EX-EC-U20',
+        displayOrder: 2,
+        specifications: {
+          'Rod Size': '16 - 20 mm',
+          'Tape Dimension': '25 x 3 mm / 25 x 6 mm',
+          'Material': 'Naval Brass Gunmetal',
+        },
+      },
+      {
+        id: 'var-ec-95',
+        name: 'Type HD (Heavy Duty 70-120mm²)',
+        sku: 'EX-EC-HD95',
+        displayOrder: 3,
+        specifications: {
+          'Rod Size': '20 - 25 mm',
+          'Conductor': '70 mm² - 120 mm²',
+          'Material': 'High-Tensile Phosphor Bronze',
+        },
+      },
+    ],
   },
   {
     id: 'p5',

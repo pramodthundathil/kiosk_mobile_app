@@ -107,16 +107,9 @@ export const MediaModal: React.FC<MediaModalProps> = ({
           {/* Header Bar */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <View style={styles.badgeWrapper}>
-                {getAssetBadgeIcon()}
-                <Text style={[styles.badgeText, { fontSize: scaleFont(12) }]}>
-                  {asset.asset_type_display || assetType}
-                </Text>
-              </View>
-
               <View style={styles.titleColumn}>
                 <Text numberOfLines={1} style={[styles.titleText, { fontSize: scaleFont(16) }]}>
-                  {asset.title || product?.name || 'Media Asset Preview'}
+                  {asset.title || product?.name || 'Media Preview'}
                 </Text>
                 {product && (
                   <Text numberOfLines={1} style={[styles.productSub, { fontSize: scaleFont(12) }]}>

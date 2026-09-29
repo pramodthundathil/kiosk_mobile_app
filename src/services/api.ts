@@ -204,9 +204,152 @@ export async function isKioskAuthenticated(): Promise<boolean> {
   return false;
 }
 
+// ─── Kiosk Session Invalidation & State Listener ────────────────────────────
+
+export type KioskAuthListener = (isAuthenticated: boolean, reason?: string) => void;
+const authListeners = new Set<KioskAuthListener>();
+
+export function onKioskAuthChange(listener: KioskAuthListener): () => void {
+  authListeners.add(listener);
+  return () => {
+    authListeners.delete(listener);
+  };
+}
+
+export function notifyKioskAuthChange(isAuthenticated: boolean, reason?: string): void {
+  authListeners.forEach((fn) => {
+    try {
+      fn(isAuthenticated, reason);
+    } catch (e) {}
+  });
+}
+
+export interface KioskVerificationResult {
+  available: boolean;
+  active: boolean;
+  authenticated: boolean;
+  status?: string;
+  deviceId?: string;
+  kioskName?: string;
+  message?: string;
+  action: 'OK' | 'LOGOUT' | 'LOGIN_REQUIRED';
+  offline?: boolean;
+}
+
+/**
+ * Hits the backend to check if this kiosk's MAC ID is registered, available, and active.
+ * Used during kiosk startup and runtime checks.
+ *
+ * If the backend says the kiosk MAC is not available (deleted) or deactivated/disabled:
+ * Returns action="LOGOUT".
+ */
+export async function verifyKioskStatus(explicitMac?: string): Promise<KioskVerificationResult> {
+  try {
+    const macAddress = explicitMac || (await getDeviceMacAddress());
+    const token = await getStoredKioskToken();
+    const serverUrl = await getSavedServerUrl();
+    const cleanUrl = serverUrl.replace(/\/+$/, '');
+    const endpoint = `${cleanUrl}/api/kiosk/verify/?mac_address=${encodeURIComponent(macAddress)}`;
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'X-Device-MAC': macAddress,
+      'X-Device-Id': macAddress,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(endpoint, {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (res.status === 404) {
+      // Backend MAC ID is not available / kiosk deleted by admin
+      return {
+        available: false,
+        active: false,
+        authenticated: false,
+        action: 'LOGOUT',
+        message: 'Kiosk MAC ID is not available or was deleted by an administrator.',
+      };
+    }
+
+    if (res.status === 403) {
+      // Kiosk deactivated or disabled by admin
+      return {
+        available: true,
+        active: false,
+        authenticated: false,
+        action: 'LOGOUT',
+        message: 'Kiosk has been deactivated or disabled by an administrator.',
+      };
+    }
+
+    if (res.status === 401) {
+      // Token rejected or credential revoked or device deleted
+      return {
+        available: false,
+        active: false,
+        authenticated: false,
+        action: 'LOGOUT',
+        message: 'Kiosk authentication failed or device registration revoked.',
+      };
+    }
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.action === 'LOGOUT' || data.available === false || data.active === false) {
+        return {
+          available: !!data.available,
+          active: !!data.active,
+          authenticated: false,
+          status: data.status,
+          action: 'LOGOUT',
+          message: data.error || data.message || 'Kiosk invalidated by backend.',
+        };
+      }
+      return {
+        available: true,
+        active: true,
+        authenticated: !!data.authenticated,
+        status: data.status,
+        deviceId: data.device_id,
+        kioskName: data.name,
+        action: data.action || (data.authenticated ? 'OK' : 'LOGIN_REQUIRED'),
+      };
+    }
+
+    return {
+      available: true,
+      active: true,
+      authenticated: false,
+      action: 'LOGIN_REQUIRED',
+      message: `Backend returned HTTP ${res.status}`,
+    };
+  } catch (err: any) {
+    console.warn('[verifyKioskStatus] Network offline or unreachable:', err?.message);
+    // Device is offline or network error: return offline=true
+    return {
+      available: true,
+      active: true,
+      authenticated: true,
+      action: 'OK',
+      offline: true,
+    };
+  }
+}
+
 /**
  * Verifies and refreshes the kiosk session in the background when network is available.
  * If offline or server unreachable, KEEPS the authenticated state intact so the kiosk can run offline.
+ * BUT if server explicitly rejects with 401/403/404 (deleted or deactivated), logs out immediately.
  */
 export async function ensureKioskSessionValid(): Promise<boolean> {
   try {
@@ -237,7 +380,7 @@ export async function ensureKioskSessionValid(): Promise<boolean> {
         const timeoutId = setTimeout(() => controller.abort(), 6000);
         const refreshRes = await fetch(`${cleanUrl}/api/token/refresh/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ refresh: refreshToken }),
           signal: controller.signal,
         });
@@ -270,6 +413,14 @@ export async function ensureKioskSessionValid(): Promise<boolean> {
             await storageSetItem(KIOSK_INFO_KEY, JSON.stringify(loginRes.json));
             console.log('[ensureKioskSessionValid] Auto re-authentication successful via saved credentials.');
             return true;
+          }
+
+          // If backend actively rejected credentials because device was deleted or deactivated
+          if (!loginRes.ok && (loginRes.status === 401 || loginRes.status === 403 || loginRes.status === 404)) {
+            console.warn('[ensureKioskSessionValid] Device deleted or deactivated on backend. Logging out.');
+            await logoutKioskDevice();
+            notifyKioskAuthChange(false, 'Kiosk device was deleted or deactivated by an administrator.');
+            return false;
           }
         }
       } catch (authErr) {
@@ -505,6 +656,19 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
     const json = await response.json();
     if (!Array.isArray(json)) return await getCachedCatalogProducts();
 
+    // Group flat child products by parent id for catalogs that return variants in the flat list
+    const childVariantsMap = new Map<string, any[]>();
+    json.forEach((item: any) => {
+      const pId = item.parent_id ?? item.parent?.id ?? item.parent;
+      if (pId != null) {
+        const key = String(pId);
+        if (!childVariantsMap.has(key)) {
+          childVariantsMap.set(key, []);
+        }
+        childVariantsMap.get(key)!.push(item);
+      }
+    });
+
     const mainProducts = json.filter((p: any) => !p.parent_id && !p.parent);
     const mapped: KioskProduct[] = mainProducts.map((p: any) => {
       const rawImg = p.image_url || p.image || '';
@@ -635,9 +799,21 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
           ? sanitizeMediaUrl(p.category.image_url, cleanUrl)
           : 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80');
 
-      // Map product variants
-      const mappedVariants = Array.isArray(p.variants)
-        ? p.variants.map((v: any) => {
+      // Map product variants across all possible backend alias keys & flat child products
+      const rawVariantsList: any[] =
+        (Array.isArray(p.variants) && p.variants.length > 0)
+          ? p.variants
+          : (Array.isArray(p.sub_products) && p.sub_products.length > 0)
+          ? p.sub_products
+          : (Array.isArray(p.child_variants) && p.child_variants.length > 0)
+          ? p.child_variants
+          : (Array.isArray(p.direct_variants) && p.direct_variants.length > 0)
+          ? p.direct_variants
+          : (Array.isArray(p.children) && p.children.length > 0)
+          ? p.children
+          : childVariantsMap.get(String(p.id)) || [];
+
+      const mappedVariants = rawVariantsList.map((v: any) => {
             const vRawImg = v.image_url || v.image || '';
             const vFixedImg = vRawImg ? sanitizeMediaUrl(vRawImg, cleanUrl) : '';
 
@@ -736,8 +912,7 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
               isActive: v.is_active !== false,
               mediaAssets: mappedVAssets,
             };
-          })
-        : [];
+          });
 
       return {
         id: String(p.id || Math.random()),
@@ -1153,6 +1328,15 @@ export async function sendKioskHeartbeat(
 
     if (res.ok) {
       const data = await res.json();
+
+      // Check if server explicitly commanded terminal logout
+      if (data.action === 'LOGOUT' || data.logout === true) {
+        console.warn('[Heartbeat] Server commanded kiosk logout.');
+        await logoutKioskDevice();
+        notifyKioskAuthChange(false, 'Kiosk device was deleted or deactivated by an administrator.');
+        return { success: false };
+      }
+
       // If coordinates were submitted, record timestamp to enforce the 24-hour gap
       if (locationToSend) {
         await saveRecordedLocation(locationToSend);
@@ -1188,6 +1372,12 @@ export async function sendKioskHeartbeat(
       return { success: true, data };
 
     } else {
+      // If server returned 401 Unauthorized, 403 Forbidden, or 404 Not Found (deleted or deactivated)
+      if (res.status === 401 || res.status === 403 || res.status === 404) {
+        console.warn(`[Heartbeat] Server returned HTTP ${res.status}: Kiosk device was deleted or deactivated. Logging out.`);
+        await logoutKioskDevice();
+        notifyKioskAuthChange(false, 'Kiosk device was deleted or deactivated by an administrator.');
+      }
       return { success: false };
     }
   } catch (e) {

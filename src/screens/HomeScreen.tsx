@@ -169,6 +169,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
     return (
       <ProductDetailScreen
         product={selectedProduct}
+        allProducts={products}
         metrics={responsiveMetrics}
         onBack={handleBackToCatalog}
         onOpenMediaViewer={handleOpenMediaViewer}
