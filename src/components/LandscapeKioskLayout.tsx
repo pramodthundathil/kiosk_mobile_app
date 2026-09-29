@@ -196,6 +196,16 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
     ? Math.min(480, Math.max(315, maxCardFitHeight))
     : Math.min(335, Math.max(195, maxCardFitHeight));
 
+  // Subcategory card sizing in landscape: balanced, elegant, and compact
+  // Instead of 2 massive wide slabs, use 3 or 4 columns (or capped max width 275px)
+  const subCatColumns = is4K ? 4 : screenWidth >= 1200 ? 4 : 3;
+  const subCatGridGap = scaleSpacing(14);
+  const subCatAvailableWidth = Math.max(300, screenWidth - (catHorizontalPadding * 2));
+  const subCatCalculatedWidth = Math.floor((subCatAvailableWidth - ((subCatColumns - 1) * subCatGridGap)) / subCatColumns);
+  // Cap max width to 275px (350px on 4K) so cards are never overly wide or stretched
+  const subCategoryCardWidth = Math.min(is4K ? 350 : screenWidth >= 1200 ? 275 : 245, subCatCalculatedWidth);
+  const subCategoryCardHeight = Math.round(subCategoryCardWidth * 0.78);
+
   // Active category for home → product list navigation
   const [activeCategory, setActiveCategory] = useState<string | null>(
     selectedCategory === 'all' ? null : selectedCategory
@@ -514,9 +524,9 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
             >
               <View style={styles.sectionHeadRow}>
                 <View style={styles.sectionHeadLeft}>
-                  <Text style={[styles.sectionTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>Product Categories</Text>
+                  <Text style={[styles.sectionTitle, { fontSize: scaleFont(is4K ? 17 : 14.5) }]} {...crispTextProps}>Product Categories</Text>
                   <View style={styles.sectionBadge}>
-                    <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                    <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(is4K ? 12 : 10.5) }]} {...crispTextProps}>
                       {displayCategories.length} Categories
                     </Text>
                   </View>
@@ -532,11 +542,11 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                       }}
                       style={styles.viewAllAssignedBtn}
                     >
-                      <Zap size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
-                      <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
+                      <Zap size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
+                      <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(is4K ? 13 : 11.5) }]} {...crispTextProps}>
                         All Products ({products.length})
                       </Text>
-                      <ChevronRight size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                      <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                     </TouchableOpacity>
                   </Animated.View>
                 )}
@@ -638,7 +648,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
               contentContainerStyle={[styles.categoryHomeContent, { paddingHorizontal: catHorizontalPadding }]}
             >
               <View style={styles.sectionHeadRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <KioskBackButton
                     onPress={() => {
                       setActiveCategory(null);
@@ -648,17 +658,17 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                     label="Categories"
                   />
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={[styles.sectionTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.sectionTitle, { fontSize: scaleFont(is4K ? 17 : 14.5) }]} {...crispTextProps}>
                         {activeCategoryObj?.name}
                       </Text>
                       <View style={styles.sectionBadge}>
-                        <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                        <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(is4K ? 12 : 10.5) }]} {...crispTextProps}>
                           {activeCategoryObj?.subcategories?.length || 0} Sub-Categories
                         </Text>
                       </View>
                     </View>
-                    <Text style={{ fontSize: scaleFont(12), color: kioskColors.textSecondary, marginTop: 2 }}>
+                    <Text style={{ fontSize: scaleFont(is4K ? 12 : 10.5), color: kioskColors.textSecondary, marginTop: 1 }}>
                       Select a product category to explore specialized components
                     </Text>
                   </View>
@@ -672,16 +682,16 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                     }}
                     style={styles.viewAllAssignedBtn}
                   >
-                    <Zap size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
-                    <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
+                    <Zap size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
+                    <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(is4K ? 13 : 11.5) }]} {...crispTextProps}>
                       All {activeCategoryObj?.name} Products ({categoryProductsCount})
                     </Text>
-                    <ChevronRight size={scaleFont(13)} color="#FFFFFF" strokeWidth={2.4} />
+                    <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                   </TouchableOpacity>
                 )}
               </View>
 
-              <View style={[styles.categoryGrid, { gap: catGridGap, justifyContent: 'center', alignItems: 'center' }]}>
+              <View style={[styles.categoryGrid, { gap: subCatGridGap, justifyContent: 'center', alignItems: 'center' }]}>
                 {activeCategoryObj?.subcategories?.map((subCat, idx) => {
                   const subCatProdCount = products.filter((p) => {
                     const target = (subCat.id || subCat.code || subCat.name).toLowerCase();
@@ -709,8 +719,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                       style={[
                         styles.categoryCard,
                         {
-                          width: categoryCardWidth,
-                          height: categoryCardHeight,
+                          width: subCategoryCardWidth,
+                          height: subCategoryCardHeight,
                         },
                       ]}
                     >
@@ -729,22 +739,21 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                           {/* 2. Active Touch Tint Feedback */}
                           {active && <View style={styles.cardActivePhotoOverlay} />}
 
-                          {/* 3. Bottom Gradient Strip */}
+                          {/* 3. Bottom Solid/Gradient Strip for Razor-Sharp High-Contrast Typography */}
                           <LinearGradient
-                            colors={getCategoryGradientColors(subCat)}
-                            locations={KIOSK_CARD_GRADIENT_LOCATIONS}
+                            colors={['#0F1D36', '#081120']}
                             style={styles.subCatBottomBar}
                           >
-                            {/* 4. Writing of the subcategory on top of the gradient */}
-                            <View style={styles.cardBottomWriting}>
+                            {/* 4. Writing of the subcategory on top of the dark bar */}
+                            <View style={styles.subCatBottomWriting}>
                               <View style={styles.cardBottomTextCol}>
                                 <Text
                                   numberOfLines={2}
                                   style={[
-                                    styles.cardBottomTitle,
+                                    styles.subCatCardTitle,
                                     {
-                                      fontSize: scaleFont(is4K ? 20 : screenWidth >= 1200 ? 15 : 13.5),
-                                      lineHeight: scaleFont(is4K ? 26 : screenWidth >= 1200 ? 20 : 18),
+                                      fontSize: scaleFont(is4K ? 15.5 : screenWidth >= 1200 ? 13 : 12),
+                                      lineHeight: scaleFont(is4K ? 20 : screenWidth >= 1200 ? 17 : 16),
                                     },
                                   ]}
                                   {...crispTextProps}
@@ -754,7 +763,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                               </View>
                               <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
                                 <ChevronRight
-                                  size={scaleFont(is4K ? 16 : 13)}
+                                  size={scaleFont(is4K ? 13 : 11)}
                                   color={active ? kioskColors.brandNavy : '#FFFFFF'}
                                   strokeWidth={2.6}
                                 />
@@ -793,20 +802,20 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                 <View style={styles.productSubHeaderInfo}>
                   {activeSubCategoryObj ? (
                     <View>
-                      <Text style={{ fontSize: scaleFont(11), color: kioskColors.textSecondary, fontWeight: '600', marginBottom: 1 }} {...crispTextProps}>
+                      <Text style={{ fontSize: scaleFont(is4K ? 11 : 9.5), color: kioskColors.textSecondary, fontWeight: '600', marginBottom: 1 }} {...crispTextProps}>
                         {activeCategoryObj?.name} ›
                       </Text>
-                      <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
+                      <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(is4K ? 17 : 14.5) }]} {...crispTextProps}>
                         {activeSubCategoryObj.name}
                       </Text>
                     </View>
                   ) : (
-                    <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(17) }]} {...crispTextProps}>
+                    <Text style={[styles.productSubHeaderTitle, { fontSize: scaleFont(is4K ? 17 : 14.5) }]} {...crispTextProps}>
                       {activeCategoryObj?.name || 'All Products'}
                     </Text>
                   )}
                   <View style={styles.productCountPill}>
-                    <Text style={[styles.productCountPillText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                    <Text style={[styles.productCountPillText, { fontSize: scaleFont(is4K ? 12 : 10.5) }]} {...crispTextProps}>
                       {filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'}
                     </Text>
                   </View>
@@ -1475,11 +1484,27 @@ const styles = StyleSheet.create({
   },
   subCatBottomBar: {
     width: '100%',
-    paddingTop: 6,
-    paddingBottom: 4,
+    paddingTop: 4,
+    paddingBottom: 3,
     borderBottomLeftRadius: 14,
     borderBottomRightRadius: 14,
     zIndex: 3,
+  },
+  subCatBottomWriting: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subCatCardTitle: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: -0.15,
+    includeFontPadding: false,
+    textShadowColor: 'transparent',
   },
   cardActivePhotoOverlay: {
     position: 'absolute',

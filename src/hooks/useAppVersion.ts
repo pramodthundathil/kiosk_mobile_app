@@ -3,8 +3,8 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { updateService } from '../services/updateService';
 
-export const CURRENT_APP_VERSION = '1.1.2';
-export const CURRENT_VERSION_CODE = 13;
+export const CURRENT_APP_VERSION = '1.1.3';
+export const CURRENT_VERSION_CODE = 14;
 
 /**
  * Custom hook that returns the application version string (e.g., "1.1.2").

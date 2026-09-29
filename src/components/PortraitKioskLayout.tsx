@@ -660,20 +660,19 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                           {/* 2. Active Touch Tint Feedback */}
                           {active && <View style={styles.cardActivePhotoOverlay} />}
 
-                          {/* 3. Bottom Gradient Strip */}
+                          {/* 3. Bottom Solid/Gradient Strip for Razor-Sharp High-Contrast Typography */}
                           <LinearGradient
-                            colors={getCategoryGradientColors(subCat)}
-                            locations={KIOSK_CARD_GRADIENT_LOCATIONS}
+                            colors={['#0F1D36', '#081120']}
                             style={styles.subCatBottomBar}
                           >
-                            {/* 4. Writing of the subcategory on top of the gradient */}
-                            <View style={styles.cardBottomWriting}>
+                            {/* 4. Writing of the subcategory on top of the dark bar */}
+                            <View style={styles.subCatBottomWriting}>
                               <View style={styles.cardBottomTextCol}>
                                 <Text
                                   numberOfLines={2}
                                   style={[
-                                    styles.cardBottomTitle,
-                                    { fontSize: scaleFont(14.5), lineHeight: scaleFont(19) },
+                                    styles.subCatCardTitle,
+                                    { fontSize: scaleFont(14), lineHeight: scaleFont(18.5) },
                                   ]}
                                   {...crispTextProps}
                                 >
@@ -682,7 +681,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                               </View>
                               <View style={[styles.cardBottomArrowCircle, active && styles.cardBottomArrowCircleActive]}>
                                 <ChevronRight
-                                  size={scaleFont(15)}
+                                  size={scaleFont(14)}
                                   color={active ? kioskColors.brandNavy : '#FFFFFF'}
                                   strokeWidth={2.6}
                                 />
@@ -1354,11 +1353,27 @@ const styles = StyleSheet.create({
   },
   subCatBottomBar: {
     width: '100%',
-    paddingTop: 6,
-    paddingBottom: 4,
+    paddingTop: 4,
+    paddingBottom: 3,
     borderBottomLeftRadius: 14,
     borderBottomRightRadius: 14,
     zIndex: 3,
+  },
+  subCatBottomWriting: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subCatCardTitle: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: -0.15,
+    includeFontPadding: false,
+    textShadowColor: 'transparent',
   },
   cardActivePhotoOverlay: {
     position: 'absolute',
