@@ -177,27 +177,10 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   const appVersion = useAppVersion();
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
-  // Redesigned 2x2 grid layout for landscape: 2 cards per row ("two two each")
-  // Dynamically sized to fit 4 cards neatly on a single screen without clipping or overflow
-  const catColumns = 2;
   const catHorizontalPadding = scaleSpacing(screenWidth >= 1200 ? 18 : 14);
-  const catGridGap = scaleSpacing(screenWidth >= 1200 ? 14 : 10);
-  const catTotalGaps = (catColumns - 1) * catGridGap;
-  const catAvailableWidth = Math.max(300, screenWidth - (catHorizontalPadding * 2));
-  const categoryCardWidth = Math.floor((catAvailableWidth - catTotalGaps) / catColumns);
 
-  // Available height accounts for Top Header (52px), Footer (32px), Section Title (~36px),
-  // Content padding (top: 8, bottom: 10), and inter-card row gap (catGridGap).
-  const verticalOverhead = scaleSpacing(is4K ? 230 : 142);
-  const availableVerticalForCards = Math.max(220, screenHeight - verticalOverhead - catGridGap);
-  const maxCardFitHeight = Math.floor(availableVerticalForCards / 2);
-
-  const categoryCardHeight = is4K
-    ? Math.min(480, Math.max(315, maxCardFitHeight))
-    : Math.min(335, Math.max(195, maxCardFitHeight));
-
-  // Subcategory card sizing in landscape: balanced, elegant, and compact
-  // Instead of 2 massive wide slabs, use 3 or 4 columns (or capped max width 275px)
+  // Card sizing in landscape: balanced, elegant, and compact
+  // Category cards and Subcategory cards share the exact same card dimensions and grid gap
   const subCatColumns = is4K ? 4 : screenWidth >= 1200 ? 4 : 3;
   const subCatGridGap = scaleSpacing(14);
   const subCatAvailableWidth = Math.max(300, screenWidth - (catHorizontalPadding * 2));
@@ -205,6 +188,11 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   // Cap max width to 275px (350px on 4K) so cards are never overly wide or stretched
   const subCategoryCardWidth = Math.min(is4K ? 350 : screenWidth >= 1200 ? 275 : 245, subCatCalculatedWidth);
   const subCategoryCardHeight = Math.round(subCategoryCardWidth * 0.78);
+
+  // Make category card size exactly match subcategory card size
+  const categoryCardWidth = subCategoryCardWidth;
+  const categoryCardHeight = subCategoryCardHeight;
+  const catGridGap = subCatGridGap;
 
   // Active category for home → product list navigation
   const [activeCategory, setActiveCategory] = useState<string | null>(
@@ -613,8 +601,8 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                                   style={[
                                     styles.cardBottomTitle,
                                     {
-                                      fontSize: scaleFont(is4K ? 21 : screenWidth >= 1200 ? 15.5 : 14),
-                                      lineHeight: scaleFont(is4K ? 27 : screenWidth >= 1200 ? 21 : 19),
+                                      fontSize: scaleFont(is4K ? 17 : screenWidth >= 1200 ? 14 : 13),
+                                      lineHeight: scaleFont(is4K ? 22 : screenWidth >= 1200 ? 18 : 17),
                                     },
                                   ]}
                                   {...crispTextProps}
