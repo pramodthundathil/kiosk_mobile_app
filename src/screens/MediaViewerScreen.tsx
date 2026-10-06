@@ -11,6 +11,7 @@ import {
   Dimensions,
   Platform,
   Pressable,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -479,67 +480,175 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
   return (
     <View style={styles.rootContainer}>
       {/* Top Header Bar */}
-      <View style={[styles.headerBar, isLandscape && styles.headerBarLandscape]}>
-        <View style={styles.headerLeftCluster}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={onBack}
-            activeOpacity={0.85}
-          >
-            <ArrowLeft size={scaleFont(18)} color="#FFFFFF" strokeWidth={2.4} />
-            <Text style={[styles.backButtonText, { fontSize: scaleFont(13.5) }]}>
-              Back to Product
-            </Text>
-          </TouchableOpacity>
+      <View
+        style={[
+          styles.headerBar,
+          isLandscape ? styles.headerBarLandscape : styles.headerBarPortrait,
+        ]}
+      >
+        {isLandscape ? (
+          // ── LANDSCAPE SINGLE-ROW HEADER ──
+          <View style={styles.headerLandscapeRow}>
+            <View style={styles.headerLeftCluster}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={onBack}
+                activeOpacity={0.85}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <View style={styles.backButtonIconCircle}>
+                  <ArrowLeft size={scaleFont(15)} color="#FFFFFF" strokeWidth={2.6} />
+                </View>
+                <Text style={[styles.backButtonText, { fontSize: scaleFont(13) }]} {...crispTextProps}>
+                  Back to Product
+                </Text>
+              </TouchableOpacity>
 
-          <View style={styles.dividerPipe} />
+              <View style={styles.dividerPipe} />
 
-          <View style={styles.headerProductInfo}>
-            <View style={styles.headerPillsRow}>
+              <View style={styles.headerProductInfo}>
+                <View style={styles.headerPillsRow}>
+                  <View style={styles.categoryPill}>
+                    <Text style={[styles.categoryPillText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
+                      {product.categoryName || 'Technical Catalog'}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={[
+                    styles.productHeaderTitle,
+                    { fontSize: scaleFont(15), lineHeight: Math.round(scaleFont(15) * 1.3) },
+                  ]}
+                  {...crispTextProps}
+                >
+                  {product.name}
+                </Text>
+              </View>
+            </View>
+
+            {/* Right Status Badge */}
+            <View style={styles.headerRightCluster}>
+              {activeItem?.type === 'THREE_D' && (
+                <View style={styles.live3DBadge}>
+                  <View style={styles.livePulseDot} />
+                  <Box size={scaleFont(13)} color="#38BDF8" strokeWidth={2.4} />
+                  <Text style={[styles.liveBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
+                    Interactive 3D Stage
+                  </Text>
+                </View>
+              )}
+
+              {activeItem?.type === 'PDF' && (
+                <View style={styles.livePdfBadge}>
+                  <FileText size={scaleFont(13)} color="#10B981" strokeWidth={2.4} />
+                  <Text style={[styles.livePdfBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
+                    Verified Engineering PDF
+                  </Text>
+                </View>
+              )}
+
+              {activeItem?.type === 'VIDEO' && (
+                <View style={styles.liveVideoBadge}>
+                  <Video size={scaleFont(13)} color="#F43F5E" strokeWidth={2.4} />
+                  <Text style={[styles.liveVideoBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
+                    Video Demonstration
+                  </Text>
+                </View>
+              )}
+
+              {activeItem?.type === 'IMAGE' && (
+                <View style={styles.liveImageBadge}>
+                  <ImageIcon size={scaleFont(13)} color="#38BDF8" strokeWidth={2.4} />
+                  <Text style={[styles.liveImageBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
+                    HD Photo Preview
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        ) : (
+          // ── PORTRAIT TWO-TIER RESPONSIVE HEADER ──
+          <View style={styles.headerPortraitStack}>
+            {/* Row 1: Back to Product Button + Media Status Badge */}
+            <View style={styles.portraitTopControlsRow}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={onBack}
+                activeOpacity={0.85}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <View style={styles.backButtonIconCircle}>
+                  <ArrowLeft size={scaleFont(14)} color="#FFFFFF" strokeWidth={2.6} />
+                </View>
+                <Text style={[styles.backButtonText, { fontSize: scaleFont(12.5) }]} {...crispTextProps}>
+                  Back to Product
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.headerRightCluster}>
+                {activeItem?.type === 'THREE_D' && (
+                  <View style={styles.live3DBadge}>
+                    <View style={styles.livePulseDot} />
+                    <Box size={scaleFont(12)} color="#38BDF8" strokeWidth={2.4} />
+                    <Text style={[styles.liveBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
+                      3D Stage
+                    </Text>
+                  </View>
+                )}
+
+                {activeItem?.type === 'PDF' && (
+                  <View style={styles.livePdfBadge}>
+                    <FileText size={scaleFont(12)} color="#10B981" strokeWidth={2.4} />
+                    <Text style={[styles.livePdfBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
+                      Engineering PDF
+                    </Text>
+                  </View>
+                )}
+
+                {activeItem?.type === 'VIDEO' && (
+                  <View style={styles.liveVideoBadge}>
+                    <Video size={scaleFont(12)} color="#F43F5E" strokeWidth={2.4} />
+                    <Text style={[styles.liveVideoBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
+                      Video Demo
+                    </Text>
+                  </View>
+                )}
+
+                {activeItem?.type === 'IMAGE' && (
+                  <View style={styles.liveImageBadge}>
+                    <ImageIcon size={scaleFont(12)} color="#38BDF8" strokeWidth={2.4} />
+                    <Text style={[styles.liveImageBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
+                      HD Photo
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Row 2: Category Pill + Heading (Product Name) */}
+            <View style={styles.portraitTitleRow}>
               <View style={styles.categoryPill}>
-                <Text style={[styles.categoryPillText, { fontSize: scaleFont(10.5) }]}>
+                <Text style={[styles.categoryPillText, { fontSize: scaleFont(10) }]} {...crispTextProps}>
                   {product.categoryName || 'Technical Catalog'}
                 </Text>
               </View>
-              
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={[
+                  styles.productHeaderTitlePortrait,
+                  { fontSize: scaleFont(14.5), lineHeight: Math.round(scaleFont(14.5) * 1.3) },
+                ]}
+                {...crispTextProps}
+              >
+                {product.name}
+              </Text>
             </View>
-
-            <Text numberOfLines={1} style={[styles.productHeaderTitle, { fontSize: scaleFont(14.5) }]}>
-              {product.name}
-            </Text>
           </View>
-        </View>
-
-        {/* Right Status Badge */}
-        <View style={styles.headerRightCluster}>
-          {activeItem?.type === 'THREE_D' && (
-            <View style={styles.live3DBadge}>
-              <View style={styles.livePulseDot} />
-              <Box size={scaleFont(14)} color="#38BDF8" strokeWidth={2.4} />
-              <Text style={[styles.liveBadgeText, { fontSize: scaleFont(11.5) }]}>
-                Interactive 3D Stage
-              </Text>
-            </View>
-          )}
-
-          {activeItem?.type === 'PDF' && (
-            <View style={styles.livePdfBadge}>
-              <FileText size={scaleFont(14)} color="#10B981" strokeWidth={2.4} />
-              <Text style={[styles.livePdfBadgeText, { fontSize: scaleFont(11.5) }]}>
-                Verified Engineering PDF
-              </Text>
-            </View>
-          )}
-
-          {activeItem?.type === 'VIDEO' && (
-            <View style={styles.liveVideoBadge}>
-              <Video size={scaleFont(14)} color="#F43F5E" strokeWidth={2.4} />
-              <Text style={[styles.liveVideoBadgeText, { fontSize: scaleFont(11.5) }]}>
-                Video Demonstration
-              </Text>
-            </View>
-          )}
-        </View>
+        )}
       </View>
 
       {/* Main Center Stage with Crossfade Animation */}
@@ -667,102 +776,157 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   headerBar: {
-    height: 64,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: '#0F172A',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    zIndex: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  headerBarLandscape: {
+    height: 64,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+  },
+  headerBarPortrait: {
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? Math.max(RNStatusBar.currentHeight || 0, 20) + 6 : 20,
+    paddingBottom: 12,
+  },
+  headerLandscapeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    zIndex: 20,
+    width: '100%',
+  },
+  headerPortraitStack: {
+    width: '100%',
+    gap: 10,
+  },
+  portraitTopControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  portraitTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
   },
   headerLeftCluster: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 16,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0D60AE',
-    paddingHorizontal: 16,
-    height: 42,
-    borderRadius: kioskRadii.md,
-    shadowColor: '#0D60AE',
+    backgroundColor: '#0284C7',
+    paddingLeft: 6,
+    paddingRight: 16,
+    height: 40,
+    borderRadius: kioskRadii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    shadowColor: '#0284C7',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 5,
     elevation: 3,
+  },
+  backButtonIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backButtonText: {
     color: '#FFFFFF',
     fontWeight: '800',
+    letterSpacing: -0.2,
     includeFontPadding: false,
   },
   dividerPipe: {
     width: 1,
-    height: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    height: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     marginHorizontal: 14,
   },
   headerProductInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   headerPillsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 2,
   },
   categoryPill: {
-    backgroundColor: 'rgba(13, 96, 174, 0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: kioskRadii.xs,
+    backgroundColor: 'rgba(2, 132, 199, 0.22)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: kioskRadii.full,
     borderWidth: 1,
-    borderColor: 'rgba(13, 96, 174, 0.45)',
+    borderColor: 'rgba(56, 189, 248, 0.45)',
+    alignSelf: 'flex-start',
   },
   categoryPillText: {
     color: '#38BDF8',
     fontWeight: '800',
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   skuPill: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: kioskRadii.xs,
+    borderRadius: kioskRadii.full,
   },
   skuPillText: {
     color: '#94A3B8',
     fontWeight: '700',
   },
   productHeaderTitle: {
-    color: '#F8FAFC',
-    fontWeight: '800',
-    marginTop: 2,
+    color: '#FFFFFF',
+    fontWeight: '900',
+    letterSpacing: -0.2,
+  },
+  productHeaderTitlePortrait: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    letterSpacing: -0.2,
+    flex: 1,
   },
   headerRightCluster: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   live3DBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    gap: 6,
+    backgroundColor: 'rgba(56, 189, 248, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: kioskRadii.full,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.35)',
+    borderColor: 'rgba(56, 189, 248, 0.4)',
   },
   livePulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: '#38BDF8',
   },
   liveBadgeText: {
@@ -774,13 +938,13 @@ const styles = StyleSheet.create({
   livePdfBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: kioskRadii.full,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
   },
   livePdfBadgeText: {
     color: '#10B981',
@@ -791,16 +955,33 @@ const styles = StyleSheet.create({
   liveVideoBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(244, 63, 94, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    gap: 6,
+    backgroundColor: 'rgba(244, 63, 94, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: kioskRadii.full,
     borderWidth: 1,
-    borderColor: 'rgba(244, 63, 94, 0.35)',
+    borderColor: 'rgba(244, 63, 94, 0.4)',
   },
   liveVideoBadgeText: {
     color: '#F43F5E',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  liveImageBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(56, 189, 248, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: kioskRadii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+  },
+  liveImageBadgeText: {
+    color: '#38BDF8',
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
@@ -1056,10 +1237,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#38BDF8',
     marginTop: 4,
-  },
-  headerBarLandscape: {
-    height: 52,
-    paddingHorizontal: 14,
   },
   thumbnailStripContainerLandscape: {
     paddingTop: 6,

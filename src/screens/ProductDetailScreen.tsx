@@ -639,7 +639,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollBody,
-          { padding: scaleSpacing(18) },
+          { padding: scaleSpacing(18), paddingBottom: scaleSpacing(44) },
         ]}
       >
         <View style={[styles.contentLayoutRow, { flexDirection: isLandscape ? 'row' : 'column' }]}>
@@ -659,20 +659,20 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           <View style={styles.rightPanel}>
             {/* Product Overview Header */}
             <View style={styles.overviewCard}>
-              <Text style={[styles.productTitleMain, { fontSize: scaleFont(22) }]}>
+              <Text style={[styles.productTitleMain, { fontSize: scaleFont(22), lineHeight: Math.round(scaleFont(22) * 1.28) }]} {...crispTextProps}>
                 {resolvedName}
               </Text>
               {!isParentSelected && (
-                <Text style={[styles.productBaseNameText, { fontSize: scaleFont(12) }]}>
+                <Text style={[styles.productBaseNameText, { fontSize: scaleFont(12), lineHeight: Math.round(scaleFont(12) * 1.35) }]} {...crispTextProps}>
                   Base Model: {product.name}
                 </Text>
               )}
               {product.subtitle ? (
-                <Text style={[styles.productSubtitleText, { fontSize: scaleFont(13.5) }]}>
+                <Text style={[styles.productSubtitleText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.4) }]} {...crispTextProps}>
                   {product.subtitle}
                 </Text>
               ) : null}
-              <Text style={[styles.productDescText, { fontSize: scaleFont(12.5) }]}>
+              <Text style={[styles.productDescText, { fontSize: scaleFont(13), lineHeight: Math.round(scaleFont(13) * 1.5) }]} {...crispTextProps}>
                 {resolvedDescription || 'Precision-engineered industrial earthing and grounding equipment manufactured under stringent international quality control.'}
               </Text>
             </View>
@@ -772,7 +772,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     color={activeTab === 'features' ? '#FFFFFF' : kioskColors.textSecondary}
                     strokeWidth={2.2}
                   />
-                  <Text style={[styles.tabButtonText, activeTab === 'features' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
+                  <Text style={[styles.tabButtonText, activeTab === 'features' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
                     Features ({resolvedFeatures.length})
                   </Text>
                 </TouchableOpacity>
@@ -788,7 +788,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     color={activeTab === 'specifications' ? '#FFFFFF' : kioskColors.textSecondary}
                     strokeWidth={2.2}
                   />
-                  <Text style={[styles.tabButtonText, activeTab === 'specifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
+                  <Text style={[styles.tabButtonText, activeTab === 'specifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
                     Specifications ({Object.keys(resolvedSpecs).length})
                   </Text>
                 </TouchableOpacity>
@@ -804,7 +804,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     color={activeTab === 'certifications' ? '#FFFFFF' : kioskColors.textSecondary}
                     strokeWidth={2.2}
                   />
-                  <Text style={[styles.tabButtonText, activeTab === 'certifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
+                  <Text style={[styles.tabButtonText, activeTab === 'certifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
                     Certifications ({resolvedCertifications.length})
                   </Text>
                 </TouchableOpacity>
@@ -820,7 +820,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     color={activeTab === 'in_house_tests' ? '#FFFFFF' : kioskColors.textSecondary}
                     strokeWidth={2.2}
                   />
-                  <Text style={[styles.tabButtonText, activeTab === 'in_house_tests' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
+                  <Text style={[styles.tabButtonText, activeTab === 'in_house_tests' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
                     Testing ({resolvedInHouseTests.length})
                   </Text>
                 </TouchableOpacity>
@@ -836,7 +836,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     color={activeTab === 'applicable_areas' ? '#FFFFFF' : kioskColors.textSecondary}
                     strokeWidth={2.2}
                   />
-                  <Text style={[styles.tabButtonText, activeTab === 'applicable_areas' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5) }]}>
+                  <Text style={[styles.tabButtonText, activeTab === 'applicable_areas' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
                     Applicable Areas ({resolvedAreas.length})
                   </Text>
                 </TouchableOpacity>
@@ -861,17 +861,17 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <Zap size={scaleFont(16)} color={kioskColors.lightningGold} strokeWidth={2.2} />
-                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5) }]}>
+                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5), lineHeight: Math.round(scaleFont(14.5) * 1.3) }]} {...crispTextProps}>
                       Features & Engineering Highlights
                     </Text>
                   </View>
-                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(11.5) }]}>
+                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(12), lineHeight: Math.round(scaleFont(12) * 1.45) }]} {...crispTextProps}>
                     Key functional advantages, structural integrity, and electrical performance parameters.
                   </Text>
 
                   {resolvedFeatures.length === 0 ? (
                     <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5) }]}>
+                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
                         No engineering features configured for this item.
                       </Text>
                     </View>
@@ -883,7 +883,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                             <View style={styles.featureCheckIconWrap}>
                               <CheckCircle2 size={16} color="#16A34A" strokeWidth={2.5} />
                             </View>
-                            <Text style={[styles.featureMainPointText, { fontSize: scaleFont(13) }]}>
+                            <Text style={[styles.featureMainPointText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.4) }]} {...crispTextProps}>
                               {item.point}
                             </Text>
                           </View>
@@ -894,7 +894,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                               {item.sub_points.map((sub, sIdx) => (
                                 <View key={sIdx} style={styles.featureSubPointRow}>
                                   <View style={styles.subPointDisc} />
-                                  <Text style={[styles.featureSubPointText, { fontSize: scaleFont(12) }]}>
+                                  <Text style={[styles.featureSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
                                     {sub}
                                   </Text>
                                 </View>
@@ -913,17 +913,17 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <FileText size={scaleFont(16)} color={kioskColors.brandNavy} strokeWidth={2.2} />
-                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5) }]}>
+                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5), lineHeight: Math.round(scaleFont(14.5) * 1.3) }]} {...crispTextProps}>
                       Technical Specifications
                     </Text>
                   </View>
-                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(11.5) }]}>
+                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(12), lineHeight: Math.round(scaleFont(12) * 1.45) }]} {...crispTextProps}>
                     Verified dimensional data, material compliance, and metallurgical specs.
                   </Text>
 
                   {Object.keys(resolvedSpecs).length === 0 ? (
                     <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5) }]}>
+                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
                         No specifications configured for this model.
                       </Text>
                     </View>
@@ -937,10 +937,10 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                             idx % 2 === 0 ? styles.specsRowEven : styles.specsRowOdd,
                           ]}
                         >
-                          <Text style={[styles.specsKeyText, { fontSize: scaleFont(12) }]}>
+                          <Text style={[styles.specsKeyText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
                             {key}
                           </Text>
-                          <Text style={[styles.specsValText, { fontSize: scaleFont(12) }]}>
+                          <Text style={[styles.specsValText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
                             {val}
                           </Text>
                         </View>
@@ -955,17 +955,17 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <Award size={scaleFont(16)} color="#D97706" strokeWidth={2.2} />
-                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5) }]}>
+                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5), lineHeight: Math.round(scaleFont(14.5) * 1.3) }]} {...crispTextProps}>
                       International Standards & Certifications
                     </Text>
                   </View>
-                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(11.5) }]}>
+                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(12), lineHeight: Math.round(scaleFont(12) * 1.45) }]} {...crispTextProps}>
                     Accredited third-party compliance, safety approvals, and global electrical certifications.
                   </Text>
 
                   {resolvedCertifications.length === 0 ? (
                     <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5) }]}>
+                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
                         No certifications configured for this item.
                       </Text>
                     </View>
@@ -977,7 +977,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                             <View style={styles.certBadgeWrap}>
                               <Award size={15} color="#D97706" strokeWidth={2.2} />
                             </View>
-                            <Text style={[styles.certTitleText, { fontSize: scaleFont(13) }]}>
+                            <Text style={[styles.certTitleText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.35) }]} {...crispTextProps}>
                               {item.title}
                             </Text>
                           </View>
@@ -990,7 +990,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                                   <View style={styles.certSubPointCheck}>
                                     <Check size={10} color="#D97706" strokeWidth={2.5} />
                                   </View>
-                                  <Text style={[styles.certSubPointText, { fontSize: scaleFont(12) }]}>
+                                  <Text style={[styles.certSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
                                     {sub}
                                   </Text>
                                 </View>
@@ -1009,17 +1009,17 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <ClipboardCheck size={scaleFont(16)} color="#0D9488" strokeWidth={2.2} />
-                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5) }]}>
+                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5), lineHeight: Math.round(scaleFont(14.5) * 1.3) }]} {...crispTextProps}>
                       In-House Quality Control & Laboratory Tests
                     </Text>
                   </View>
-                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(11.5) }]}>
+                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(12), lineHeight: Math.round(scaleFont(12) * 1.45) }]} {...crispTextProps}>
                     Continuous batch testing, micro-layer thickness measurement, and structural pull tests.
                   </Text>
 
                   {resolvedInHouseTests.length === 0 ? (
                     <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5) }]}>
+                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
                         No in-house tests configured for this item.
                       </Text>
                     </View>
@@ -1031,7 +1031,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                             <View style={styles.testBadgeWrap}>
                               <ClipboardCheck size={15} color="#0D9488" strokeWidth={2.2} />
                             </View>
-                            <Text style={[styles.testTitleText, { fontSize: scaleFont(13) }]}>
+                            <Text style={[styles.testTitleText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.35) }]} {...crispTextProps}>
                               {t.title}
                             </Text>
                           </View>
@@ -1044,7 +1044,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                                   <View style={styles.testSubPointCheck}>
                                     <Check size={10} color="#0D9488" strokeWidth={2.5} />
                                   </View>
-                                  <Text style={[styles.testSubPointText, { fontSize: scaleFont(12) }]}>
+                                  <Text style={[styles.testSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
                                     {sub}
                                   </Text>
                                 </View>
@@ -1063,17 +1063,17 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <Building2 size={scaleFont(16)} color={kioskColors.accentBlue} strokeWidth={2.2} />
-                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5) }]}>
+                    <Text style={[styles.tabSectionTitle, { fontSize: scaleFont(14.5), lineHeight: Math.round(scaleFont(14.5) * 1.3) }]} {...crispTextProps}>
                       Recommended Application & Deployment Areas
                     </Text>
                   </View>
-                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(11.5) }]}>
+                  <Text style={[styles.tabSectionSub, { fontSize: scaleFont(12), lineHeight: Math.round(scaleFont(12) * 1.45) }]} {...crispTextProps}>
                     Ideal installation grounds, industry sectors, and infrastructure environments.
                   </Text>
 
                   {resolvedAreas.length === 0 ? (
                     <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5) }]}>
+                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
                         No applicable areas configured for this item.
                       </Text>
                     </View>
@@ -1084,7 +1084,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                           <View style={styles.areaIconBox}>
                             <Building2 size={16} color={kioskColors.accentBlue} strokeWidth={2.2} />
                           </View>
-                          <Text style={[styles.areaCardText, { fontSize: scaleFont(12.5) }]}>
+                          <Text style={[styles.areaCardText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
                             {area}
                           </Text>
                         </View>
@@ -1387,30 +1387,31 @@ const styles = StyleSheet.create({
   // ── CONTENT LAYOUT ──
   scrollBody: {
     flexGrow: 1,
+    paddingBottom: 40,
   },
   contentLayoutRow: {
     gap: 20,
   },
   leftPanel: {
-    gap: 14,
+    gap: 16,
   },
   rightPanel: {
     flex: 1,
-    gap: 14,
+    gap: 16,
   },
 
   // ── PRODUCT OVERVIEW ──
   overviewCard: {
     backgroundColor: '#FFFFFF',
-    padding: 18,
+    padding: 20,
     borderRadius: kioskRadii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 6,
+    gap: 10,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 2,
   },
   productTitleMain: {
@@ -1422,7 +1423,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   productSubtitleText: {
     color: kioskColors.accentBlue,
@@ -1430,18 +1431,17 @@ const styles = StyleSheet.create({
   },
   productDescText: {
     color: '#475569',
-    lineHeight: 19,
     marginTop: 2,
   },
 
   // ── AVAILABLE VARIANTS CARDS (MATCHING UPLOADED DESIGN) ──
   variantsCard: {
     backgroundColor: '#FFFFFF',
-    padding: 14,
+    padding: 16,
     borderRadius: kioskRadii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 10,
+    gap: 12,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -1456,7 +1456,7 @@ const styles = StyleSheet.create({
   variantsHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   variantsSectionTitle: {
     fontWeight: '800',
@@ -1469,16 +1469,16 @@ const styles = StyleSheet.create({
   },
   variantsScrollContent: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     paddingVertical: 2,
   },
   variantCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    minHeight: 46,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    minHeight: 48,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
   },
@@ -1497,8 +1497,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   variantThumbWrapper: {
-    width: 26,
-    height: 38,
+    width: 28,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F8FAFC',
@@ -1522,8 +1522,8 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   variantScrollArrowBtn: {
-    width: 32,
-    height: 46,
+    width: 34,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
@@ -1541,26 +1541,26 @@ const styles = StyleSheet.create({
   // ── 5-TAB SEGMENTED CONTROLLER ──
   tabsContainer: {
     backgroundColor: '#F1F5F9',
-    borderRadius: kioskRadii.md,
-    padding: 4,
+    borderRadius: 14,
+    padding: 6,
     flexDirection: 'row',
     alignItems: 'center',
   },
   tabsRow: {
     flexDirection: 'row',
-    gap: 4,
-    paddingRight: 4,
+    gap: 8,
+    paddingRight: 6,
   },
   tabsScrollArrowBtn: {
-    width: 32,
-    height: 38,
+    width: 34,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: kioskRadii.sm,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    marginLeft: 4,
+    marginLeft: 6,
     marginRight: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -1571,19 +1571,20 @@ const styles = StyleSheet.create({
   tabButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    minHeight: 42,
-    borderRadius: kioskRadii.sm,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minHeight: 44,
+    borderRadius: 10,
     backgroundColor: 'transparent',
   },
   tabButtonActive: {
     backgroundColor: kioskColors.brandNavy,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tabButtonText: {
     fontWeight: '700',
@@ -1597,24 +1598,24 @@ const styles = StyleSheet.create({
   // ── TAB CONTENT PANEL ──
   tabContentCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: kioskRadii.lg,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     elevation: 2,
-    minHeight: 220,
+    minHeight: 260,
   },
   tabSection: {
-    gap: 12,
+    gap: 16,
   },
   tabSectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   tabSectionTitle: {
     fontWeight: '800',
@@ -1622,12 +1623,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   tabSectionSub: {
-    color: kioskColors.textMuted,
-    marginTop: -4,
-    lineHeight: 16,
+    color: '#64748B',
+    marginTop: 4,
+    lineHeight: 18,
   },
   emptyTabBox: {
-    padding: 24,
+    padding: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1638,66 +1639,68 @@ const styles = StyleSheet.create({
 
   // Features list
   featuresListContainer: {
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
+    marginTop: 6,
   },
   featureItemCard: {
     backgroundColor: '#F8FAFC',
     borderRadius: kioskRadii.md,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 6,
+    gap: 8,
   },
   featureMainRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
   },
   featureCheckIconWrap: {
-    marginTop: 1,
+    marginTop: 2,
   },
   featureMainPointText: {
     fontWeight: '700',
     color: kioskColors.textPrimary,
     flex: 1,
-    lineHeight: 18,
   },
   featureSubPointsWrapper: {
-    paddingLeft: 26,
-    gap: 4,
+    paddingLeft: 28,
+    gap: 6,
     marginTop: 4,
   },
   featureSubPointRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'flex-start',
+    gap: 10,
   },
   subPointDisc: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#64748B',
+    marginTop: 6,
   },
   featureSubPointText: {
     color: '#475569',
     flex: 1,
-    lineHeight: 16,
   },
 
   // Specs Table
   specsTableContainer: {
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: kioskRadii.md,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: 8,
   },
   specsTableRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 46,
+    gap: 16,
   },
   specsRowEven: {
     backgroundColor: '#FFFFFF',
@@ -1706,9 +1709,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   specsKeyText: {
-    color: kioskColors.textMuted,
+    color: '#64748B',
     fontWeight: '600',
     flex: 1,
+    letterSpacing: 0.1,
   },
   specsValText: {
     color: kioskColors.brandNavy,
@@ -1719,26 +1723,26 @@ const styles = StyleSheet.create({
 
   // Certifications list
   certsListContainer: {
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
+    marginTop: 6,
   },
   certCard: {
     backgroundColor: '#FFFBEB',
     borderRadius: kioskRadii.md,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#FDE68A',
-    gap: 6,
+    gap: 8,
   },
   certHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   certBadgeWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1749,22 +1753,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   certSubPointsWrapper: {
-    paddingLeft: 34,
-    gap: 4,
+    paddingLeft: 38,
+    gap: 6,
     marginTop: 4,
   },
   certSubPointRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    alignItems: 'flex-start',
+    gap: 8,
   },
   certSubPointCheck: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
   certSubPointText: {
     color: '#78350F',
@@ -1773,26 +1778,26 @@ const styles = StyleSheet.create({
 
   // In-House Tests list
   testsListContainer: {
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
+    marginTop: 6,
   },
   testCard: {
     backgroundColor: '#F0FDFA',
     borderRadius: kioskRadii.md,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#99F6E4',
-    gap: 6,
+    gap: 8,
   },
   testHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   testBadgeWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#CCFBF1',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1803,22 +1808,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   testSubPointsWrapper: {
-    paddingLeft: 34,
-    gap: 4,
+    paddingLeft: 38,
+    gap: 6,
     marginTop: 4,
   },
   testSubPointRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    alignItems: 'flex-start',
+    gap: 8,
   },
   testSubPointCheck: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#CCFBF1',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
   testSubPointText: {
     color: '#134E4A',
@@ -1829,25 +1835,25 @@ const styles = StyleSheet.create({
   areasGridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
+    gap: 10,
+    marginTop: 6,
   },
   areaGridCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#BFDBFE',
     borderRadius: kioskRadii.md,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     minWidth: 140,
   },
   areaIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1862,20 +1868,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 8,
-    paddingTop: 14,
+    gap: 14,
+    marginTop: 18,
+    paddingTop: 18,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
   detailBackBtn: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: kioskRadii.md,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
-    minHeight: 46,
+    minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1887,12 +1893,12 @@ const styles = StyleSheet.create({
   detailWhiteboardBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     backgroundColor: kioskColors.accentBlue,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: kioskRadii.md,
-    minHeight: 46,
+    minHeight: 48,
     justifyContent: 'center',
     shadowColor: kioskColors.accentBlue,
     shadowOffset: { width: 0, height: 2 },

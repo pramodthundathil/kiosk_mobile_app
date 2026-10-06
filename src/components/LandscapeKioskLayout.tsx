@@ -949,14 +949,14 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         style={[
                           styles.productCard,
                           {
-                            width: is4K ? 245 : screenWidth >= 1200 ? 195 : 180,
-                            minHeight: is4K ? 240 : 190,
+                            width: is4K ? 250 : screenWidth >= 1200 ? 200 : 185,
+                            minHeight: is4K ? 250 : 205,
                             backgroundColor: combo.bg,
                             borderColor: combo.borderColor,
                           },
                         ]}
                       >
-                        <View style={[styles.productImgWrapper, { height: is4K ? 170 : 130 }]}>
+                        <View style={styles.productImgWrapper}>
                           {item.image ? (
                             <Image
                               source={{ uri: item.image }}
@@ -971,7 +971,18 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                         </View>
                         <View style={styles.productCardFooter}>
                           <View style={styles.productCardTextCol}>
-                            <Text numberOfLines={2} style={[styles.productCardTitle, { color: combo.textColor, fontSize: scaleFont(13.5) }]} {...crispTextProps}>
+                            <Text
+                              numberOfLines={3}
+                              style={[
+                                styles.productCardTitle,
+                                {
+                                  color: combo.textColor,
+                                  fontSize: scaleFont(is4K ? 15 : 12.5),
+                                  lineHeight: Math.round(scaleFont(is4K ? 15 : 12.5) * 1.32),
+                                },
+                              ]}
+                              {...crispTextProps}
+                            >
                               {item.name}
                             </Text>
                           </View>
@@ -1742,7 +1753,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    minHeight: 185,
+    minHeight: 205,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -1751,7 +1762,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   productImgWrapper: {
-    height: 130,
+    flex: 1,
+    minHeight: 115,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1783,6 +1795,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   productCardFooter: {
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1791,21 +1804,20 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     gap: 4,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.04)',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
     borderBottomLeftRadius: kioskRadii.md,
     borderBottomRightRadius: kioskRadii.md,
   },
   productCardTextCol: {
     flex: 1,
     marginRight: 4,
+    justifyContent: 'center',
   },
   productCardTitle: {
     fontWeight: '700',
-    fontSize: 13,
     color: kioskColors.brandNavy,
-    lineHeight: 16,
-    letterSpacing: -0.2,
+    letterSpacing: -0.15,
     includeFontPadding: false,
   },
   productCardSku: {
