@@ -362,6 +362,34 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     return [];
   }, [activeVariant, product.applicableAreas, product.applications]);
 
+  // Dynamically computed available tabs that contain content (hiding any empty sections)
+  const availableTabs = useMemo(() => {
+    const tabs: { key: DetailTabKey; label: string; icon: any }[] = [];
+    if (resolvedFeatures.length > 0) {
+      tabs.push({ key: 'features', label: 'Features', icon: Zap });
+    }
+    if (Object.keys(resolvedSpecs).length > 0) {
+      tabs.push({ key: 'specifications', label: 'Specifications', icon: FileText });
+    }
+    if (resolvedCertifications.length > 0) {
+      tabs.push({ key: 'certifications', label: 'Certifications', icon: Award });
+    }
+    if (resolvedInHouseTests.length > 0) {
+      tabs.push({ key: 'in_house_tests', label: 'Testing', icon: ClipboardCheck });
+    }
+    if (resolvedAreas.length > 0) {
+      tabs.push({ key: 'applicable_areas', label: 'Applicable Areas', icon: Building2 });
+    }
+    return tabs;
+  }, [resolvedFeatures.length, resolvedSpecs, resolvedCertifications.length, resolvedInHouseTests.length, resolvedAreas.length]);
+
+  // Keep activeTab aligned with an available non-empty tab
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some((t) => t.key === activeTab)) {
+      setActiveTab(availableTabs[0].key);
+    }
+  }, [availableTabs, activeTab]);
+
   // Helper to extract clean base filename for robust deduplication
   const getCleanMediaFilename = (url?: string) => {
     if (!url) return '';
@@ -753,111 +781,73 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               </View>
             )}
 
-            {/* 5-TAB SEGMENTED CONTROLLER */}
-            <View style={styles.tabsContainer}>
-              <ScrollView
-                ref={tabsScrollRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.tabsRow}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleSelectTab('features')}
-                  style={[styles.tabButton, activeTab === 'features' && styles.tabButtonActive]}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            {/* TAB SEGMENTED CONTROLLER - Only showing sections that contain content, without count brackets */}
+            {availableTabs.length > 0 && (
+              <View style={styles.tabsContainer}>
+                <ScrollView
+                  ref={tabsScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.tabsRow}
                 >
-                  <Zap
-                    size={scaleFont(14)}
-                    color={activeTab === 'features' ? '#FFFFFF' : kioskColors.textSecondary}
-                    strokeWidth={2.2}
-                  />
-                  <Text style={[styles.tabButtonText, activeTab === 'features' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
-                    Features ({resolvedFeatures.length})
-                  </Text>
-                </TouchableOpacity>
+                  {availableTabs.map((tab) => {
+                    const IconComp = tab.icon;
+                    const isActive = activeTab === tab.key;
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        activeOpacity={0.85}
+                        onPress={() => handleSelectTab(tab.key)}
+                        style={[styles.tabButton, isActive && styles.tabButtonActive]}
+                        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                      >
+                        <IconComp
+                          size={scaleFont(14)}
+                          color={isActive ? '#FFFFFF' : kioskColors.textSecondary}
+                          strokeWidth={2.2}
+                        />
+                        <Text
+                          style={[
+                            styles.tabButtonText,
+                            isActive && styles.tabButtonTextActive,
+                            { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) },
+                          ]}
+                          {...crispTextProps}
+                        >
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
 
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleSelectTab('specifications')}
-                  style={[styles.tabButton, activeTab === 'specifications' && styles.tabButtonActive]}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                >
-                  <FileText
-                    size={scaleFont(14)}
-                    color={activeTab === 'specifications' ? '#FFFFFF' : kioskColors.textSecondary}
-                    strokeWidth={2.2}
-                  />
-                  <Text style={[styles.tabButtonText, activeTab === 'specifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
-                    Specifications ({Object.keys(resolvedSpecs).length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleSelectTab('certifications')}
-                  style={[styles.tabButton, activeTab === 'certifications' && styles.tabButtonActive]}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                >
-                  <Award
-                    size={scaleFont(14)}
-                    color={activeTab === 'certifications' ? '#FFFFFF' : kioskColors.textSecondary}
-                    strokeWidth={2.2}
-                  />
-                  <Text style={[styles.tabButtonText, activeTab === 'certifications' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
-                    Certifications ({resolvedCertifications.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleSelectTab('in_house_tests')}
-                  style={[styles.tabButton, activeTab === 'in_house_tests' && styles.tabButtonActive]}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                >
-                  <ClipboardCheck
-                    size={scaleFont(14)}
-                    color={activeTab === 'in_house_tests' ? '#FFFFFF' : kioskColors.textSecondary}
-                    strokeWidth={2.2}
-                  />
-                  <Text style={[styles.tabButtonText, activeTab === 'in_house_tests' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
-                    Testing ({resolvedInHouseTests.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleSelectTab('applicable_areas')}
-                  style={[styles.tabButton, activeTab === 'applicable_areas' && styles.tabButtonActive]}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                >
-                  <Building2
-                    size={scaleFont(14)}
-                    color={activeTab === 'applicable_areas' ? '#FFFFFF' : kioskColors.textSecondary}
-                    strokeWidth={2.2}
-                  />
-                  <Text style={[styles.tabButtonText, activeTab === 'applicable_areas' && styles.tabButtonTextActive, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.3) }]} {...crispTextProps}>
-                    Applicable Areas ({resolvedAreas.length})
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-
-              {/* Right side arrow to identify more tabs are available on sliding */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => tabsScrollRef.current?.scrollTo({ x: 260, animated: true })}
-                style={styles.tabsScrollArrowBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel="Scroll tabs right"
-              >
-                <ChevronRight size={scaleFont(16)} color="#0D60AE" strokeWidth={2.6} />
-              </TouchableOpacity>
-            </View>
+                {availableTabs.length > 3 && (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => tabsScrollRef.current?.scrollTo({ x: 260, animated: true })}
+                    style={styles.tabsScrollArrowBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Scroll tabs right"
+                  >
+                    <ChevronRight size={scaleFont(16)} color="#0D60AE" strokeWidth={2.6} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             {/* TAB CONTENT PANEL */}
             <View style={styles.tabContentCard}>
+              {/* Fallback if no sections contain data */}
+              {availableTabs.length === 0 && (
+                <View style={styles.emptyTabBox}>
+                  <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
+                    No specifications or engineering details configured for this model.
+                  </Text>
+                </View>
+              )}
+
               {/* TAB 1: FEATURES (Pointed & Sub-Points) */}
-              {activeTab === 'features' && (
+              {activeTab === 'features' && resolvedFeatures.length > 0 && (
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <Zap size={scaleFont(16)} color={kioskColors.lightningGold} strokeWidth={2.2} />
@@ -869,47 +859,39 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     Key functional advantages, structural integrity, and electrical performance parameters.
                   </Text>
 
-                  {resolvedFeatures.length === 0 ? (
-                    <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
-                        No engineering features configured for this item.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.featuresListContainer}>
-                      {resolvedFeatures.map((item, idx) => (
-                        <View key={idx} style={styles.featureItemCard}>
-                          <View style={styles.featureMainRow}>
-                            <View style={styles.featureCheckIconWrap}>
-                              <CheckCircle2 size={16} color="#16A34A" strokeWidth={2.5} />
-                            </View>
-                            <Text style={[styles.featureMainPointText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.4) }]} {...crispTextProps}>
-                              {item.point}
-                            </Text>
+                  <View style={styles.featuresListContainer}>
+                    {resolvedFeatures.map((item, idx) => (
+                      <View key={idx} style={styles.featureItemCard}>
+                        <View style={styles.featureMainRow}>
+                          <View style={styles.featureCheckIconWrap}>
+                            <CheckCircle2 size={16} color="#16A34A" strokeWidth={2.5} />
                           </View>
-
-                          {/* Nested Sub-points */}
-                          {item.sub_points && item.sub_points.length > 0 && (
-                            <View style={styles.featureSubPointsWrapper}>
-                              {item.sub_points.map((sub, sIdx) => (
-                                <View key={sIdx} style={styles.featureSubPointRow}>
-                                  <View style={styles.subPointDisc} />
-                                  <Text style={[styles.featureSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
-                                    {sub}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
+                          <Text style={[styles.featureMainPointText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.4) }]} {...crispTextProps}>
+                            {item.point}
+                          </Text>
                         </View>
-                      ))}
-                    </View>
-                  )}
+
+                        {/* Nested Sub-points */}
+                        {item.sub_points && item.sub_points.length > 0 && (
+                          <View style={styles.featureSubPointsWrapper}>
+                            {item.sub_points.map((sub, sIdx) => (
+                              <View key={sIdx} style={styles.featureSubPointRow}>
+                                <View style={styles.subPointDisc} />
+                                <Text style={[styles.featureSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
+                                  {sub}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
 
               {/* TAB 2: TECHNICAL SPECIFICATIONS TABLE */}
-              {activeTab === 'specifications' && (
+              {activeTab === 'specifications' && Object.keys(resolvedSpecs).length > 0 && (
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <FileText size={scaleFont(16)} color={kioskColors.brandNavy} strokeWidth={2.2} />
@@ -921,37 +903,29 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     Verified dimensional data, material compliance, and metallurgical specs.
                   </Text>
 
-                  {Object.keys(resolvedSpecs).length === 0 ? (
-                    <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
-                        No specifications configured for this model.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.specsTableContainer}>
-                      {Object.entries(resolvedSpecs).map(([key, val], idx) => (
-                        <View
-                          key={idx}
-                          style={[
-                            styles.specsTableRow,
-                            idx % 2 === 0 ? styles.specsRowEven : styles.specsRowOdd,
-                          ]}
-                        >
-                          <Text style={[styles.specsKeyText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
-                            {key}
-                          </Text>
-                          <Text style={[styles.specsValText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
-                            {val}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
+                  <View style={styles.specsTableContainer}>
+                    {Object.entries(resolvedSpecs).map(([key, val], idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.specsTableRow,
+                          idx % 2 === 0 ? styles.specsRowEven : styles.specsRowOdd,
+                        ]}
+                      >
+                        <Text style={[styles.specsKeyText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
+                          {key}
+                        </Text>
+                        <Text style={[styles.specsValText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
+                          {val}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
 
               {/* TAB 3: CERTIFICATIONS */}
-              {activeTab === 'certifications' && (
+              {activeTab === 'certifications' && resolvedCertifications.length > 0 && (
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <Award size={scaleFont(16)} color="#D97706" strokeWidth={2.2} />
@@ -963,49 +937,41 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     Accredited third-party compliance, safety approvals, and global electrical certifications.
                   </Text>
 
-                  {resolvedCertifications.length === 0 ? (
-                    <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
-                        No certifications configured for this item.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.certsListContainer}>
-                      {resolvedCertifications.map((item, idx) => (
-                        <View key={idx} style={styles.certCard}>
-                          <View style={styles.certHeaderRow}>
-                            <View style={styles.certBadgeWrap}>
-                              <Award size={15} color="#D97706" strokeWidth={2.2} />
-                            </View>
-                            <Text style={[styles.certTitleText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.35) }]} {...crispTextProps}>
-                              {item.title}
-                            </Text>
+                  <View style={styles.certsListContainer}>
+                    {resolvedCertifications.map((item, idx) => (
+                      <View key={idx} style={styles.certCard}>
+                        <View style={styles.certHeaderRow}>
+                          <View style={styles.certBadgeWrap}>
+                            <Award size={15} color="#D97706" strokeWidth={2.2} />
                           </View>
-
-                          {/* Cert sub-points */}
-                          {item.sub_points && item.sub_points.length > 0 && (
-                            <View style={styles.certSubPointsWrapper}>
-                              {item.sub_points.map((sub, sIdx) => (
-                                <View key={sIdx} style={styles.certSubPointRow}>
-                                  <View style={styles.certSubPointCheck}>
-                                    <Check size={10} color="#D97706" strokeWidth={2.5} />
-                                  </View>
-                                  <Text style={[styles.certSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
-                                    {sub}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
+                          <Text style={[styles.certTitleText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.35) }]} {...crispTextProps}>
+                            {item.title}
+                          </Text>
                         </View>
-                      ))}
-                    </View>
-                  )}
+
+                        {/* Cert sub-points */}
+                        {item.sub_points && item.sub_points.length > 0 && (
+                          <View style={styles.certSubPointsWrapper}>
+                            {item.sub_points.map((sub, sIdx) => (
+                              <View key={sIdx} style={styles.certSubPointRow}>
+                                <View style={styles.certSubPointCheck}>
+                                  <Check size={10} color="#D97706" strokeWidth={2.5} />
+                                </View>
+                                <Text style={[styles.certSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
+                                  {sub}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
 
               {/* TAB 4: IN-HOUSE TESTS */}
-              {activeTab === 'in_house_tests' && (
+              {activeTab === 'in_house_tests' && resolvedInHouseTests.length > 0 && (
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <ClipboardCheck size={scaleFont(16)} color="#0D9488" strokeWidth={2.2} />
@@ -1017,49 +983,41 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     Continuous batch testing, micro-layer thickness measurement, and structural pull tests.
                   </Text>
 
-                  {resolvedInHouseTests.length === 0 ? (
-                    <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
-                        No in-house tests configured for this item.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.testsListContainer}>
-                      {resolvedInHouseTests.map((t, idx) => (
-                        <View key={idx} style={styles.testCard}>
-                          <View style={styles.testHeaderRow}>
-                            <View style={styles.testBadgeWrap}>
-                              <ClipboardCheck size={15} color="#0D9488" strokeWidth={2.2} />
-                            </View>
-                            <Text style={[styles.testTitleText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.35) }]} {...crispTextProps}>
-                              {t.title}
-                            </Text>
+                  <View style={styles.testsListContainer}>
+                    {resolvedInHouseTests.map((t, idx) => (
+                      <View key={idx} style={styles.testCard}>
+                        <View style={styles.testHeaderRow}>
+                          <View style={styles.testBadgeWrap}>
+                            <ClipboardCheck size={15} color="#0D9488" strokeWidth={2.2} />
                           </View>
-
-                          {/* Test details sub-points */}
-                          {t.sub_points && t.sub_points.length > 0 && (
-                            <View style={styles.testSubPointsWrapper}>
-                              {t.sub_points.map((sub, sIdx) => (
-                                <View key={sIdx} style={styles.testSubPointRow}>
-                                  <View style={styles.testSubPointCheck}>
-                                    <Check size={10} color="#0D9488" strokeWidth={2.5} />
-                                  </View>
-                                  <Text style={[styles.testSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
-                                    {sub}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
+                          <Text style={[styles.testTitleText, { fontSize: scaleFont(13.5), lineHeight: Math.round(scaleFont(13.5) * 1.35) }]} {...crispTextProps}>
+                            {t.title}
+                          </Text>
                         </View>
-                      ))}
-                    </View>
-                  )}
+
+                        {/* Test details sub-points */}
+                        {t.sub_points && t.sub_points.length > 0 && (
+                          <View style={styles.testSubPointsWrapper}>
+                            {t.sub_points.map((sub, sIdx) => (
+                              <View key={sIdx} style={styles.testSubPointRow}>
+                                <View style={styles.testSubPointCheck}>
+                                  <Check size={10} color="#0D9488" strokeWidth={2.5} />
+                                </View>
+                                <Text style={[styles.testSubPointText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.45) }]} {...crispTextProps}>
+                                  {sub}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
 
               {/* TAB 5: APPLICABLE AREAS */}
-              {activeTab === 'applicable_areas' && (
+              {activeTab === 'applicable_areas' && resolvedAreas.length > 0 && (
                 <View style={styles.tabSection}>
                   <View style={styles.tabSectionTitleRow}>
                     <Building2 size={scaleFont(16)} color={kioskColors.accentBlue} strokeWidth={2.2} />
@@ -1071,26 +1029,18 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     Ideal installation grounds, industry sectors, and infrastructure environments.
                   </Text>
 
-                  {resolvedAreas.length === 0 ? (
-                    <View style={styles.emptyTabBox}>
-                      <Text style={[styles.emptyTabText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.4) }]} {...crispTextProps}>
-                        No applicable areas configured for this item.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.areasGridContainer}>
-                      {resolvedAreas.map((area, idx) => (
-                        <View key={idx} style={styles.areaGridCard}>
-                          <View style={styles.areaIconBox}>
-                            <Building2 size={16} color={kioskColors.accentBlue} strokeWidth={2.2} />
-                          </View>
-                          <Text style={[styles.areaCardText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
-                            {area}
-                          </Text>
+                  <View style={styles.areasGridContainer}>
+                    {resolvedAreas.map((area, idx) => (
+                      <View key={idx} style={styles.areaGridCard}>
+                        <View style={styles.areaIconBox}>
+                          <Building2 size={16} color={kioskColors.accentBlue} strokeWidth={2.2} />
                         </View>
-                      ))}
-                    </View>
-                  )}
+                        <Text style={[styles.areaCardText, { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.35) }]} {...crispTextProps}>
+                          {area}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
             </View>

@@ -513,11 +513,6 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
               <View style={styles.sectionHeadRow}>
                 <View style={styles.sectionHeadLeft}>
                   <Text style={[styles.sectionTitle, { fontSize: scaleFont(is4K ? 17 : 14.5) }]} {...crispTextProps}>Product Categories</Text>
-                  <View style={styles.sectionBadge}>
-                    <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(is4K ? 12 : 10.5) }]} {...crispTextProps}>
-                      {displayCategories.length} Categories
-                    </Text>
-                  </View>
                 </View>
 
                 {products.length > 0 && (
@@ -532,7 +527,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                     >
                       <Zap size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                       <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(is4K ? 13 : 11.5) }]} {...crispTextProps}>
-                        All Products ({products.length})
+                        All Products
                       </Text>
                       <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                     </TouchableOpacity>
@@ -650,11 +645,6 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                       <Text style={[styles.sectionTitle, { fontSize: scaleFont(is4K ? 17 : 14.5) }]} {...crispTextProps}>
                         {activeCategoryObj?.name}
                       </Text>
-                      <View style={styles.sectionBadge}>
-                        <Text style={[styles.sectionBadgeText, { fontSize: scaleFont(is4K ? 12 : 10.5) }]} {...crispTextProps}>
-                          {activeCategoryObj?.subcategories?.length || 0} Sub-Categories
-                        </Text>
-                      </View>
                     </View>
                     <Text style={{ fontSize: scaleFont(is4K ? 12 : 10.5), color: kioskColors.textSecondary, marginTop: 1 }}>
                       Select a product category to explore specialized components
@@ -672,7 +662,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                   >
                     <Zap size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                     <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(is4K ? 13 : 11.5) }]} {...crispTextProps}>
-                      All {activeCategoryObj?.name} Products ({categoryProductsCount})
+                      All {activeCategoryObj?.name} Products
                     </Text>
                     <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                   </TouchableOpacity>
@@ -835,7 +825,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                           ]}
                           {...crispTextProps}
                         >
-                          All ({categoryProductsCount})
+                          All
                         </Text>
                       </TouchableOpacity>
                       {activeCategoryObj.subcategories!.map((sc) => {
@@ -896,7 +886,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                           ]}
                           {...crispTextProps}
                         >
-                          All ({products.length})
+                          All
                         </Text>
                       </TouchableOpacity>
                       {displayCategories.map((c) => {

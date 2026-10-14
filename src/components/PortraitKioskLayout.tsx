@@ -464,7 +464,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                   >
                     <Zap size={13} color="#FFFFFF" strokeWidth={2.4} />
                     <Text style={styles.portraitAllProductsBtnText}>
-                      All Products ({products.length})
+                      All Products
                     </Text>
                     <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
                   </TouchableOpacity>
@@ -576,11 +576,6 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                 <Text numberOfLines={1} style={[styles.catHeaderTitle, { fontSize: scaleFont(17) }]}>
                   {activeCategoryObj?.name}
                 </Text>
-                <View style={styles.productCountPill}>
-                  <Text style={[styles.productCountPillText, { fontSize: scaleFont(12) }]}>
-                    {activeCategoryObj?.subcategories?.length || 0} Sub-Categories
-                  </Text>
-                </View>
               </View>
             </View>
 
@@ -604,7 +599,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                   >
                     <Zap size={13} color="#FFFFFF" strokeWidth={2.4} />
                     <Text style={styles.portraitAllProductsBtnText}>
-                      All {activeCategoryObj?.name} Products ({categoryProductsCount})
+                      All {activeCategoryObj?.name} Products
                     </Text>
                     <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
                   </TouchableOpacity>
@@ -764,7 +759,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                           { fontSize: scaleFont(12) },
                         ]}
                       >
-                        All ({categoryProductsCount})
+                        All
                       </Text>
                     </TouchableOpacity>
                     {activeCategoryObj.subcategories!.map((sc) => {
@@ -823,7 +818,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                           { fontSize: scaleFont(12) },
                         ]}
                       >
-                        All ({products.length})
+                        All
                       </Text>
                     </TouchableOpacity>
                     {displayCategories.map((c) => {

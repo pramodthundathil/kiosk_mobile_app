@@ -18,6 +18,8 @@ import {
   Pause,
   Box,
   AlertCircle,
+  ArrowLeftRight,
+  ArrowUpDown,
 } from 'lucide-react-native';
 import { kioskColors, kioskRadii, kioskShadows } from '../theme/kioskTheme';
 import { MODEL_VIEWER_SCRIPT } from '../assets/modelViewerBundle';
@@ -39,6 +41,7 @@ export interface ThreeDModelViewerProps {
   posterUrl?: string;
   title?: string;
   autoRotate?: boolean;
+  initialOrientation?: 'horizontal' | 'vertical';
   showControls?: boolean;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
@@ -51,6 +54,7 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   posterUrl,
   title = '3D Product Model',
   autoRotate = true,
+  initialOrientation = 'horizontal',
   showControls = true,
   isFullscreen = false,
   onToggleFullscreen,
@@ -60,6 +64,7 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isAutoRotating, setIsAutoRotating] = useState(autoRotate);
+  const [orientationMode, setOrientationMode] = useState<'horizontal' | 'vertical'>(initialOrientation);
   const [cameraZoomLevel, setCameraZoomLevel] = useState(0); // -2 to +2
   const [resolvedModelUrl, setResolvedModelUrl] = useState<string>('');
   const [isPreparingModel, setIsPreparingModel] = useState<boolean>(true);
@@ -102,7 +107,12 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
 
   // Generates complete self-contained HTML for Google <model-viewer>
   // Uses bundled JavaScript so it works 100% OFFLINE without any CDN dependency
-  const generateModelViewerHtml = (url: string, poster?: string, initialAutoRotate: boolean = true) => `
+  const generateModelViewerHtml = (
+    url: string,
+    poster?: string,
+    initialAutoRotate: boolean = true,
+    startingOrientation: 'horizontal' | 'vertical' = 'horizontal'
+  ) => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -155,6 +165,8 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
     loading="eager"
     reveal="auto"
     bounds="tight"
+    orientation="${startingOrientation === 'vertical' ? '0deg 0deg 0deg' : '90deg 0deg 0deg'}"
+    camera-orbit="0deg 75deg 105%"
     ar
   >
   </model-viewer>
@@ -212,9 +224,20 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
           } else {
             viewer.removeAttribute('auto-rotate');
           }
-        } else if (cmd.action === 'reset-camera') {
+        } else if (cmd.action === 'set-orientation') {
+          const isHoriz = cmd.value === 'horizontal';
+          viewer.setAttribute('orientation', isHoriz ? '90deg 0deg 0deg' : '0deg 0deg 0deg');
           viewer.cameraOrbit = '0deg 75deg 105%';
-          viewer.resetTurntableRotation();
+          if (viewer.resetTurntableRotation) viewer.resetTurntableRotation();
+          if (viewer.updateFraming) viewer.updateFraming();
+        } else if (cmd.action === 'reset-camera') {
+          const isHoriz = cmd.orientation === 'horizontal';
+          if (cmd.orientation) {
+            viewer.setAttribute('orientation', isHoriz ? '90deg 0deg 0deg' : '0deg 0deg 0deg');
+          }
+          viewer.cameraOrbit = '0deg 75deg 105%';
+          if (viewer.resetTurntableRotation) viewer.resetTurntableRotation();
+          if (viewer.updateFraming) viewer.updateFraming();
         } else if (cmd.action === 'zoom-in') {
           viewer.zoom(0.85);
         } else if (cmd.action === 'zoom-out') {
@@ -250,6 +273,11 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
     }
   };
 
+  const handleSetOrientation = (mode: 'horizontal' | 'vertical') => {
+    setOrientationMode(mode);
+    sendCommand({ action: 'set-orientation', value: mode });
+  };
+
   const toggleAutoRotate = () => {
     const nextVal = !isAutoRotating;
     setIsAutoRotating(nextVal);
@@ -257,7 +285,7 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   };
 
   const resetCamera = () => {
-    sendCommand({ action: 'reset-camera' });
+    sendCommand({ action: 'reset-camera', orientation: orientationMode });
   };
 
   const handleZoomIn = () => {
@@ -269,7 +297,7 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   };
 
   const activeHtml = !isPreparingModel && resolvedModelUrl
-    ? generateModelViewerHtml(resolvedModelUrl, posterUrl, isAutoRotating)
+    ? generateModelViewerHtml(resolvedModelUrl, posterUrl, isAutoRotating, initialOrientation)
     : '';
 
   if (!modelUrl || !modelUrl.trim() || (!isPreparingModel && !resolvedModelUrl)) {
@@ -382,67 +410,125 @@ export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
           </View>
         )}
 
-        {/* Interactive Floating Tool Bar */}
+        {/* Interactive Floating Tool Bar & View Controls */}
         {showControls && !hasError && (
-          <View style={styles.floatingControlsContainer}>
-            {/* Auto Rotate Toggle */}
-            <TouchableOpacity
-              style={[
-                styles.controlBtn,
-                isAutoRotating && styles.controlBtnActive,
-              ]}
-              onPress={toggleAutoRotate}
-              activeOpacity={0.8}
-            >
-              {isAutoRotating ? (
-                <Pause size={scaleFont(15)} color="#FFFFFF" strokeWidth={2.4} />
-              ) : (
-                <Play size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
-              )}
-            </TouchableOpacity>
-
-            {/* Reset Camera */}
-            <TouchableOpacity
-              style={styles.controlBtn}
-              onPress={resetCamera}
-              activeOpacity={0.8}
-            >
-              <RotateCcw size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
-            </TouchableOpacity>
-
-            {/* Zoom In */}
-            <TouchableOpacity
-              style={styles.controlBtn}
-              onPress={handleZoomIn}
-              activeOpacity={0.8}
-            >
-              <ZoomIn size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
-            </TouchableOpacity>
-
-            {/* Zoom Out */}
-            <TouchableOpacity
-              style={styles.controlBtn}
-              onPress={handleZoomOut}
-              activeOpacity={0.8}
-            >
-              <ZoomOut size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
-            </TouchableOpacity>
-
-            {/* Toggle Fullscreen Modal if available */}
-            {onToggleFullscreen && (
+          <>
+            {/* View Mode Toggle: Horizontal & Vertical View */}
+            <View style={styles.viewModeTogglePill}>
               <TouchableOpacity
-                style={[styles.controlBtn, styles.fullscreenBtn]}
-                onPress={onToggleFullscreen}
+                style={[
+                  styles.viewModeBtn,
+                  orientationMode === 'horizontal' && styles.viewModeBtnActive,
+                ]}
+                onPress={() => handleSetOrientation('horizontal')}
+                activeOpacity={0.8}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                accessibilityLabel="Switch to horizontal 3D view"
+              >
+                <ArrowLeftRight
+                  size={scaleFont(13)}
+                  color={orientationMode === 'horizontal' ? '#FFFFFF' : '#94A3B8'}
+                  strokeWidth={2.4}
+                />
+                <Text
+                  style={[
+                    styles.viewModeBtnText,
+                    orientationMode === 'horizontal' && styles.viewModeBtnTextActive,
+                    { fontSize: scaleFont(11.5) },
+                  ]}
+                >
+                  Horizontal
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.viewModeBtn,
+                  orientationMode === 'vertical' && styles.viewModeBtnActive,
+                ]}
+                onPress={() => handleSetOrientation('vertical')}
+                activeOpacity={0.8}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                accessibilityLabel="Switch to vertical 3D view"
+              >
+                <ArrowUpDown
+                  size={scaleFont(13)}
+                  color={orientationMode === 'vertical' ? '#FFFFFF' : '#94A3B8'}
+                  strokeWidth={2.4}
+                />
+                <Text
+                  style={[
+                    styles.viewModeBtnText,
+                    orientationMode === 'vertical' && styles.viewModeBtnTextActive,
+                    { fontSize: scaleFont(11.5) },
+                  ]}
+                >
+                  Vertical
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Right Side Floating Control Actions */}
+            <View style={styles.floatingControlsContainer}>
+              {/* Auto Rotate Toggle */}
+              <TouchableOpacity
+                style={[
+                  styles.controlBtn,
+                  isAutoRotating && styles.controlBtnActive,
+                ]}
+                onPress={toggleAutoRotate}
                 activeOpacity={0.8}
               >
-                {isFullscreen ? (
-                  <Minimize2 size={scaleFont(16)} color="#38BDF8" strokeWidth={2.5} />
+                {isAutoRotating ? (
+                  <Pause size={scaleFont(15)} color="#FFFFFF" strokeWidth={2.4} />
                 ) : (
-                  <Maximize2 size={scaleFont(16)} color="#38BDF8" strokeWidth={2.5} />
+                  <Play size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
                 )}
               </TouchableOpacity>
-            )}
-          </View>
+
+              {/* Reset Camera */}
+              <TouchableOpacity
+                style={styles.controlBtn}
+                onPress={resetCamera}
+                activeOpacity={0.8}
+              >
+                <RotateCcw size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              {/* Zoom In */}
+              <TouchableOpacity
+                style={styles.controlBtn}
+                onPress={handleZoomIn}
+                activeOpacity={0.8}
+              >
+                <ZoomIn size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              {/* Zoom Out */}
+              <TouchableOpacity
+                style={styles.controlBtn}
+                onPress={handleZoomOut}
+                activeOpacity={0.8}
+              >
+                <ZoomOut size={scaleFont(15)} color="#94A3B8" strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              {/* Toggle Fullscreen Modal if available */}
+              {onToggleFullscreen && (
+                <TouchableOpacity
+                  style={[styles.controlBtn, styles.fullscreenBtn]}
+                  onPress={onToggleFullscreen}
+                  activeOpacity={0.8}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 size={scaleFont(16)} color="#38BDF8" strokeWidth={2.5} />
+                  ) : (
+                    <Maximize2 size={scaleFont(16)} color="#38BDF8" strokeWidth={2.5} />
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
         )}
       </View>
     </View>
@@ -555,5 +641,38 @@ const styles = StyleSheet.create({
   fullscreenBtn: {
     backgroundColor: 'rgba(13, 96, 174, 0.25)',
     borderColor: '#0D60AE',
+  },
+  viewModeTogglePill: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    borderRadius: kioskRadii.full,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    zIndex: 20,
+    ...kioskShadows.card,
+  },
+  viewModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: kioskRadii.full,
+  },
+  viewModeBtnActive: {
+    backgroundColor: '#0D60AE',
+  },
+  viewModeBtnText: {
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  viewModeBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });
