@@ -213,6 +213,16 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
     setSelectedProductDetail(selectedProduct);
   }, [selectedProduct]);
 
+  // Keep active category and subcategory in sync with external selectedCategory prop
+  useEffect(() => {
+    if (selectedCategory === 'all') {
+      setActiveCategory(null);
+      setActiveSubCategory(null);
+    } else {
+      setActiveCategory(selectedCategory);
+    }
+  }, [selectedCategory]);
+
   // Immediately close modal and whiteboard if screensaver activates
   useEffect(() => {
     if (isScreensaverActive) {

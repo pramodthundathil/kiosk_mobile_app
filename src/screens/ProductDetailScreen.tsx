@@ -427,10 +427,10 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       candidateAssets = [...combinedVariantAssets, ...generalPhotos, ...generalPdfs];
     }
 
-    // Strictly deduplicate PDF assets so only 1 unique PDF is ever shown if only 1 is available
-    const seenPdfKeys = new Set<string>();
+    // Strictly deduplicate PDF assets so only 1 unique PDF is ever shown per file
     const seenAssetIds = new Set<string>();
-    const deduplicated: ProductMediaAsset[] = [];
+    const seenPdfMap = new Map<string, ProductMediaAsset>();
+    const nonPdfAssets: ProductMediaAsset[] = [];
 
     for (const a of candidateAssets) {
       if (a.id && seenAssetIds.has(a.id)) {
@@ -444,18 +444,36 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         a.file_url?.toLowerCase().endsWith('.pdf');
 
       if (isPdf && a.file_url) {
-        const cleanFile = getCleanMediaFilename(a.file_url);
-        if (seenPdfKeys.has(a.file_url) || (cleanFile && seenPdfKeys.has(cleanFile))) {
-          continue; // Skip duplicate PDF
-        }
-        seenPdfKeys.add(a.file_url);
-        if (cleanFile) seenPdfKeys.add(cleanFile);
-      }
+        const cleanFile = getCleanMediaFilename(a.file_url) || a.file_url.trim();
+        const defaultTitle = a.asset_type?.toUpperCase().includes('TECH') ? 'Technical Data Sheet' : 'Product Brochure';
+        const displayTitle = (a.title && a.title !== 'Media Asset' && a.title !== 'Media Preview') ? a.title : defaultTitle;
+        const normalizedAsset = { ...a, title: displayTitle };
 
-      deduplicated.push(a);
+        const existing = seenPdfMap.get(cleanFile);
+        if (!existing) {
+          seenPdfMap.set(cleanFile, normalizedAsset);
+        } else {
+          const existingIsFile = existing.file_url?.startsWith('file://');
+          const currentIsHttp = a.file_url.startsWith('http');
+          const existingIsGeneric = existing.title === 'Media Asset' || existing.title === 'Media Preview';
+
+          const updatedUrl = (existingIsFile && currentIsHttp) ? a.file_url : (existing.file_url || a.file_url);
+          const updatedTitle = (existingIsGeneric && displayTitle !== 'Media Asset' && displayTitle !== 'Media Preview')
+            ? displayTitle
+            : (existing.title || displayTitle);
+
+          seenPdfMap.set(cleanFile, {
+            ...existing,
+            title: updatedTitle,
+            file_url: updatedUrl,
+          });
+        }
+      } else {
+        nonPdfAssets.push(a);
+      }
     }
 
-    return deduplicated;
+    return [...nonPdfAssets, ...Array.from(seenPdfMap.values())];
   }, [product.mediaAssets, activeVariant, isParentSelected, selectedVariantId, product.id]);
 
   // Virtual product with active variant parameters for gallery / media

@@ -2,7 +2,6 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { KioskProduct, KioskCategory, KioskScreensaver } from '../types/kiosk';
-import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '../mock/kioskData';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
 import {
   shouldIdentifyLocation,
@@ -523,9 +522,9 @@ export async function getActiveKioskIdentity(): Promise<ActiveKioskIdentity> {
 export async function getCachedCatalogProducts(): Promise<KioskProduct[]> {
   try {
     const raw = await storageGetItem(KIOSK_CACHED_PRODUCTS_KEY);
-    if (raw) {
+    if (raw !== null && raw !== undefined) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         const mainOnly = parsed.filter((p: KioskProduct) => !p.parentId);
         const listToReturn = mainOnly.length > 0 ? mainOnly : parsed;
         return listToReturn.map((p: KioskProduct) => ({
@@ -543,24 +542,15 @@ export async function getCachedCatalogProducts(): Promise<KioskProduct[]> {
   } catch (e) {
     console.warn('[api] getCachedCatalogProducts parse notice:', e);
   }
-  return MOCK_PRODUCTS.map((p) => ({
-    ...p,
-    image: mediaCacheService.resolveCachedImageUri(p.image),
-    mediaAssets: Array.isArray(p.mediaAssets)
-      ? p.mediaAssets.map((m) => ({
-          ...m,
-          file_url: mediaCacheService.resolveCachedImageUri(m.file_url),
-        }))
-      : [],
-  }));
+  return [];
 }
 
 export async function getCachedCatalogCategories(): Promise<KioskCategory[]> {
   try {
     const raw = await storageGetItem(KIOSK_CACHED_CATEGORIES_KEY);
-    if (raw) {
+    if (raw !== null && raw !== undefined) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed.map((c: KioskCategory) => ({
           ...c,
           image: c.image ? mediaCacheService.resolveCachedImageUri(c.image) : undefined,
@@ -576,16 +566,7 @@ export async function getCachedCatalogCategories(): Promise<KioskCategory[]> {
   } catch (e) {
     console.warn('[api] getCachedCatalogCategories parse notice:', e);
   }
-  return MOCK_CATEGORIES.map((c) => ({
-    ...c,
-    image: c.image ? mediaCacheService.resolveCachedImageUri(c.image) : undefined,
-    subcategories: Array.isArray(c.subcategories)
-      ? c.subcategories.map((sc) => ({
-          ...sc,
-          image: sc.image ? mediaCacheService.resolveCachedImageUri(sc.image) : undefined,
-        }))
-      : [],
-  }));
+  return [];
 }
 
 export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceId?: string): Promise<KioskProduct[]> {
@@ -721,9 +702,16 @@ export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceI
             ? String(rawVId)
             : undefined;
 
+        const defaultTitle =
+          rawType === 'TECH_SHEET'
+            ? 'Technical Data Sheet'
+            : rawType === 'PDF_BROCHURE'
+            ? 'Product Brochure'
+            : 'Media Asset';
+
         return {
           id: String(m.id || Math.random()),
-          title: m.title || 'Media Asset',
+          title: m.title && m.title.trim().length > 0 ? m.title : defaultTitle,
           asset_type: rawType,
           asset_type_display: m.asset_type_display || '',
           file_url: fileUrl,

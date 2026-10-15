@@ -154,6 +154,25 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   // Fullscreen media preview (3D or Video)
   const [previewMediaAsset, setPreviewMediaAsset] = useState<ProductMediaAsset | null>(null);
 
+  // Sync activeCategory and activeSubCategory with selectedCategory prop
+  useEffect(() => {
+    if (selectedCategory === 'all') {
+      setActiveCategory(null);
+      setActiveSubCategory(null);
+    } else {
+      setActiveCategory(selectedCategory);
+    }
+  }, [selectedCategory]);
+
+  // Immediately close modals when screensaver activates
+  useEffect(() => {
+    if (isScreensaverActive) {
+      setSelectedProductDetail(null);
+      setIsWhiteboardOpen(false);
+      setIsSearchOpen(false);
+    }
+  }, [isScreensaverActive]);
+
   // Dedicated large category card dimensions for Main Screen in Portrait orientation
   const catColumns = screenWidth >= 1100 ? 3 : 2;
   const catHorizontalPadding = scaleSpacing(16);
