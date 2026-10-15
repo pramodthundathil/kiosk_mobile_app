@@ -257,10 +257,6 @@ export const InAppPdfViewer: React.FC<InAppPdfViewerProps> = ({
       {/* Top Document Toolbar */}
       <View style={styles.toolbar}>
         <View style={styles.docMetaBox}>
-          <View style={styles.docBadge}>
-            <FileText size={scaleFont(14)} color="#10B981" strokeWidth={2.4} />
-            <Text style={[styles.docBadgeText, { fontSize: scaleFont(11.5) }]}>PDF In-App Viewer</Text>
-          </View>
           <View style={styles.titleWrapper}>
             <Text numberOfLines={1} style={[styles.docTitleText, { fontSize: scaleFont(14) }]}>
               {title}

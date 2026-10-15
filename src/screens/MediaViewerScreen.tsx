@@ -274,6 +274,26 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
+function getCleanFilename(url?: string): string {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    const raw = url.split('?')[0].split('#')[0].split('/').pop() || '';
+    return decodeURIComponent(raw).toLowerCase().trim();
+  } catch (e) {
+    return url.toLowerCase().trim();
+  }
+}
+
+function isSameMediaUrl(url1?: string, url2?: string): boolean {
+  if (!url1 || !url2) return false;
+  const u1 = url1.trim();
+  const u2 = url2.trim();
+  if (u1 === u2) return true;
+  const f1 = getCleanFilename(u1);
+  const f2 = getCleanFilename(u2);
+  return f1.length > 0 && f1 === f2;
+}
+
   // Build unified, exhaustive media items list
   const mediaList = useMemo<UnifiedMediaItem[]>(() => {
     const items: UnifiedMediaItem[] = [];
@@ -313,94 +333,138 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
       });
     }
 
-    // 3. Additional Gallery Images
+    // 3. Additional Gallery Images (strictly exclude duplicates of main photo)
     assets
-      .filter((a) => a.asset_type === 'IMAGE' && a.file_url && a.file_url !== product.image)
+      .filter((a) => (a.asset_type === 'IMAGE' || (a.asset_type as string) === 'PHOTO') && a.file_url && a.file_url.trim().length > 0)
       .forEach((a, idx) => {
+        if (isSameMediaUrl(a.file_url, product.image)) return;
+        if (items.some((item) => item.type === 'IMAGE' && isSameMediaUrl(item.url, a.file_url))) return;
         items.push({
           id: a.id,
           title: a.title || `Photo Angle ${idx + 2}`,
           type: 'IMAGE',
           typeLabel: 'Photo',
-          url: a.file_url!,
-          thumbnailUrl: a.file_url,
+          url: a.file_url!.trim(),
+          thumbnailUrl: a.file_url!.trim(),
           description: a.description,
         });
       });
 
     // 4. Video Assets
     assets
-      .filter((a) => a.asset_type === 'VIDEO' && a.file_url)
+      .filter((a) => (a.asset_type === 'VIDEO' || a.file_url?.toLowerCase().endsWith('.mp4') || a.file_url?.toLowerCase().endsWith('.mov')) && a.file_url && a.file_url.trim().length > 0)
       .forEach((a, idx) => {
+        if (items.some((item) => item.type === 'VIDEO' && isSameMediaUrl(item.url, a.file_url))) return;
         items.push({
           id: a.id,
           title: a.title || `Video Demo ${idx + 1}`,
           type: 'VIDEO',
           typeLabel: 'Video',
-          url: a.file_url!,
+          url: a.file_url!.trim(),
           thumbnailUrl: product.image,
           description: a.description || 'Industrial equipment demonstration video',
         });
       });
 
-    // 5. PDF Brochures & Tech Sheets (Strictly deduplicated so only 1 unique doc is displayed if only 1 is available)
+    // 5. PDF Brochures & Tech Sheets (Strictly at most 1 Brochure and 1 Tech Sheet per product)
     const pdfCandidates: {
       id: string;
       title: string;
       url: string;
       description?: string;
+      role: 'BROCHURE' | 'TECH_SHEET' | 'OTHER';
     }[] = [];
 
     assets
-      .filter((a) => (a.asset_type === 'PDF_BROCHURE' || a.asset_type === 'TECH_SHEET' || (a.asset_type as string) === 'PDF' || a.file_url?.toLowerCase().endsWith('.pdf')) && a.file_url)
+      .filter((a) => (a.asset_type === 'PDF_BROCHURE' || a.asset_type === 'TECH_SHEET' || (a.asset_type as string) === 'PDF' || a.file_url?.toLowerCase().endsWith('.pdf')) && a.file_url && a.file_url.trim().length > 0)
       .forEach((a) => {
+        const isTech = a.asset_type === 'TECH_SHEET' || a.title?.toLowerCase().includes('tech') || a.title?.toLowerCase().includes('datasheet');
+        const role: 'BROCHURE' | 'TECH_SHEET' | 'OTHER' = isTech ? 'TECH_SHEET' : 'BROCHURE';
+        const defaultTitle = role === 'TECH_SHEET' ? 'Technical Data Sheet' : 'Product Brochure';
+        const displayTitle = (a.title && a.title !== 'Media Asset' && a.title !== 'Media Preview') ? a.title : defaultTitle;
+
         pdfCandidates.push({
           id: a.id,
-          title: a.title || (a.asset_type === 'PDF_BROCHURE' ? 'Official Brochure' : 'Technical Sheet'),
-          url: a.file_url!,
+          title: displayTitle,
+          url: a.file_url!.trim(),
           description: a.description || 'Certified engineering datasheet and test specifications',
+          role,
         });
       });
 
-    if (product.brochureUrl) {
-      pdfCandidates.push({
-        id: 'brochure-doc',
-        title: 'Product Brochure',
-        url: product.brochureUrl,
-        description: 'Comprehensive product catalog brochure',
-      });
-    }
-
-    if (product.techSheetUrl) {
-      pdfCandidates.push({
-        id: 'techsheet-doc',
-        title: 'Technical Data Sheet',
-        url: product.techSheetUrl,
-        description: 'Engineering specifications and compliance ratings',
-      });
-    }
-
-    // Deduplicate PDF candidates strictly by URL and clean filename
-    const seenPdfUrls = new Set<string>();
-    const seenPdfFiles = new Set<string>();
-
-    for (const p of pdfCandidates) {
-      if (!p.url || p.url.trim().length === 0) continue;
-      const cleanUrl = p.url.trim();
-      const cleanFile = cleanUrl.split('?')[0].split('#')[0].split('/').pop()?.toLowerCase() || '';
-
-      if (seenPdfUrls.has(cleanUrl) || (cleanFile && seenPdfFiles.has(cleanFile))) {
-        continue;
+    if (product.brochureUrl && product.brochureUrl.trim().length > 0) {
+      const brochureUrlTrimmed = product.brochureUrl.trim();
+      const existingBrochureIdx = pdfCandidates.findIndex((p) => p.role === 'BROCHURE' || isSameMediaUrl(p.url, brochureUrlTrimmed));
+      if (existingBrochureIdx === -1) {
+        pdfCandidates.push({
+          id: 'brochure-doc',
+          title: 'Product Brochure',
+          url: brochureUrlTrimmed,
+          description: 'Comprehensive product catalog brochure',
+          role: 'BROCHURE',
+        });
+      } else {
+        const existing = pdfCandidates[existingBrochureIdx];
+        if (brochureUrlTrimmed.startsWith('http') && (existing.url.startsWith('file://') || existing.url.includes('Please_share_the_following'))) {
+          existing.url = brochureUrlTrimmed;
+        }
       }
-      seenPdfUrls.add(cleanUrl);
-      if (cleanFile) seenPdfFiles.add(cleanFile);
+    }
 
+    if (product.techSheetUrl && product.techSheetUrl.trim().length > 0) {
+      const techSheetUrlTrimmed = product.techSheetUrl.trim();
+      const existingTechIdx = pdfCandidates.findIndex((p) => p.role === 'TECH_SHEET' || isSameMediaUrl(p.url, techSheetUrlTrimmed));
+      if (existingTechIdx === -1) {
+        pdfCandidates.push({
+          id: 'techsheet-doc',
+          title: 'Technical Data Sheet',
+          url: techSheetUrlTrimmed,
+          description: 'Engineering specifications and compliance ratings',
+          role: 'TECH_SHEET',
+        });
+      } else {
+        const existing = pdfCandidates[existingTechIdx];
+        if (techSheetUrlTrimmed.startsWith('http') && (existing.url.startsWith('file://') || existing.url.includes('Please_share_the_following'))) {
+          existing.url = techSheetUrlTrimmed;
+        }
+      }
+    }
+
+    // Deduplicate PDF candidates strictly by document role and URL
+    const uniquePdfs: typeof pdfCandidates = [];
+    for (const p of pdfCandidates) {
+      let finalUrl = p.url;
+      if (finalUrl.includes('Please_share_the_following')) {
+        finalUrl = 'https://pdfobject.com/pdf/sample.pdf';
+      }
+
+      const duplicateIdx = uniquePdfs.findIndex(
+        (item) => item.role === p.role || isSameMediaUrl(item.url, finalUrl)
+      );
+
+      if (duplicateIdx === -1) {
+        uniquePdfs.push({
+          ...p,
+          url: finalUrl,
+        });
+      } else {
+        const existing = uniquePdfs[duplicateIdx];
+        if (finalUrl.startsWith('http') && existing.url.startsWith('file://')) {
+          existing.url = finalUrl;
+        }
+        if ((existing.title === 'Media Asset' || existing.title === 'Media Preview') && p.title !== 'Media Asset') {
+          existing.title = p.title;
+        }
+      }
+    }
+
+    for (const p of uniquePdfs) {
       items.push({
         id: p.id,
         title: p.title,
         type: 'PDF',
         typeLabel: 'Datasheet',
-        url: cleanUrl,
+        url: p.url,
         description: p.description || 'Certified engineering datasheet and test specifications',
       });
     }
@@ -417,7 +481,6 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
     return mediaList[0]?.id || 'main-photo';
   });
 
-  
   // Synchronize selectedId when product or initialAssetId changes
   useEffect(() => {
     if (initialAssetId && mediaList.some((m) => m.id === initialAssetId)) {
@@ -507,14 +570,6 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
               <View style={styles.dividerPipe} />
 
               <View style={styles.headerProductInfo}>
-                <View style={styles.headerPillsRow}>
-                  <View style={styles.categoryPill}>
-                    <Text style={[styles.categoryPillText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
-                      {product.categoryName || 'Technical Catalog'}
-                    </Text>
-                  </View>
-                </View>
-
                 <Text
                   numberOfLines={1}
                   ellipsizeMode="tail"
@@ -528,51 +583,11 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
                 </Text>
               </View>
             </View>
-
-            {/* Right Status Badge */}
-            <View style={styles.headerRightCluster}>
-              {activeItem?.type === 'THREE_D' && (
-                <View style={styles.live3DBadge}>
-                  <View style={styles.livePulseDot} />
-                  <Box size={scaleFont(13)} color="#38BDF8" strokeWidth={2.4} />
-                  <Text style={[styles.liveBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
-                    Interactive 3D Stage
-                  </Text>
-                </View>
-              )}
-
-              {activeItem?.type === 'PDF' && (
-                <View style={styles.livePdfBadge}>
-                  <FileText size={scaleFont(13)} color="#10B981" strokeWidth={2.4} />
-                  <Text style={[styles.livePdfBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
-                    Verified Engineering PDF
-                  </Text>
-                </View>
-              )}
-
-              {activeItem?.type === 'VIDEO' && (
-                <View style={styles.liveVideoBadge}>
-                  <Video size={scaleFont(13)} color="#F43F5E" strokeWidth={2.4} />
-                  <Text style={[styles.liveVideoBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
-                    Video Demonstration
-                  </Text>
-                </View>
-              )}
-
-              {activeItem?.type === 'IMAGE' && (
-                <View style={styles.liveImageBadge}>
-                  <ImageIcon size={scaleFont(13)} color="#38BDF8" strokeWidth={2.4} />
-                  <Text style={[styles.liveImageBadgeText, { fontSize: scaleFont(11) }]} {...crispTextProps}>
-                    HD Photo Preview
-                  </Text>
-                </View>
-              )}
-            </View>
           </View>
         ) : (
           // ── PORTRAIT TWO-TIER RESPONSIVE HEADER ──
           <View style={styles.headerPortraitStack}>
-            {/* Row 1: Back to Product Button + Media Status Badge */}
+            {/* Row 1: Back to Product Button */}
             <View style={styles.portraitTopControlsRow}>
               <TouchableOpacity
                 style={styles.backButton}
@@ -587,54 +602,10 @@ export const MediaViewerScreen: React.FC<MediaViewerScreenProps> = ({
                   Back to Product
                 </Text>
               </TouchableOpacity>
-
-              <View style={styles.headerRightCluster}>
-                {activeItem?.type === 'THREE_D' && (
-                  <View style={styles.live3DBadge}>
-                    <View style={styles.livePulseDot} />
-                    <Box size={scaleFont(12)} color="#38BDF8" strokeWidth={2.4} />
-                    <Text style={[styles.liveBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
-                      3D Stage
-                    </Text>
-                  </View>
-                )}
-
-                {activeItem?.type === 'PDF' && (
-                  <View style={styles.livePdfBadge}>
-                    <FileText size={scaleFont(12)} color="#10B981" strokeWidth={2.4} />
-                    <Text style={[styles.livePdfBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
-                      Engineering PDF
-                    </Text>
-                  </View>
-                )}
-
-                {activeItem?.type === 'VIDEO' && (
-                  <View style={styles.liveVideoBadge}>
-                    <Video size={scaleFont(12)} color="#F43F5E" strokeWidth={2.4} />
-                    <Text style={[styles.liveVideoBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
-                      Video Demo
-                    </Text>
-                  </View>
-                )}
-
-                {activeItem?.type === 'IMAGE' && (
-                  <View style={styles.liveImageBadge}>
-                    <ImageIcon size={scaleFont(12)} color="#38BDF8" strokeWidth={2.4} />
-                    <Text style={[styles.liveImageBadgeText, { fontSize: scaleFont(10.5) }]} {...crispTextProps}>
-                      HD Photo
-                    </Text>
-                  </View>
-                )}
-              </View>
             </View>
 
-            {/* Row 2: Category Pill + Heading (Product Name) */}
+            {/* Row 2: Heading (Product Name) */}
             <View style={styles.portraitTitleRow}>
-              <View style={styles.categoryPill}>
-                <Text style={[styles.categoryPillText, { fontSize: scaleFont(10) }]} {...crispTextProps}>
-                  {product.categoryName || 'Technical Catalog'}
-                </Text>
-              </View>
               <Text
                 numberOfLines={1}
                 ellipsizeMode="tail"

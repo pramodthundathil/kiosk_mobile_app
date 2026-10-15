@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useKioskResponsive } from '../hooks/useKioskResponsive';
 import { PortraitKioskLayout } from '../components/PortraitKioskLayout';
@@ -15,8 +15,6 @@ import {
 } from '../services/api';
 import { analyticsService } from '../services/analyticsService';
 import { syncService } from '../services/syncService';
-
-import { MOCK_CATEGORIES } from '../mock/kioskData';
 
 const DEFAULT_CATEGORY: KioskCategory = {
   id: 'all',
@@ -44,22 +42,68 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [products, setProducts] = useState<KioskProduct[]>([]);
-  const [categories, setCategories] = useState<KioskCategory[]>(
-    MOCK_CATEGORIES && MOCK_CATEGORIES.length > 0 ? MOCK_CATEGORIES : [DEFAULT_CATEGORY]
-  );
+  const [categories, setCategories] = useState<KioskCategory[]>([DEFAULT_CATEGORY]);
   const [selectedProduct, setSelectedProduct] = useState<KioskProduct | null>(null);
   const [selectedMediaAssetId, setSelectedMediaAssetId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const FIVE_MINUTES_MS = 5 * 60 * 1000; // 300,000 ms (5 minutes)
+  const fiveMinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Determine if user is currently on the main category list screen
+  const isMainCategoryScreen =
+    activePage === 'catalog' &&
+    selectedCategory === 'all' &&
+    selectedProduct === null &&
+    searchQuery.trim() === '' &&
+    activeTab === 'home';
+
+  // Handler to reset all navigation state back to main category list screen
+  const handleResetToMainCategoryScreen = useCallback(() => {
+    console.log('[HomeScreen] 5 minutes of inactivity detected while off main screen. Redirecting to main category list screen...');
+    setActivePage('catalog');
+    setSelectedCategory('all');
+    setSelectedProduct(null);
+    setSelectedMediaAssetId(null);
+    setSearchQuery('');
+    setActiveTab('home');
+  }, []);
+
+  // Reset 5-minute inactivity timer
+  const resetFiveMinTimer = useCallback(() => {
+    if (fiveMinTimerRef.current) {
+      clearTimeout(fiveMinTimerRef.current);
+      fiveMinTimerRef.current = null;
+    }
+
+    if (!isMainCategoryScreen) {
+      fiveMinTimerRef.current = setTimeout(() => {
+        handleResetToMainCategoryScreen();
+      }, FIVE_MINUTES_MS);
+    }
+  }, [isMainCategoryScreen, handleResetToMainCategoryScreen]);
 
   // Automatically dismiss modal/product and reset to catalog when screensaver activates
   useEffect(() => {
     if (isScreensaverActive) {
       setSelectedProduct(null);
+      setSelectedMediaAssetId(null);
       if (activePage !== 'catalog') {
         setActivePage('catalog');
       }
     }
   }, [isScreensaverActive, activePage]);
+
+  // Restart 5-minute inactivity timer whenever user navigates or state changes
+  useEffect(() => {
+    resetFiveMinTimer();
+    return () => {
+      if (fiveMinTimerRef.current) {
+        clearTimeout(fiveMinTimerRef.current);
+        fiveMinTimerRef.current = null;
+      }
+    };
+  }, [resetFiveMinTimer, activePage, selectedCategory, selectedProduct, searchQuery, activeTab, isScreensaverActive]);
 
   // Load content directly from Local Storage for instant, zero-latency kiosk performance
   const loadFromLocalStorage = useCallback(async () => {
@@ -69,11 +113,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
         getCachedCatalogCategories(),
       ]);
 
-      if (cachedProds && cachedProds.length > 0) {
+      if (cachedProds) {
         setProducts(cachedProds.filter((p) => !p.parentId));
       }
-      if (cachedCats && cachedCats.length > 0) {
-        setCategories([DEFAULT_CATEGORY, ...cachedCats]);
+      if (cachedCats) {
+        setCategories(cachedCats.length > 0 ? [DEFAULT_CATEGORY, ...cachedCats] : [DEFAULT_CATEGORY]);
       }
     } catch (e) {
       console.warn('[HomeScreen] Local storage load notice:', e);

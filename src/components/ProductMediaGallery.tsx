@@ -105,23 +105,45 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
     [mediaAssets]
   );
 
+function getCleanFilename(url?: string): string {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    const raw = url.split('?')[0].split('#')[0].split('/').pop() || '';
+    return decodeURIComponent(raw).toLowerCase().trim();
+  } catch (e) {
+    return url.toLowerCase().trim();
+  }
+}
+
+function isSameMediaUrl(url1?: string, url2?: string): boolean {
+  if (!url1 || !url2) return false;
+  const u1 = url1.trim();
+  const u2 = url2.trim();
+  if (u1 === u2) return true;
+  const f1 = getCleanFilename(u1);
+  const f2 = getCleanFilename(u2);
+  return f1.length > 0 && f1 === f2;
+}
+
   const photoAssets = useMemo(() => {
     const list: { id: string; url: string; title: string }[] = [];
     if (product.image) {
       list.push({ id: `main-${product.id}`, url: product.image, title: product.name || 'Product Photo' });
     }
-    // Include additional images explicitly defined in mediaAssets
+    // Include additional images explicitly defined in mediaAssets (strictly exclude duplicates of main photo)
     if (Array.isArray(mediaAssets)) {
       mediaAssets
-        .filter((a) => (a.asset_type === 'IMAGE' || (a.asset_type as string) === 'PHOTO') && a.file_url && a.file_url.trim().length > 0 && a.file_url !== product.image)
+        .filter((a) => (a.asset_type === 'IMAGE' || (a.asset_type as string) === 'PHOTO') && a.file_url && a.file_url.trim().length > 0)
         .forEach((a) => {
+          if (isSameMediaUrl(a.file_url, product.image)) return;
+          if (list.some((item) => isSameMediaUrl(item.url, a.file_url))) return;
           list.push({ id: a.id, url: a.file_url!.trim(), title: a.title || 'Product Photo' });
         });
     }
     // Also include variant images if available
     if (product.variants && product.variants.length > 0) {
       product.variants.forEach((v) => {
-        if (v.image && v.image.trim().length > 0 && !list.some((item) => item.url === v.image)) {
+        if (v.image && v.image.trim().length > 0 && !list.some((item) => isSameMediaUrl(item.url, v.image))) {
           list.push({ id: `var-${v.id}`, url: v.image.trim(), title: v.name });
         }
       });
@@ -140,7 +162,16 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
         a.file_url.trim().length > 0
     );
 
-    const candidates: ProductMediaAsset[] = [...rawDocs];
+    const candidates: ProductMediaAsset[] = [];
+
+    for (const a of rawDocs) {
+      const defaultTitle = a.asset_type === 'TECH_SHEET' ? 'Technical Data Sheet' : `${product.name} Brochure`;
+      const displayTitle = (a.title && a.title !== 'Media Asset' && a.title !== 'Media Preview') ? a.title : defaultTitle;
+      candidates.push({
+        ...a,
+        title: displayTitle,
+      });
+    }
 
     if (product.brochureUrl && product.brochureUrl.trim().length > 0) {
       candidates.push({
@@ -159,22 +190,40 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
       });
     }
 
-    // Deduplicate candidates by clean filename and exact URL
-    const seenUrls = new Set<string>();
-    const seenFiles = new Set<string>();
     const uniqueDocs: ProductMediaAsset[] = [];
 
     for (const d of candidates) {
       if (!d.file_url) continue;
-      const url = d.file_url.trim();
-      const cleanFile = url.split('?')[0].split('#')[0].split('/').pop()?.toLowerCase() || '';
+      const cleanUrl = d.file_url.trim();
 
-      if (seenUrls.has(url) || (cleanFile && seenFiles.has(cleanFile))) {
-        continue;
+      const existingIdx = uniqueDocs.findIndex((item) => isSameMediaUrl(item.file_url, cleanUrl));
+
+      if (existingIdx === -1) {
+        let bestUrl = cleanUrl;
+        if (bestUrl.startsWith('file://')) {
+          if (product.brochureUrl && product.brochureUrl.startsWith('http') && isSameMediaUrl(bestUrl, product.brochureUrl)) {
+            bestUrl = product.brochureUrl.trim();
+          } else if (product.techSheetUrl && product.techSheetUrl.startsWith('http') && isSameMediaUrl(bestUrl, product.techSheetUrl)) {
+            bestUrl = product.techSheetUrl.trim();
+          }
+        }
+        uniqueDocs.push({
+          ...d,
+          file_url: bestUrl,
+        });
+      } else {
+        const existing = uniqueDocs[existingIdx];
+        const existingIsFile = existing.file_url?.startsWith('file://');
+        const currentIsHttp = cleanUrl.startsWith('http');
+        const existingIsGeneric = existing.title === 'Media Asset' || existing.title === 'Media Preview';
+
+        if (existingIsFile && currentIsHttp) {
+          existing.file_url = cleanUrl;
+        }
+        if (existingIsGeneric && d.title !== 'Media Asset' && d.title !== 'Media Preview') {
+          existing.title = d.title;
+        }
       }
-      seenUrls.add(url);
-      if (cleanFile) seenFiles.add(cleanFile);
-      uniqueDocs.push(d);
     }
 
     return uniqueDocs;
