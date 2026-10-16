@@ -134,7 +134,7 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               {/* Left Column: Branding Logo & Terminal Registration */}
               <View style={styles.landscapeLeftCol}>
                 <Image
-                  source={require('../../assets/excel_since_logo.png')}
+                  source={require('../../assets/sincepng (1).png')}
                   style={{ width: scaleSpacing(90), height: scaleSpacing(86), marginBottom: scaleSpacing(8) }}
                   resizeMode="contain"
                 />
@@ -317,7 +317,7 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
               {/* Header Branding with Transparent Official Logo */}
               <View style={styles.brandHeader}>
                 <Image
-                  source={require('../../assets/excel_since_logo.png')}
+                  source={require('../../assets/sincepng (1).png')}
                   style={{ width: scaleSpacing(80), height: scaleSpacing(76), marginBottom: scaleSpacing(6) }}
                   resizeMode="contain"
                 />

@@ -436,12 +436,12 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
         >
           <View style={styles.logoSection}>
             <Image
-              source={require('../../assets/excel_since_logo.png')}
+              source={require('../../assets/sincepng (1).png')}
               style={{ width: scaleSpacing(38), height: scaleSpacing(36), marginRight: scaleSpacing(10) }}
               resizeMode="contain"
             />
             <Image
-              source={require('../../assets/excel_logo_white.png')}
+              source={require('../../assets/NewLogo (1).png')}
               style={styles.logoImg}
               resizeMode="contain"
             />

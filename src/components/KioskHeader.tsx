@@ -57,7 +57,7 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
       <View style={styles.leftSection}>
         <View style={styles.logoContainer}>
           <Image
-            source={require('../../assets/excel_since_logo.png')}
+            source={require('../../assets/sincepng (1).png')}
             style={styles.crestLogoImage}
             resizeMode="contain"
           />

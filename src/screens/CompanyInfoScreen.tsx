@@ -62,11 +62,18 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
           resizeMode="cover"
         >
           <View style={styles.portraitHeaderTopRow}>
-            <Image
-              source={require('../../assets/excel_logo_white.png')}
-              style={styles.portraitLogoImg}
-              resizeMode="contain"
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(8) }}>
+              <Image
+                source={require('../../assets/sincepng (1).png')}
+                style={{ width: scaleSpacing(34), height: scaleSpacing(32) }}
+                resizeMode="contain"
+              />
+              <Image
+                source={require('../../assets/NewLogo (1).png')}
+                style={styles.portraitLogoImg}
+                resizeMode="contain"
+              />
+            </View>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setIsWhiteboardOpen(true)}
@@ -113,7 +120,7 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
         <View style={styles.bannerCard}>
           <View style={styles.bannerLogoRow}>
             <Image
-              source={require('../../assets/excel_since_logo.png')}
+              source={require('../../assets/sincepng (1).png')}
               style={{ width: scaleSpacing(72), height: scaleSpacing(68) }}
               resizeMode="contain"
             />

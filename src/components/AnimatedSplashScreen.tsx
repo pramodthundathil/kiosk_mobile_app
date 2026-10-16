@@ -21,7 +21,7 @@ interface AnimatedSplashScreenProps {
 }
 
 // Official brand assets
-const EXCEL_SINCE_LOGO = require('../../assets/excel_since_logo.png');
+const EXCEL_SINCE_LOGO = require('../../assets/sincepng (1).png');
 const EXCEL_CORPORATE_LOGO = require('../../assets/excel_corporate_logo.png');
 const EXCEL_DEDICATED_CAPTION = require('../../assets/excel_dedicated_caption_gold.png');
 
