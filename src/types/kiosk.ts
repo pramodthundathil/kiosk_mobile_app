@@ -54,6 +54,46 @@ export interface ProductMediaAsset {
   variantId?: string;
 }
 
+export interface MediaLibraryCategory {
+  id: string; // 'ALL' | 'IMAGE' | 'PDF_BROCHURE' | 'THREE_D' | 'TECH_SHEET' | 'VIDEO'
+  name: string;
+  icon?: string;
+  count: number;
+}
+
+export interface MediaLibraryAsset {
+  id: string;
+  title: string;
+  asset_type: 'IMAGE' | 'VIDEO' | 'PDF_BROCHURE' | 'TECH_SHEET' | 'THREE_D';
+  asset_type_display?: string;
+  file?: string;
+  file_url: string;
+  thumbnail_url?: string;
+  external_url?: string;
+  file_size_mb?: number;
+  description?: string;
+  product_id?: string;
+  product_name?: string;
+  product_sku?: string;
+  category_id?: string;
+  category_name?: string;
+  category_code?: string;
+  sub_category_name?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MediaLibraryResponse {
+  count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+  categories: MediaLibraryCategory[];
+  results: MediaLibraryAsset[];
+}
+
 export interface FeaturePointItem {
   point: string;
   sub_points?: string[];

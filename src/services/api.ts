@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { KioskProduct, KioskCategory, KioskScreensaver } from '../types/kiosk';
+import { KioskProduct, KioskCategory, KioskScreensaver, MediaLibraryAsset, MediaLibraryCategory, MediaLibraryResponse } from '../types/kiosk';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
 import {
   shouldIdentifyLocation,
@@ -34,6 +34,9 @@ export const KIOSK_CACHED_CATEGORIES_KEY = '@kiosk_cached_categories';
 export const KIOSK_LAST_SYNC_TIME_KEY = '@kiosk_last_sync_time';
 export const KIOSK_IS_AUTHENTICATED_KEY = '@kiosk_is_authenticated';
 export const KIOSK_SAVED_CREDENTIALS_KEY = '@kiosk_saved_credentials';
+export const KIOSK_CACHED_MEDIA_LIBRARY_ITEMS_KEY = '@kiosk_cached_media_library_items';
+export const KIOSK_CACHED_MEDIA_LIBRARY_CATEGORIES_KEY = '@kiosk_cached_media_library_categories';
+export const KIOSK_MEDIA_LIBRARY_LAST_SYNC_KEY = '@kiosk_media_library_last_sync';
 
 import { storageGetItem, storageSetItem, storageRemoveItem } from '../utils/storage';
 export { storageGetItem, storageSetItem, storageRemoveItem };
@@ -567,6 +570,186 @@ export async function getCachedCatalogCategories(): Promise<KioskCategory[]> {
     console.warn('[api] getCachedCatalogCategories parse notice:', e);
   }
   return [];
+}
+
+export async function getCachedMediaLibrary(): Promise<{
+  results: MediaLibraryAsset[];
+  categories: MediaLibraryCategory[];
+} | null> {
+  try {
+    const rawItems = await storageGetItem(KIOSK_CACHED_MEDIA_LIBRARY_ITEMS_KEY);
+    const rawCategories = await storageGetItem(KIOSK_CACHED_MEDIA_LIBRARY_CATEGORIES_KEY);
+
+    if (rawItems) {
+      const items: MediaLibraryAsset[] = JSON.parse(rawItems);
+      const categories: MediaLibraryCategory[] = rawCategories ? JSON.parse(rawCategories) : [];
+
+      const resolvedItems = items.map((item) => ({
+        ...item,
+        file_url: mediaCacheService.resolveCachedImageUri(item.file_url) || item.file_url,
+        thumbnail_url: item.thumbnail_url
+          ? mediaCacheService.resolveCachedImageUri(item.thumbnail_url) || item.thumbnail_url
+          : undefined,
+      }));
+
+      return {
+        results: resolvedItems,
+        categories,
+      };
+    }
+  } catch (e) {
+    console.warn('[api] getCachedMediaLibrary parse notice:', e);
+  }
+  return null;
+}
+
+export async function saveCachedMediaLibrary(
+  items: MediaLibraryAsset[],
+  categories?: MediaLibraryCategory[]
+): Promise<void> {
+  try {
+    if (items) {
+      await storageSetItem(KIOSK_CACHED_MEDIA_LIBRARY_ITEMS_KEY, JSON.stringify(items));
+      await storageSetItem(KIOSK_MEDIA_LIBRARY_LAST_SYNC_KEY, String(Date.now()));
+    }
+    if (categories && categories.length > 0) {
+      await storageSetItem(KIOSK_CACHED_MEDIA_LIBRARY_CATEGORIES_KEY, JSON.stringify(categories));
+    }
+  } catch (e) {
+    console.warn('[api] saveCachedMediaLibrary notice:', e);
+  }
+}
+
+export async function fetchMediaLibraryItems(params?: {
+  page?: number;
+  pageSize?: number;
+  assetType?: string;
+  categoryId?: string;
+  search?: string;
+  targetKioskId?: string;
+  targetDeviceId?: string;
+}): Promise<MediaLibraryResponse> {
+  const page = params?.page || 1;
+  const pageSize = params?.pageSize || 12;
+  const assetType = params?.assetType;
+  const categoryId = params?.categoryId;
+  const search = params?.search;
+
+  try {
+    const serverUrl = await getSavedServerUrl();
+    const token = await getStoredKioskToken();
+    const cleanUrl = serverUrl.replace(/\/+$/, '');
+
+    let kioskId = params?.targetKioskId;
+    let deviceId = params?.targetDeviceId;
+
+    if (!kioskId || !deviceId) {
+      const activeIdentity = await getActiveKioskIdentity();
+      if (!kioskId && activeIdentity.kiosk_id) kioskId = activeIdentity.kiosk_id;
+      if (!deviceId && activeIdentity.device_id) deviceId = activeIdentity.device_id;
+    }
+
+    const queryParts: string[] = [
+      `page=${page}`,
+      `page_size=${pageSize}`,
+    ];
+
+    if (assetType && assetType !== 'ALL') {
+      queryParts.push(`asset_type=${encodeURIComponent(assetType)}`);
+    }
+    if (categoryId && categoryId !== 'all') {
+      queryParts.push(`category_id=${encodeURIComponent(categoryId)}`);
+    }
+    if (search && search.trim()) {
+      queryParts.push(`search=${encodeURIComponent(search.trim())}`);
+    }
+    if (kioskId) queryParts.push(`kiosk_id=${encodeURIComponent(kioskId)}`);
+    if (deviceId) queryParts.push(`device_id=${encodeURIComponent(deviceId)}`);
+
+    const endpoint = `${cleanUrl}/api/media-library/?${queryParts.join('&')}`;
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+
+    let canSendToken = false;
+    if (token) {
+      const payload = parseJwtPayload(token);
+      if (payload && payload.exp) {
+        const isExpired = Date.now() >= payload.exp * 1000;
+        if (!isExpired) canSendToken = true;
+      } else {
+        canSendToken = true;
+      }
+    }
+    if (canSendToken && token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(endpoint, { headers, signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data: MediaLibraryResponse = await response.json();
+      const sanitizedResults = (data.results || []).map((item) => ({
+        ...item,
+        file_url: sanitizeMediaUrl(item.file_url),
+        thumbnail_url: item.thumbnail_url ? sanitizeMediaUrl(item.thumbnail_url) : undefined,
+      }));
+
+      return {
+        ...data,
+        results: sanitizedResults,
+      };
+    } else {
+      throw new Error(`Media library HTTP ${response.status}`);
+    }
+  } catch (error) {
+    console.warn('[api] fetchMediaLibraryItems network notice, checking cache:', error);
+    const cached = await getCachedMediaLibrary();
+    if (cached) {
+      let filtered = cached.results;
+      if (assetType && assetType !== 'ALL') {
+        filtered = filtered.filter((i) => i.asset_type === assetType);
+      }
+      if (categoryId && categoryId !== 'all') {
+        filtered = filtered.filter(
+          (i) => i.category_id === categoryId || i.category_code === categoryId
+        );
+      }
+      if (search && search.trim()) {
+        const s = search.trim().toLowerCase();
+        filtered = filtered.filter(
+          (i) =>
+            i.title.toLowerCase().includes(s) ||
+            (i.product_name && i.product_name.toLowerCase().includes(s)) ||
+            (i.product_sku && i.product_sku.toLowerCase().includes(s))
+        );
+      }
+
+      const totalItems = filtered.length;
+      const totalPages = Math.ceil(totalItems / pageSize) || 1;
+      const start = (page - 1) * pageSize;
+      const pageResults = filtered.slice(start, start + pageSize);
+
+      return {
+        count: totalItems,
+        page,
+        page_size: pageSize,
+        total_pages: totalPages,
+        has_next: page < totalPages,
+        has_previous: page > 1,
+        categories: cached.categories.length > 0 ? cached.categories : [
+          { id: 'ALL', name: 'All Media', count: totalItems },
+        ],
+        results: pageResults,
+      };
+    }
+    throw error;
+  }
 }
 
 export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceId?: string): Promise<KioskProduct[]> {

@@ -6,6 +6,7 @@ import { LandscapeKioskLayout } from '../components/LandscapeKioskLayout';
 import { ProductDetailScreen } from './ProductDetailScreen';
 import { CompanyInfoScreen } from './CompanyInfoScreen';
 import { MediaViewerScreen } from './MediaViewerScreen';
+import { MediaLibraryScreen } from './MediaLibraryScreen';
 import { KioskProduct, KioskCategory } from '../types/kiosk';
 import {
   fetchCatalogProducts,
@@ -24,7 +25,7 @@ const DEFAULT_CATEGORY: KioskCategory = {
   color: '#0D60AE',
 };
 
-type KioskActivePage = 'catalog' | 'product-detail' | 'company-info' | 'media-viewer';
+type KioskActivePage = 'catalog' | 'product-detail' | 'company-info' | 'media-viewer' | 'media-library';
 type KioskActiveTab = 'home' | 'products' | 'about';
 
 interface HomeScreenProps {
@@ -196,6 +197,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
     }
   };
 
+  const handleOpenLibrary = () => {
+    analyticsService.onUserActivity();
+    setActivePage('media-library');
+  };
+
+  // Dedicated Full-Page View: Media Library (Pictures, Brochures, 3D Assets, Videos)
+  if (activePage === 'media-library') {
+    return (
+      <MediaLibraryScreen
+        metrics={responsiveMetrics}
+        onBack={handleBackToCatalog}
+        onOpenProductDetail={(productId) => {
+          const prod = products.find((p) => p.id === productId);
+          if (prod) {
+            handleOpenProductDetail(prod);
+          }
+        }}
+      />
+    );
+  }
+
   // Dedicated Full-Page View: Fullscreen Interactive Media & 3D Viewer
   if (activePage === 'media-viewer' && selectedProduct) {
     return (
@@ -248,6 +270,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
           onSelectProduct={handleSelectProduct}
           onOpenFullDetail={handleOpenProductDetail}
           onOpenMediaViewer={handleOpenMediaViewer}
+          onOpenLibrary={handleOpenLibrary}
         />
       ) : (
         <PortraitKioskLayout
@@ -264,6 +287,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
           onSelectTab={handleSelectTab}
           onLogout={onLogout}
           onOpenMediaViewer={handleOpenMediaViewer}
+          onOpenLibrary={handleOpenLibrary}
         />
       )}
     </View>

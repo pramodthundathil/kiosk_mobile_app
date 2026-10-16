@@ -156,6 +156,7 @@ interface LandscapeKioskLayoutProps {
   onSelectProduct: (product: KioskProduct | null) => void;
   onOpenFullDetail: (product: KioskProduct) => void;
   onOpenMediaViewer?: (product: KioskProduct, initialAssetId?: string) => void;
+  onOpenLibrary?: () => void;
 }
 
 export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
@@ -171,6 +172,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
   onSelectProduct,
   onOpenFullDetail,
   onOpenMediaViewer,
+  onOpenLibrary,
 }) => {
   const { scaleFont, scaleSpacing, is4K, crispTextProps, width: screenWidth, height: screenHeight } = metrics;
   const { resetTimer } = useInactivityTimer();
@@ -486,6 +488,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
               <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
               <Text style={[styles.whiteboardBtnText, { fontSize: scaleFont(13) }]} {...crispTextProps}>Whiteboard</Text>
             </AnimatedButton>
+
           </View>
         </ImageBackground>
 
@@ -525,24 +528,40 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
                   <Text style={[styles.sectionTitle, { fontSize: scaleFont(is4K ? 17 : 14.5) }]} {...crispTextProps}>Product Categories</Text>
                 </View>
 
-                {products.length > 0 && (
-                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(10) }}>
+                  {products.length > 0 && (
+                    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          setActiveCategory('all');
+                          onSelectCategory('all');
+                        }}
+                        style={styles.viewAllAssignedBtn}
+                      >
+                        <Zap size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
+                        <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(is4K ? 13 : 11.5) }]} {...crispTextProps}>
+                          All Products
+                        </Text>
+                        <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
+                      </TouchableOpacity>
+                    </Animated.View>
+                  )}
+
+                  {onOpenLibrary && (
                     <TouchableOpacity
                       activeOpacity={0.85}
-                      onPress={() => {
-                        setActiveCategory('all');
-                        onSelectCategory('all');
-                      }}
-                      style={styles.viewAllAssignedBtn}
+                      onPress={onOpenLibrary}
+                      style={[styles.viewAllAssignedBtn, { backgroundColor: '#7C3AED' }]}
                     >
-                      <Zap size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
+                      <Layers size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                       <Text style={[styles.viewAllAssignedBtnText, { fontSize: scaleFont(is4K ? 13 : 11.5) }]} {...crispTextProps}>
-                        All Products
+                        Media Library
                       </Text>
                       <ChevronRight size={scaleFont(12)} color="#FFFFFF" strokeWidth={2.4} />
                     </TouchableOpacity>
-                  </Animated.View>
-                )}
+                  )}
+                </View>
               </View>
 
               <View style={[styles.categoryGrid, { gap: catGridGap, justifyContent: 'center', alignItems: 'center' }]}>
@@ -1355,6 +1374,26 @@ const styles = StyleSheet.create({
   },
   whiteboardBtnText: {
     color: kioskColors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  libraryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: kioskColors.accentBlue,
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: kioskRadii.md,
+    shadowColor: kioskColors.accentBlue,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  libraryBtnText: {
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
     includeFontPadding: false,
