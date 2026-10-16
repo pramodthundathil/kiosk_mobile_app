@@ -1,6 +1,6 @@
 import { Image } from 'react-native';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
-import { KioskProduct, KioskScreensaver, KioskCategory } from '../types/kiosk';
+import { KioskProduct, KioskScreensaver, KioskCategory, MediaLibraryAsset } from '../types/kiosk';
 import {
   storageGetItem,
   storageSetItem,
@@ -10,6 +10,8 @@ import {
   fetchCatalogProducts,
   fetchCatalogCategories,
   fetchScreensavers,
+  fetchMediaLibraryItems,
+  saveCachedMediaLibrary,
   sendKioskHeartbeat,
   KIOSK_CONTENT_VERSION_KEY,
   KIOSK_LAST_SYNC_TIME_KEY,
@@ -25,6 +27,7 @@ export interface SyncStats {
   productsCount: number;
   screensaversCount: number;
   categoriesCount: number;
+  mediaLibraryCount?: number;
   completedAt: string;
 }
 
@@ -266,12 +269,31 @@ class KioskSyncService {
       console.log(`[SyncService] Assigned products collected: ${assignedProducts.length} items.`);
 
       // 3. Fetch product categories & subcategories
-      console.log('[SyncService] 3/5 Fetching catalog categories...');
+      console.log('[SyncService] 3/6 Fetching catalog categories...');
       const categories = await fetchCatalogCategories();
       console.log(`[SyncService] Categories collected: ${categories.length} categories.`);
 
-      // 4. Download and cache ALL media assets (pictures, 3D assets, videos, PDFs) into persistent local disk storage
-      console.log('[SyncService] 4/5 Downloading pictures and 3D assets to local storage...');
+      // 4. Fetch media library items (pictures, brochures, 3d assets)
+      console.log('[SyncService] 4/6 Fetching media library assets...');
+      let mediaLibItems: MediaLibraryAsset[] = [];
+      let mediaLibCategories: any[] = [];
+      try {
+        const libResponse = await fetchMediaLibraryItems({
+          pageSize: 100,
+          targetKioskId: kioskId,
+          targetDeviceId: deviceId,
+        });
+        if (libResponse && Array.isArray(libResponse.results)) {
+          mediaLibItems = libResponse.results;
+          mediaLibCategories = libResponse.categories || [];
+          console.log(`[SyncService] Media library items collected: ${mediaLibItems.length} assets.`);
+        }
+      } catch (libErr) {
+        console.warn('[SyncService] Media library fetch notice:', libErr);
+      }
+
+      // 5. Download and cache ALL media assets (pictures, 3D assets, videos, PDFs) into persistent local disk storage
+      console.log('[SyncService] 5/6 Downloading pictures, 3D assets and brochures to local storage...');
       try {
         const mediaToCache: string[] = [];
 
@@ -309,7 +331,17 @@ class KioskSyncService {
           }
         });
 
-        // B. Categories and Sub-categories images
+        // B. Media Library Assets: files and thumbnails
+        mediaLibItems.forEach((item) => {
+          if (item.file_url && item.file_url.startsWith('http')) {
+            mediaToCache.push(item.file_url);
+          }
+          if (item.thumbnail_url && item.thumbnail_url.startsWith('http')) {
+            mediaToCache.push(item.thumbnail_url);
+          }
+        });
+
+        // C. Categories and Sub-categories images
         categories.forEach((c) => {
           if (c.image && c.image.startsWith('http')) {
             mediaToCache.push(c.image);
@@ -323,14 +355,14 @@ class KioskSyncService {
           }
         });
 
-        // C. Fallback category images
+        // D. Fallback category images
         Object.values(FALLBACK_CATEGORY_IMAGES).forEach((imgUrl) => {
           if (imgUrl && imgUrl.startsWith('http')) {
             mediaToCache.push(imgUrl);
           }
         });
 
-        // D. Screensaver images
+        // E. Screensaver images
         screensaversMap.forEach((ss) => {
           const img = ss.image_url || ss.image;
           if (img && img.startsWith('http')) {
@@ -352,8 +384,8 @@ class KioskSyncService {
         console.warn('[SyncService] Media caching notice:', mediaErr);
       }
 
-      // 5. Save structured catalog data into local storage with resolved local filesystem URIs
-      console.log('[SyncService] 5/5 Saving content with local URIs to Local Storage...');
+      // 6. Save structured catalog & media library data into local storage with resolved local filesystem URIs
+      console.log('[SyncService] 6/6 Saving content with local URIs to Local Storage...');
       const resolvedProducts: KioskProduct[] = assignedProducts.map((p) => ({
         ...p,
         image: mediaCacheService.resolveCachedImageUri(p.image),
@@ -378,6 +410,17 @@ class KioskSyncService {
       }));
       await storageSetItem(KIOSK_CACHED_CATEGORIES_KEY, JSON.stringify(resolvedCategories));
 
+      if (mediaLibItems.length > 0) {
+        const resolvedMediaLibrary: MediaLibraryAsset[] = mediaLibItems.map((item) => ({
+          ...item,
+          file_url: mediaCacheService.resolveCachedImageUri(item.file_url) || item.file_url,
+          thumbnail_url: item.thumbnail_url
+            ? mediaCacheService.resolveCachedImageUri(item.thumbnail_url) || item.thumbnail_url
+            : undefined,
+        }));
+        await saveCachedMediaLibrary(resolvedMediaLibrary, mediaLibCategories);
+      }
+
       // 6. Update local content version and last sync timestamp
       await this.setCurrentContentVersion(version);
       const completedAt = new Date().toISOString();
@@ -389,6 +432,7 @@ class KioskSyncService {
         productsCount: assignedProducts.length,
         screensaversCount: totalScreensavers,
         categoriesCount: categories.length,
+        mediaLibraryCount: mediaLibItems.length,
         completedAt,
       };
 

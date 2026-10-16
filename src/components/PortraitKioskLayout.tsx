@@ -121,6 +121,7 @@ interface PortraitKioskLayoutProps {
   onSelectTab?: (tab: 'home' | 'products' | 'about') => void;
   onLogout?: () => void;
   onOpenMediaViewer?: (product: KioskProduct, initialAssetId?: string) => void;
+  onOpenLibrary?: () => void;
 }
 
 export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
@@ -135,6 +136,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
   onSelectProduct,
   onLogout,
   onOpenMediaViewer,
+  onOpenLibrary,
 }) => {
   const { resetTimer } = useInactivityTimer();
   const { scaleFont, scaleSpacing, width: screenWidth, height: screenHeight, crispTextProps } = metrics;
@@ -388,38 +390,56 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
         resizeMode="cover"
       >
         <View style={styles.headerTopRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(8) }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(6), flexShrink: 1 }}>
             <Image
               source={require('../../assets/excel_since_logo.png')}
-              style={{ width: scaleSpacing(34), height: scaleSpacing(32) }}
+              style={{
+                width: scaleSpacing(screenWidth < 500 ? 26 : 34),
+                height: scaleSpacing(screenWidth < 500 ? 24 : 32),
+              }}
               resizeMode="contain"
             />
             <Image
               source={require('../../assets/excel_logo_white.png')}
-              style={styles.officialWhiteLogoImg}
+              style={{
+                width: scaleSpacing(screenWidth < 500 ? 115 : 175),
+                height: scaleSpacing(screenWidth < 500 ? 32 : 48),
+              }}
               resizeMode="contain"
             />
           </View>
 
-          <View style={styles.headerActionsRow}>
+          <View style={[styles.headerActionsRow, { gap: scaleSpacing(screenWidth < 500 ? 6 : 10) }]}>
             {/* Standardized Search Button */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setIsSearchOpen((prev) => !prev)}
-              style={styles.headerPillBtn}
+              style={[
+                styles.headerPillBtn,
+                {
+                  paddingHorizontal: scaleSpacing(screenWidth < 500 ? 9 : 14),
+                  height: scaleSpacing(screenWidth < 500 ? 34 : 38),
+                },
+              ]}
             >
-              <Search size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={[styles.headerPillBtnText, { fontSize: scaleFont(12) }]}>Search</Text>
+              <Search size={scaleFont(screenWidth < 500 ? 13 : 14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+              <Text style={[styles.headerPillBtnText, { fontSize: scaleFont(screenWidth < 500 ? 11.5 : 12) }]}>Search</Text>
             </TouchableOpacity>
 
             {/* Standardized Whiteboard Button */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setIsWhiteboardOpen(true)}
-              style={styles.headerPillBtn}
+              style={[
+                styles.headerPillBtn,
+                {
+                  paddingHorizontal: scaleSpacing(screenWidth < 500 ? 9 : 14),
+                  height: scaleSpacing(screenWidth < 500 ? 34 : 38),
+                },
+              ]}
             >
-              <Edit3 size={scaleFont(14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
-              <Text style={[styles.headerPillBtnText, { fontSize: scaleFont(12) }]}>Whiteboard</Text>
+              <Edit3 size={scaleFont(screenWidth < 500 ? 13 : 14)} color={kioskColors.accentBlue} strokeWidth={kioskIcons.strokeWidth} />
+              <Text style={[styles.headerPillBtnText, { fontSize: scaleFont(screenWidth < 500 ? 11.5 : 12) }]}>Whiteboard</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -471,7 +491,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
             onContentSizeChange={(_w, h) => setCatContentHeight(h)}
           >
             {products.length > 0 && (
-              <View style={styles.portraitTopActionRow}>
+              <View style={[styles.portraitTopActionRow, { flexDirection: 'row', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }]}>
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                   <TouchableOpacity
                     activeOpacity={0.85}
@@ -488,6 +508,20 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
                     <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
                   </TouchableOpacity>
                 </Animated.View>
+
+                {onOpenLibrary && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={onOpenLibrary}
+                    style={[styles.portraitAllProductsBtn, { backgroundColor: '#7C3AED' }]}
+                  >
+                    <Layers size={13} color="#FFFFFF" strokeWidth={2.4} />
+                    <Text style={styles.portraitAllProductsBtnText}>
+                      Media Library
+                    </Text>
+                    <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
