@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { KioskProduct, KioskCategory, KioskScreensaver, MediaLibraryAsset, MediaLibraryCategory, MediaLibraryResponse } from '../types/kiosk';
+import { MOCK_PRODUCTS } from '../mock/kioskData';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
 import {
   shouldIdentifyLocation,
@@ -620,6 +621,186 @@ export async function saveCachedMediaLibrary(
   }
 }
 
+/**
+ * Extracts all valid visual media assets (product images, variant images, gallery media, brochures)
+ * from KioskProduct objects while strictly excluding 3D model assets.
+ */
+export function extractMediaAssetsFromProducts(products: KioskProduct[]): MediaLibraryAsset[] {
+  const assets: MediaLibraryAsset[] = [];
+  const seenUrls = new Set<string>();
+
+  if (!Array.isArray(products)) return assets;
+
+  for (const product of products) {
+    if (!product) continue;
+
+    const prodCategory = product.categoryId || product.category || 'general';
+    const prodCategoryName = product.categoryName || product.category || 'General';
+
+    // 1. Primary Product Image
+    if (product.image && typeof product.image === 'string' && product.image.trim()) {
+      const cleanUrl = product.image.trim();
+      const lower = cleanUrl.toLowerCase();
+      const is3D = lower.endsWith('.glb') || lower.endsWith('.gltf');
+      if (!is3D && !seenUrls.has(cleanUrl)) {
+        seenUrls.add(cleanUrl);
+        assets.push({
+          id: `prod-img-${product.id}`,
+          title: product.name,
+          asset_type: 'IMAGE',
+          asset_type_display: 'Image',
+          file_url: cleanUrl,
+          thumbnail_url: cleanUrl,
+          product_id: product.id,
+          product_name: product.name,
+          product_sku: product.sku,
+          category_id: prodCategory,
+          category_name: prodCategoryName,
+          category_code: product.categoryCode,
+          sub_category_name: product.subCategoryName || product.subCategory,
+          description: product.description,
+        });
+      }
+    }
+
+    // 2. Product Gallery Media Assets
+    if (Array.isArray(product.mediaAssets)) {
+      for (let i = 0; i < product.mediaAssets.length; i++) {
+        const m = product.mediaAssets[i];
+        if (!m || !m.file_url || typeof m.file_url !== 'string') continue;
+        const cleanUrl = m.file_url.trim();
+        const lower = cleanUrl.toLowerCase();
+        const is3D = m.asset_type === 'THREE_D' || lower.endsWith('.glb') || lower.endsWith('.gltf');
+        if (is3D || seenUrls.has(cleanUrl)) continue;
+
+        seenUrls.add(cleanUrl);
+        const isPdf = m.asset_type === 'PDF_BROCHURE' || m.asset_type === 'TECH_SHEET' || lower.endsWith('.pdf');
+        assets.push({
+          id: m.id || `prod-media-${product.id}-${i}`,
+          title: m.title || product.name,
+          asset_type: isPdf ? 'PDF_BROCHURE' : 'IMAGE',
+          asset_type_display: isPdf ? 'Brochure' : 'Image',
+          file_url: cleanUrl,
+          thumbnail_url: isPdf ? undefined : cleanUrl,
+          product_id: product.id,
+          product_name: product.name,
+          product_sku: product.sku,
+          category_id: prodCategory,
+          category_name: prodCategoryName,
+          category_code: product.categoryCode,
+          description: m.description || product.description,
+        });
+      }
+    }
+
+    // 3. Product Brochure & Tech Sheet URLs
+    if (product.brochureUrl && typeof product.brochureUrl === 'string' && product.brochureUrl.trim()) {
+      const cleanUrl = product.brochureUrl.trim();
+      if (!seenUrls.has(cleanUrl)) {
+        seenUrls.add(cleanUrl);
+        assets.push({
+          id: `prod-brochure-${product.id}`,
+          title: `${product.name} - Brochure`,
+          asset_type: 'PDF_BROCHURE',
+          asset_type_display: 'Brochure',
+          file_url: cleanUrl,
+          product_id: product.id,
+          product_name: product.name,
+          product_sku: product.sku,
+          category_id: prodCategory,
+          category_name: prodCategoryName,
+          category_code: product.categoryCode,
+          description: product.description,
+        });
+      }
+    }
+
+    if (product.techSheetUrl && typeof product.techSheetUrl === 'string' && product.techSheetUrl.trim()) {
+      const cleanUrl = product.techSheetUrl.trim();
+      if (!seenUrls.has(cleanUrl)) {
+        seenUrls.add(cleanUrl);
+        assets.push({
+          id: `prod-techsheet-${product.id}`,
+          title: `${product.name} - Technical Data Sheet`,
+          asset_type: 'PDF_BROCHURE',
+          asset_type_display: 'Technical Sheet',
+          file_url: cleanUrl,
+          product_id: product.id,
+          product_name: product.name,
+          product_sku: product.sku,
+          category_id: prodCategory,
+          category_name: prodCategoryName,
+          category_code: product.categoryCode,
+          description: product.description,
+        });
+      }
+    }
+
+    // 4. Product Variants
+    if (Array.isArray(product.variants)) {
+      for (let vIdx = 0; vIdx < product.variants.length; vIdx++) {
+        const variant = product.variants[vIdx];
+        if (!variant) continue;
+
+        if (variant.image && typeof variant.image === 'string' && variant.image.trim()) {
+          const cleanUrl = variant.image.trim();
+          const lower = cleanUrl.toLowerCase();
+          const is3D = lower.endsWith('.glb') || lower.endsWith('.gltf');
+          if (!is3D && !seenUrls.has(cleanUrl)) {
+            seenUrls.add(cleanUrl);
+            assets.push({
+              id: `variant-img-${variant.id || `${product.id}-${vIdx}`}`,
+              title: `${product.name} - ${variant.name}`,
+              asset_type: 'IMAGE',
+              asset_type_display: 'Image',
+              file_url: cleanUrl,
+              thumbnail_url: cleanUrl,
+              product_id: product.id,
+              product_name: product.name,
+              product_sku: variant.sku || product.sku,
+              category_id: prodCategory,
+              category_name: prodCategoryName,
+              category_code: product.categoryCode,
+              description: variant.description || product.description,
+            });
+          }
+        }
+
+        if (Array.isArray(variant.mediaAssets)) {
+          for (let mIdx = 0; mIdx < variant.mediaAssets.length; mIdx++) {
+            const vm = variant.mediaAssets[mIdx];
+            if (!vm || !vm.file_url || typeof vm.file_url !== 'string') continue;
+            const cleanUrl = vm.file_url.trim();
+            const lower = cleanUrl.toLowerCase();
+            const is3D = vm.asset_type === 'THREE_D' || lower.endsWith('.glb') || lower.endsWith('.gltf');
+            if (is3D || seenUrls.has(cleanUrl)) continue;
+
+            seenUrls.add(cleanUrl);
+            const isPdf = vm.asset_type === 'PDF_BROCHURE' || vm.asset_type === 'TECH_SHEET' || lower.endsWith('.pdf');
+            assets.push({
+              id: vm.id || `variant-media-${variant.id || vIdx}-${mIdx}`,
+              title: vm.title || `${product.name} - ${variant.name}`,
+              asset_type: isPdf ? 'PDF_BROCHURE' : 'IMAGE',
+              asset_type_display: isPdf ? 'Brochure' : 'Image',
+              file_url: cleanUrl,
+              thumbnail_url: isPdf ? undefined : cleanUrl,
+              product_id: product.id,
+              product_name: product.name,
+              product_sku: variant.sku || product.sku,
+              category_id: prodCategory,
+              category_name: prodCategoryName,
+              category_code: product.categoryCode,
+              description: vm.description || variant.description || product.description,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return assets;
+}
+
 export async function fetchMediaLibraryItems(params?: {
   page?: number;
   pageSize?: number;
@@ -628,13 +809,30 @@ export async function fetchMediaLibraryItems(params?: {
   search?: string;
   targetKioskId?: string;
   targetDeviceId?: string;
+  allProducts?: KioskProduct[];
 }): Promise<MediaLibraryResponse> {
   const page = params?.page || 1;
-  const pageSize = params?.pageSize || 12;
+  const pageSize = params?.pageSize || 24;
   const assetType = params?.assetType;
   const categoryId = params?.categoryId;
   const search = params?.search;
 
+  // 1. Gather all product assets from passed products, cached products, or fallback mock
+  let products = params?.allProducts;
+  if (!products || products.length === 0) {
+    try {
+      products = await getCachedCatalogProducts();
+    } catch {
+      products = [];
+    }
+  }
+  if (!products || products.length === 0) {
+    products = MOCK_PRODUCTS;
+  }
+  const productAssets = extractMediaAssetsFromProducts(products);
+
+  // 2. Fetch backend items if available
+  let serverItems: MediaLibraryAsset[] = [];
   try {
     const serverUrl = await getSavedServerUrl();
     const token = await getStoredKioskToken();
@@ -649,28 +847,12 @@ export async function fetchMediaLibraryItems(params?: {
       if (!deviceId && activeIdentity.device_id) deviceId = activeIdentity.device_id;
     }
 
-    const queryParts: string[] = [
-      `page=${page}`,
-      `page_size=${pageSize}`,
-    ];
-
-    if (assetType && assetType !== 'ALL') {
-      queryParts.push(`asset_type=${encodeURIComponent(assetType)}`);
-    }
-    if (categoryId && categoryId !== 'all') {
-      queryParts.push(`category_id=${encodeURIComponent(categoryId)}`);
-    }
-    if (search && search.trim()) {
-      queryParts.push(`search=${encodeURIComponent(search.trim())}`);
-    }
+    const queryParts: string[] = ['page=1', 'page_size=100'];
     if (kioskId) queryParts.push(`kiosk_id=${encodeURIComponent(kioskId)}`);
     if (deviceId) queryParts.push(`device_id=${encodeURIComponent(deviceId)}`);
 
     const endpoint = `${cleanUrl}/api/media-library/?${queryParts.join('&')}`;
-
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-    };
+    const headers: Record<string, string> = { Accept: 'application/json' };
 
     let canSendToken = false;
     if (token) {
@@ -688,68 +870,105 @@ export async function fetchMediaLibraryItems(params?: {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
-
     const response = await fetch(endpoint, { headers, signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
       const data: MediaLibraryResponse = await response.json();
-      const sanitizedResults = (data.results || []).map((item) => ({
-        ...item,
-        file_url: sanitizeMediaUrl(item.file_url),
-        thumbnail_url: item.thumbnail_url ? sanitizeMediaUrl(item.thumbnail_url) : undefined,
-      }));
-
-      return {
-        ...data,
-        results: sanitizedResults,
-      };
-    } else {
-      throw new Error(`Media library HTTP ${response.status}`);
+      if (Array.isArray(data.results)) {
+        serverItems = data.results.map((item) => ({
+          ...item,
+          file_url: sanitizeMediaUrl(item.file_url),
+          thumbnail_url: item.thumbnail_url ? sanitizeMediaUrl(item.thumbnail_url) : undefined,
+        }));
+      }
     }
   } catch (error) {
-    console.warn('[api] fetchMediaLibraryItems network notice, checking cache:', error);
-    const cached = await getCachedMediaLibrary();
-    if (cached) {
-      let filtered = cached.results;
-      if (assetType && assetType !== 'ALL') {
-        filtered = filtered.filter((i) => i.asset_type === assetType);
-      }
-      if (categoryId && categoryId !== 'all') {
-        filtered = filtered.filter(
-          (i) => i.category_id === categoryId || i.category_code === categoryId
-        );
-      }
-      if (search && search.trim()) {
-        const s = search.trim().toLowerCase();
-        filtered = filtered.filter(
-          (i) =>
-            i.title.toLowerCase().includes(s) ||
-            (i.product_name && i.product_name.toLowerCase().includes(s)) ||
-            (i.product_sku && i.product_sku.toLowerCase().includes(s))
-        );
-      }
-
-      const totalItems = filtered.length;
-      const totalPages = Math.ceil(totalItems / pageSize) || 1;
-      const start = (page - 1) * pageSize;
-      const pageResults = filtered.slice(start, start + pageSize);
-
-      return {
-        count: totalItems,
-        page,
-        page_size: pageSize,
-        total_pages: totalPages,
-        has_next: page < totalPages,
-        has_previous: page > 1,
-        categories: cached.categories.length > 0 ? cached.categories : [
-          { id: 'ALL', name: 'All Media', count: totalItems },
-        ],
-        results: pageResults,
-      };
-    }
-    throw error;
+    console.warn('[api] fetchMediaLibraryItems network notice, using local assets:', error);
   }
+
+  // 3. Combine server items and product assets, strictly excluding 3D assets
+  const combinedPool: MediaLibraryAsset[] = [];
+  const seenUrls = new Set<string>();
+
+  // Add backend items first
+  for (const item of serverItems) {
+    if (!item || !item.file_url) continue;
+    const lower = item.file_url.toLowerCase();
+    if (item.asset_type === 'THREE_D' || lower.endsWith('.glb') || lower.endsWith('.gltf')) continue;
+    if (seenUrls.has(item.file_url)) continue;
+    seenUrls.add(item.file_url);
+    combinedPool.push(item);
+  }
+
+  // Add all product assets
+  for (const item of productAssets) {
+    if (!item || !item.file_url) continue;
+    const lower = item.file_url.toLowerCase();
+    if (item.asset_type === 'THREE_D' || lower.endsWith('.glb') || lower.endsWith('.gltf')) continue;
+    if (seenUrls.has(item.file_url)) continue;
+    seenUrls.add(item.file_url);
+    combinedPool.push(item);
+  }
+
+  // Calculate accurate category counts
+  const totalImageCount = combinedPool.filter((i) => i.asset_type === 'IMAGE').length;
+  const totalBrochureCount = combinedPool.filter(
+    (i) => i.asset_type === 'PDF_BROCHURE' || i.asset_type === 'TECH_SHEET'
+  ).length;
+
+  const categories: MediaLibraryCategory[] = [
+    { id: 'IMAGE', name: 'Images', icon: 'image', count: totalImageCount },
+    { id: 'PDF_BROCHURE', name: 'Brochures', icon: 'file-text', count: totalBrochureCount },
+  ];
+
+  // Save the full pool in persistent local cache
+  await saveCachedMediaLibrary(combinedPool, categories).catch(() => {});
+
+  // 4. Apply filters (assetType, categoryId, search)
+  let filtered = combinedPool;
+  if (assetType && assetType !== 'ALL') {
+    if (assetType === 'PDF_BROCHURE') {
+      filtered = filtered.filter(
+        (i) => i.asset_type === 'PDF_BROCHURE' || i.asset_type === 'TECH_SHEET'
+      );
+    } else {
+      filtered = filtered.filter((i) => i.asset_type === assetType);
+    }
+  }
+
+  if (categoryId && categoryId !== 'all') {
+    filtered = filtered.filter(
+      (i) => i.category_id === categoryId || i.category_code === categoryId
+    );
+  }
+
+  if (search && search.trim()) {
+    const s = search.trim().toLowerCase();
+    filtered = filtered.filter(
+      (i) =>
+        i.title.toLowerCase().includes(s) ||
+        (i.product_name && i.product_name.toLowerCase().includes(s)) ||
+        (i.product_sku && i.product_sku.toLowerCase().includes(s))
+    );
+  }
+
+  // 5. Paginate
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const start = (page - 1) * pageSize;
+  const pageResults = filtered.slice(start, start + pageSize);
+
+  return {
+    count: totalItems,
+    page,
+    page_size: pageSize,
+    total_pages: totalPages,
+    has_next: page < totalPages,
+    has_previous: page > 1,
+    categories,
+    results: pageResults,
+  };
 }
 
 export async function fetchCatalogProducts(targetKioskId?: string, targetDeviceId?: string): Promise<KioskProduct[]> {

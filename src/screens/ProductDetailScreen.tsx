@@ -42,6 +42,7 @@ import { KioskBackButton } from '../components/KioskBackButton';
 import { WhiteboardModal } from '../components/WhiteboardModal';
 import { ProductMediaGallery } from '../components/ProductMediaGallery';
 import { KioskScrollContainer } from '../components/KioskScrollContainer';
+import { ExcelLogoSvg, SinceLogoSvg } from '../components/SvgLogos';
 import { analyticsService } from '../services/analyticsService';
 import { useAppVersion } from '../hooks/useAppVersion';
 
@@ -68,8 +69,8 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // ScrollView refs for smooth horizontal scroll affordances
-  const variantsScrollRef = useRef<ScrollView>(null);
+  // Main vertical scroll ref for scrolling to top when selecting variants
+  const mainScrollRef = useRef<ScrollView>(null);
   const tabsScrollRef = useRef<ScrollView>(null);
 
   // Live Clock state for landscape footer
@@ -171,6 +172,15 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     return hasParent ? combined : [parentAsVariant, ...combined];
   }, [product, allProducts]);
 
+  // Pair variants into rows of 2 for grid layout
+  const variantPairs = useMemo<KioskProductVariant[][]>(() => {
+    const pairs: KioskProductVariant[][] = [];
+    for (let i = 0; i < allVariants.length; i += 2) {
+      pairs.push(allVariants.slice(i, i + 2));
+    }
+    return pairs;
+  }, [allVariants]);
+
   // Selected variant id - defaults to the parent product (product.id)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(product.id);
 
@@ -245,6 +255,11 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       variant_id: variant.id,
       variant_name: variant.name,
     });
+    // Immediately scroll page to top so user views selected variant's media, specs, and details
+    mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    setTimeout(() => {
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }, 50);
   };
 
   const handleSelectTab = (tab: DetailTabKey) => {
@@ -531,23 +546,22 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       {/* ── HEADER INHERITED FROM OTHER PAGES ── */}
       {isLandscape ? (
         <>
-          {/* LANDSCAPE TOP HEADER */}
-          <ImageBackground
-            source={require('../../assets/portrait_earth_header.png')}
+          {/* LANDSCAPE TOP HEADER WITH GRADIENT BLUE BACKGROUND */}
+          <LinearGradient
+            colors={['#0A4482', '#0D60AE', '#217FD9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0.8 }}
             style={styles.landscapeTopHeader}
-            imageStyle={styles.topHeaderBgImage}
-            resizeMode="cover"
           >
             <View style={styles.logoSection}>
-              <Image
-                source={require('../../assets/sincepng (1).png')}
-                style={{ width: scaleSpacing(38), height: scaleSpacing(36), marginRight: scaleSpacing(10) }}
-                resizeMode="contain"
+              <SinceLogoSvg
+                width={scaleSpacing(38)}
+                height={scaleSpacing(36)}
+                style={{ marginRight: scaleSpacing(10) }}
               />
-              <Image
-                source={require('../../assets/NewLogo (1).png')}
-                style={styles.logoImg}
-                resizeMode="contain"
+              <ExcelLogoSvg
+                width={scaleSpacing(142)}
+                height={scaleSpacing(38)}
               />
             </View>
 
@@ -589,7 +603,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
-          </ImageBackground>
+          </LinearGradient>
 
           {/* LANDSCAPE SUB-HEADER */}
           <View style={styles.productSubHeader}>
@@ -602,24 +616,22 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         </>
       ) : (
         <>
-          {/* PORTRAIT EXPANDED TOP HEADER */}
-          <ImageBackground
-            source={require('../../assets/portrait_earth_header.png')}
+          {/* PORTRAIT EXPANDED TOP HEADER WITH GRADIENT BLUE BACKGROUND */}
+          <LinearGradient
+            colors={['#0A4482', '#0D60AE', '#217FD9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0.85 }}
             style={[styles.portraitExpandedHeaderBg, { minHeight: scaleSpacing(110) }]}
-            imageStyle={styles.portraitExpandedHeaderBgImage}
-            resizeMode="cover"
           >
             <View style={styles.portraitHeaderTopRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(8) }}>
-                <Image
-                  source={require('../../assets/sincepng (1).png')}
-                  style={{ width: scaleSpacing(34), height: scaleSpacing(32) }}
-                  resizeMode="contain"
+                <SinceLogoSvg
+                  width={scaleSpacing(34)}
+                  height={scaleSpacing(32)}
                 />
-                <Image
-                  source={require('../../assets/NewLogo (1).png')}
-                  style={styles.portraitOfficialWhiteLogoImg}
-                  resizeMode="contain"
+                <ExcelLogoSvg
+                  width={scaleSpacing(130)}
+                  height={scaleSpacing(36)}
                 />
               </View>
 
@@ -645,7 +657,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 </TouchableOpacity>
               </View>
             </View>
-          </ImageBackground>
+          </LinearGradient>
 
           {/* Expandable Search Input in Portrait */}
           {isSearchOpen && (
@@ -680,29 +692,57 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         </>
       )}
 
-      {/* ── FULL PAGE CONTENT SCROLLVIEW ── */}
-      <KioskScrollContainer
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scrollBody,
-          { padding: scaleSpacing(18), paddingBottom: scaleSpacing(44) },
+      {/* ── MAIN CONTENT AREA ── */}
+      <View
+        style={[
+          isLandscape
+            ? [styles.landscapeBodyContainer, { padding: scaleSpacing(18), paddingBottom: 0 }]
+            : { flex: 1 },
         ]}
       >
-        <View style={[styles.contentLayoutRow, { flexDirection: isLandscape ? 'row' : 'column' }]}>
-          {/* Left Panel: Media Gallery */}
-          <View style={[styles.leftPanel, { width: isLandscape ? 440 : '100%' }]}>
+        {isLandscape && (
+          /* Left Panel: Media Gallery stays stationary and FIXED on horizontal layout */
+          <View style={styles.leftPanelFixed}>
             <ProductMediaGallery
               product={displayedProduct}
-              height={isLandscape ? 360 : 300}
-              isLandscape={isLandscape}
+              height={360}
+              isLandscape={true}
               scaleFont={scaleFont}
               scaleSpacing={scaleSpacing}
               onOpenMediaViewer={(asset) => handleLaunchMediaViewer(asset?.id)}
             />
           </View>
+        )}
 
-          {/* Right Panel: Overview, Variants Selector, Segmented Tabs, and Content */}
-          <View style={styles.rightPanel}>
+        {/* Right Panel: Vertically slidable from top to bottom */}
+        <KioskScrollContainer
+          ref={mainScrollRef}
+          style={isLandscape ? styles.rightSlidableContainer : { flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollBody,
+            isLandscape
+              ? { paddingBottom: scaleSpacing(44) }
+              : { padding: scaleSpacing(18), paddingBottom: scaleSpacing(44) },
+          ]}
+        >
+          <View style={[styles.contentLayoutRow, { flexDirection: 'column' }]}>
+            {!isLandscape && (
+              /* In Portrait: Media Gallery scrolls at the top of the page */
+              <View style={[styles.leftPanel, { width: '100%' }]}>
+                <ProductMediaGallery
+                  product={displayedProduct}
+                  height={300}
+                  isLandscape={false}
+                  scaleFont={scaleFont}
+                  scaleSpacing={scaleSpacing}
+                  onOpenMediaViewer={(asset) => handleLaunchMediaViewer(asset?.id)}
+                />
+              </View>
+            )}
+
+            {/* Right Panel: Overview, Variants Selector, Segmented Tabs, and Content */}
+            <View style={styles.rightPanel}>
             {/* Product Overview Header */}
             <View style={styles.overviewCard}>
               <Text style={[styles.productTitleMain, { fontSize: scaleFont(22), lineHeight: Math.round(scaleFont(22) * 1.28) }]} {...crispTextProps}>
@@ -723,78 +763,90 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               </Text>
             </View>
 
-            {/* PRODUCT VARIANTS SELECTOR CARDS (MATCHING UPLOADED DESIGN) */}
+            {/* PRODUCT VARIANTS SELECTOR CARDS (2-IN-A-ROW BOX GRID) */}
             {allVariants.length > 0 && (
               <View style={styles.variantsCard}>
                 <View style={styles.variantsHeaderRow}>
                   <View style={styles.variantsHeaderLeft}>
                     <Layers size={scaleFont(15)} color={kioskColors.brandNavy} strokeWidth={2.2} />
-                    <Text style={[styles.variantsSectionTitle, { fontSize: scaleFont(13.5) }]}>
+                    <Text style={[styles.variantsSectionTitle, { fontSize: scaleFont(13.5) }]} {...crispTextProps}>
                       Available Variants
                     </Text>
                   </View>
                 </View>
 
-                <View style={styles.variantsScrollWrapper}>
-                  <ScrollView
-                    ref={variantsScrollRef}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.variantsScrollContent}
-                  >
-                    {allVariants.map((v) => {
-                      const isSelected = selectedVariantId === v.id || (isParentSelected && v.id === product.id);
-                      const isParent = (v.id === product.id);
-                      const variantImage = v.image || product.image;
-                      return (
-                        <TouchableOpacity
-                          key={v.id}
-                          activeOpacity={0.88}
-                          onPress={() => handleSelectVariant(v)}
-                          style={[
-                            styles.variantCard,
-                            isSelected ? styles.variantCardActive : styles.variantCardInactive,
-                          ]}
-                          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                        >
-                          <View style={styles.variantThumbWrapper}>
-                            {variantImage ? (
-                              <Image
-                                source={typeof variantImage === 'string' ? { uri: variantImage } : variantImage}
-                                style={styles.variantThumbImg}
-                                resizeMode="contain"
-                              />
-                            ) : (
-                              <Layers size={18} color={kioskColors.accentBlue} strokeWidth={1.8} />
+                <View style={styles.variantGridContainer}>
+                  {variantPairs.map((pair, rowIndex) => (
+                    <View key={`variant-row-${rowIndex}`} style={styles.variantRow}>
+                      {pair.map((v) => {
+                        const isSelected = selectedVariantId === v.id || (isParentSelected && v.id === product.id);
+                        const isParent = (v.id === product.id);
+                        const variantImage = v.image || product.image;
+                        return (
+                          <TouchableOpacity
+                            key={v.id}
+                            activeOpacity={0.82}
+                            onPress={() => handleSelectVariant(v)}
+                            style={[
+                              styles.variantBox,
+                              isSelected ? styles.variantBoxActive : styles.variantBoxInactive,
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Select variant ${v.name}`}
+                          >
+                            <View style={[styles.variantThumbWrapper, isSelected && styles.variantThumbWrapperActive]}>
+                              {variantImage ? (
+                                <Image
+                                  source={typeof variantImage === 'string' ? { uri: variantImage } : variantImage}
+                                  style={styles.variantThumbImg}
+                                  resizeMode="contain"
+                                />
+                              ) : (
+                                <Layers size={scaleFont(18)} color={kioskColors.accentBlue} strokeWidth={1.8} />
+                              )}
+                            </View>
+
+                            <View style={styles.variantInfoCol}>
+                              <Text
+                                numberOfLines={2}
+                                style={[
+                                  styles.variantNameText,
+                                  isSelected ? styles.variantNameTextActive : styles.variantNameTextInactive,
+                                  { fontSize: scaleFont(12.5), lineHeight: Math.round(scaleFont(12.5) * 1.32) },
+                                ]}
+                                {...crispTextProps}
+                              >
+                                {v.name}
+                              </Text>
+                              {isParent && (
+                                <View style={styles.baseBadge}>
+                                  <Text style={[styles.baseBadgeText, { fontSize: scaleFont(9.5) }]} {...crispTextProps}>
+                                    Base Model
+                                  </Text>
+                                </View>
+                              )}
+                              {v.sku ? (
+                                <Text
+                                  numberOfLines={1}
+                                  style={[styles.variantSkuText, { fontSize: scaleFont(10.5) }]}
+                                  {...crispTextProps}
+                                >
+                                  SKU: {v.sku}
+                                </Text>
+                              ) : null}
+                            </View>
+
+                            {isSelected && (
+                              <View style={styles.variantSelectedCheckBadge}>
+                                <Check size={scaleFont(10)} color="#FFFFFF" strokeWidth={3} />
+                              </View>
                             )}
-                          </View>
-                          <View style={styles.variantInfoCol}>
-                            <Text
-                              numberOfLines={1}
-                              style={[
-                                styles.variantNameText,
-                                isSelected ? styles.variantNameTextActive : styles.variantNameTextInactive,
-                                { fontSize: scaleFont(12) },
-                              ]}
-                            >
-                              {isParent ? `${v.name} (Base)` : v.name}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                  {allVariants.length > 2 && (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => variantsScrollRef.current?.scrollTo({ x: 260, animated: true })}
-                      style={styles.variantScrollArrowBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityLabel="Scroll variants right"
-                    >
-                      <ChevronRight size={scaleFont(16)} color="#0D60AE" strokeWidth={2.6} />
-                    </TouchableOpacity>
-                  )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {pair.length === 1 && <View style={styles.variantBoxSpacer} />}
+                    </View>
+                  ))}
                 </View>
               </View>
             )}
@@ -1091,6 +1143,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           </View>
         </View>
       </KioskScrollContainer>
+    </View>
 
       {/* ── FOOTER INHERITED FROM OTHER PAGES ── */}
       {isLandscape ? (
@@ -1153,7 +1206,6 @@ const styles = StyleSheet.create({
 
   // ── LANDSCAPE HEADER STYLES (MATCHING LandscapeKioskLayout) ──
   landscapeTopHeader: {
-    backgroundColor: '#020D22',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1161,9 +1213,11 @@ const styles = StyleSheet.create({
     height: 52,
     overflow: 'hidden',
     zIndex: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
   },
@@ -1250,7 +1304,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    backgroundColor: '#020D22',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
   },
   portraitExpandedHeaderBgImage: {
     width: '100%',
@@ -1353,6 +1408,22 @@ const styles = StyleSheet.create({
   },
 
   // ── CONTENT LAYOUT ──
+  landscapeBodyContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 20,
+    overflow: 'hidden',
+  },
+  leftPanelFixed: {
+    width: 440,
+    alignSelf: 'flex-start',
+  },
+  rightSlidableContainer: {
+    flex: 1,
+  },
+  rightSlidableContent: {
+    flexGrow: 1,
+  },
   scrollBody: {
     flexGrow: 1,
     paddingBottom: 40,
@@ -1402,7 +1473,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ── AVAILABLE VARIANTS CARDS (MATCHING UPLOADED DESIGN) ──
+  // ── AVAILABLE VARIANTS 2-IN-A-ROW BOX GRID ──
   variantsCard: {
     backgroundColor: '#FFFFFF',
     padding: 16,
@@ -1431,54 +1502,79 @@ const styles = StyleSheet.create({
     color: kioskColors.brandNavy,
     letterSpacing: -0.2,
   },
-  variantsScrollWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  variantsScrollContent: {
-    flexDirection: 'row',
-    gap: 10,
+  variantsCountBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
     paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  variantCard: {
+  variantsCountText: {
+    color: '#475569',
+    fontWeight: '700',
+  },
+  variantGridContainer: {
+    gap: 10,
+    marginTop: 2,
+  },
+  variantRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'stretch',
+  },
+  variantBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     paddingHorizontal: 12,
-    paddingVertical: 9,
-    minHeight: 48,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    minHeight: 56,
+    borderRadius: 10,
+    position: 'relative',
   },
-  variantCardActive: {
+  variantBoxActive: {
     borderWidth: 2,
     borderColor: '#0284C7',
     backgroundColor: '#F0F9FF',
     shadowColor: '#0284C7',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
     elevation: 3,
   },
-  variantCardInactive: {
-    borderWidth: 1,
+  variantBoxInactive: {
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  variantBoxSpacer: {
+    flex: 1,
   },
   variantThumbWrapper: {
-    width: 28,
-    height: 40,
+    width: 38,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     overflow: 'hidden',
+    marginRight: 10,
+  },
+  variantThumbWrapperActive: {
+    borderColor: '#BAE6FD',
+    backgroundColor: '#FFFFFF',
   },
   variantThumbImg: {
     width: '100%',
     height: '100%',
   },
   variantInfoCol: {
+    flex: 1,
     justifyContent: 'center',
+    paddingRight: 16,
   },
   variantNameText: {
     fontWeight: '700',
@@ -1487,23 +1583,37 @@ const styles = StyleSheet.create({
     color: '#0284C7',
   },
   variantNameTextInactive: {
-    color: '#334155',
+    color: '#1E293B',
   },
-  variantScrollArrowBtn: {
-    width: 34,
-    height: 48,
+  baseBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    marginTop: 3,
+  },
+  baseBadgeText: {
+    color: '#0369A1',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  variantSkuText: {
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  variantSelectedCheckBadge: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#0284C7',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    marginLeft: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
 
   // ── 5-TAB SEGMENTED CONTROLLER ──

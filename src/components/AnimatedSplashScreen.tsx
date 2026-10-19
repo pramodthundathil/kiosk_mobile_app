@@ -20,8 +20,9 @@ interface AnimatedSplashScreenProps {
   onFinish: () => void;
 }
 
+import { SinceLogoSvg } from './SvgLogos';
+
 // Official brand assets
-const EXCEL_SINCE_LOGO = require('../../assets/sincepng (1).png');
 const EXCEL_CORPORATE_LOGO = require('../../assets/excel_corporate_logo.png');
 const EXCEL_DEDICATED_CAPTION = require('../../assets/excel_dedicated_caption_gold.png');
 
@@ -346,10 +347,9 @@ export const AnimatedSplashScreen: React.FC<AnimatedSplashScreenProps> = ({ onFi
                 },
               ]}
             >
-              <Image
-                source={EXCEL_SINCE_LOGO}
-                style={styles.crestImage}
-                resizeMode="contain"
+              <SinceLogoSvg
+                width={crestSize}
+                height={crestSize}
               />
 
               {/* Electric Spark Glow on Lightning Bolt */}

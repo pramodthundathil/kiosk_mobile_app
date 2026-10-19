@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Monitor, Smartphone, Clock, RefreshCw, LogOut, ShieldCheck } from 'lucide-react-native';
 import { kioskColors, kioskShadows, minTouchTarget } from '../theme/kioskTheme';
 import { KioskResponsiveMetrics, KioskHardwareType } from '../types/kiosk';
+import { ExcelLogoSvg, SinceLogoSvg } from './SvgLogos';
 
 interface KioskHeaderProps {
   metrics: KioskResponsiveMetrics;
@@ -56,16 +57,8 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
       {/* Left Section: Company Official Logo & Tagline */}
       <View style={styles.leftSection}>
         <View style={styles.logoContainer}>
-          <Image
-            source={require('../../assets/sincepng (1).png')}
-            style={styles.crestLogoImage}
-            resizeMode="contain"
-          />
-          <Image
-            source={require('../../assets/excel logo_blue.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
+          <SinceLogoSvg width={38} height={38} />
+          <ExcelLogoSvg width={150} height={40} />
           {isLandscape && (
             <View style={styles.brandTextWrapper}>
               <Image

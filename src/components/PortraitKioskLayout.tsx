@@ -31,6 +31,7 @@ import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
 import { MediaModal } from './MediaModal';
 import { KioskScrollContainer } from './KioskScrollContainer';
+import { ExcelLogoSvg, SinceLogoSvg } from './SvgLogos';
 import { useInactivityTimer } from './InactivityTracker';
 import { useAppVersion } from '../hooks/useAppVersion';
 import {
@@ -382,30 +383,22 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
       {/* Interactive Digital Whiteboard Modal */}
       <WhiteboardModal visible={isWhiteboardOpen} onClose={() => setIsWhiteboardOpen(false)} />
 
-      {/* ── EXPANDED HEADER WITH EARTH BACKGROUND IMAGE ── */}
-      <ImageBackground
-        source={require('../../assets/portrait_earth_header.png')}
+      {/* ── EXPANDED HEADER WITH GRADIENT BLUE BACKGROUND ── */}
+      <LinearGradient
+        colors={['#0A4482', '#0D60AE', '#217FD9']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.85 }}
         style={[styles.expandedHeaderBg, { minHeight: scaleSpacing(110) }]}
-        imageStyle={styles.expandedHeaderBgImage}
-        resizeMode="cover"
       >
         <View style={styles.headerTopRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(6), flexShrink: 1 }}>
-            <Image
-              source={require('../../assets/sincepng (1).png')}
-              style={{
-                width: scaleSpacing(screenWidth < 500 ? 26 : 34),
-                height: scaleSpacing(screenWidth < 500 ? 24 : 32),
-              }}
-              resizeMode="contain"
+            <SinceLogoSvg
+              width={scaleSpacing(screenWidth < 500 ? 26 : 34)}
+              height={scaleSpacing(screenWidth < 500 ? 24 : 32)}
             />
-            <Image
-              source={require('../../assets/NewLogo (1).png')}
-              style={{
-                width: scaleSpacing(screenWidth < 500 ? 115 : 175),
-                height: scaleSpacing(screenWidth < 500 ? 32 : 48),
-              }}
-              resizeMode="contain"
+            <ExcelLogoSvg
+              width={scaleSpacing(screenWidth < 500 ? 115 : 175)}
+              height={scaleSpacing(screenWidth < 500 ? 32 : 48)}
             />
           </View>
 
@@ -443,7 +436,7 @@ export const PortraitKioskLayout: React.FC<PortraitKioskLayoutProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </ImageBackground>
+      </LinearGradient>
 
       {/* Search Input Bar (when active) */}
       {(isSearchOpen || searchQuery.length > 0) && (
@@ -1314,7 +1307,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    backgroundColor: '#020D22',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
   },
   expandedHeaderBgImage: {
     width: '100%',

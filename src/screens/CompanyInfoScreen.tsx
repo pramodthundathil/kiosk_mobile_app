@@ -25,6 +25,7 @@ import { KioskResponsiveMetrics } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
 import { WhiteboardModal } from '../components/WhiteboardModal';
 import { KioskScrollContainer } from '../components/KioskScrollContainer';
+import { ExcelLogoSvg, SinceLogoSvg } from '../components/SvgLogos';
 import { useAppVersion } from '../hooks/useAppVersion';
 
 interface CompanyInfoScreenProps {
@@ -53,25 +54,23 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
       {/* Interactive Digital Whiteboard Modal */}
       <WhiteboardModal visible={isWhiteboardOpen} onClose={() => setIsWhiteboardOpen(false)} />
 
-      {/* Top Earth Header Background in Portrait Mode */}
+      {/* Top Header Background in Portrait Mode */}
       {!isLandscape && (
-        <ImageBackground
-          source={require('../../assets/portrait_earth_header.png')}
+        <LinearGradient
+          colors={['#0A4482', '#0D60AE', '#217FD9']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0.85 }}
           style={[styles.portraitHeaderBg, { minHeight: scaleSpacing(110) }]}
-          imageStyle={styles.portraitHeaderBgImage}
-          resizeMode="cover"
         >
           <View style={styles.portraitHeaderTopRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleSpacing(8) }}>
-              <Image
-                source={require('../../assets/sincepng (1).png')}
-                style={{ width: scaleSpacing(34), height: scaleSpacing(32) }}
-                resizeMode="contain"
+              <SinceLogoSvg
+                width={scaleSpacing(34)}
+                height={scaleSpacing(32)}
               />
-              <Image
-                source={require('../../assets/NewLogo (1).png')}
-                style={styles.portraitLogoImg}
-                resizeMode="contain"
+              <ExcelLogoSvg
+                width={scaleSpacing(175)}
+                height={scaleSpacing(48)}
               />
             </View>
             <TouchableOpacity
@@ -83,7 +82,7 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
               <Text style={[styles.portraitHeaderWhiteboardBtnText, { fontSize: scaleFont(12) }]}>Whiteboard</Text>
             </TouchableOpacity>
           </View>
-        </ImageBackground>
+        </LinearGradient>
       )}
 
       {/* Top Page Header Bar */}
@@ -119,16 +118,14 @@ export const CompanyInfoScreen: React.FC<CompanyInfoScreenProps> = ({
         {/* Main Banner Card */}
         <View style={styles.bannerCard}>
           <View style={styles.bannerLogoRow}>
-            <Image
-              source={require('../../assets/sincepng (1).png')}
-              style={{ width: scaleSpacing(72), height: scaleSpacing(68) }}
-              resizeMode="contain"
+            <SinceLogoSvg
+              width={scaleSpacing(72)}
+              height={scaleSpacing(68)}
             />
             <View>
-              <Image
-                source={require('../../assets/excel logo_blue.png')}
-                style={styles.brandLogoImg}
-                resizeMode="contain"
+              <ExcelLogoSvg
+                width={scaleSpacing(200)}
+                height={scaleSpacing(56)}
               />
               <Image
                 source={require('../../assets/excel_dedicated_caption.png')}
@@ -270,7 +267,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    backgroundColor: '#020D22',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
   },
   portraitHeaderBgImage: {
     width: '100%',

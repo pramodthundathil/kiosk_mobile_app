@@ -299,28 +299,7 @@ function isSameMediaUrl(url1?: string, url2?: string): boolean {
     const items: UnifiedMediaItem[] = [];
     const assets = product.mediaAssets || [];
 
-    // 1. 3D Model Asset (Prioritize if available and has valid non-empty URL)
-    const threeD = assets.find(
-      (a) =>
-        (a.asset_type === 'THREE_D' ||
-          a.file_url?.toLowerCase().endsWith('.glb') ||
-          a.file_url?.toLowerCase().endsWith('.gltf')) &&
-        typeof a.file_url === 'string' &&
-        a.file_url.trim().length > 0
-    );
-    if (threeD && threeD.file_url && threeD.file_url.trim().length > 0) {
-      items.push({
-        id: threeD.id,
-        title: threeD.title || '3D Interactive Model',
-        type: 'THREE_D',
-        typeLabel: '3D Model',
-        url: threeD.file_url.trim(),
-        thumbnailUrl: product.image,
-        description: threeD.description || 'Full 360-degree interactive 3D engineering model',
-      });
-    }
-
-    // 2. Primary Product Photo
+    // 1. Primary Product Photo
     if (product.image) {
       items.push({
         id: 'main-photo',

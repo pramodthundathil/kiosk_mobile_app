@@ -131,15 +131,11 @@ export const MediaModal: React.FC<MediaModalProps> = ({
           {/* Content Area Based on Media Type */}
           <View style={styles.contentArea}>
             {assetType === 'THREE_D' ? (
-              <View style={styles.threeDContainer}>
-                <ThreeDModelViewer
-                  modelUrl={assetUrl}
-                  posterUrl={product?.image}
-                  title={asset.title}
-                  autoRotate={true}
-                  showControls={true}
-                  isFullscreen={true}
-                  scaleFont={scaleFont}
+              <View style={styles.imageContainer}>
+                <Image
+                  source={{ uri: product?.image || assetUrl }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
                 />
               </View>
             ) : assetType === 'VIDEO' ? (

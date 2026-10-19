@@ -77,20 +77,8 @@ export const ProductMediaGallery: React.FC<ProductMediaGalleryProps> = ({
 }) => {
   const mediaAssets = product.mediaAssets || [];
 
-  // Categorize assets (require valid non-empty file_url)
-  const threeDAsset = useMemo(
-    () =>
-      mediaAssets.find(
-        (a) =>
-          (a.asset_type?.toUpperCase() === 'THREE_D' ||
-            a.asset_type?.toUpperCase() === '3D' ||
-            a.file_url?.toLowerCase().endsWith('.glb') ||
-            a.file_url?.toLowerCase().endsWith('.gltf')) &&
-          typeof a.file_url === 'string' &&
-          a.file_url.trim().length > 0
-      ) || null,
-    [mediaAssets]
-  );
+  // 3D model asset disabled across kiosk screens as requested
+  const threeDAsset: ProductMediaAsset | null = null;
 
   const videoAssets = useMemo(
     () =>
@@ -362,35 +350,6 @@ function isSameMediaUrl(url1?: string, url2?: string): boolean {
               </TouchableOpacity>
             )}
 
-            {threeDAsset && (
-              <TouchableOpacity
-                style={[
-                  styles.pillToggleBtn,
-                  activeTab === 'three_d' && styles.pillToggleBtnActive,
-                ]}
-                onPress={() => {
-                  try { Haptics.selectionAsync(); } catch (e) {}
-                  setActiveTab('three_d');
-                }}
-                activeOpacity={0.88}
-              >
-                <Box
-                  size={scaleFont(13)}
-                  color={activeTab === 'three_d' ? '#FFFFFF' : '#475569'}
-                  strokeWidth={2.2}
-                />
-                <Text
-                  style={[
-                    styles.pillToggleText,
-                    activeTab === 'three_d' && styles.pillToggleTextActive,
-                    { fontSize: scaleFont(12) },
-                  ]}
-                >
-                  3D
-                </Text>
-              </TouchableOpacity>
-            )}
-
             {docAssets.length > 0 && (
               <TouchableOpacity
                 style={[
@@ -456,20 +415,7 @@ function isSameMediaUrl(url1?: string, url2?: string): boolean {
       <View style={[styles.stageAndThumbsRow, { flexDirection: isLandscape ? 'row' : 'column' }]}>
         {/* Main Display Stage */}
         <View style={[styles.stageWrapper, { height, flex: 1 }]}>
-          {activeTab === 'three_d' && threeDAsset ? (
-            <View style={styles.stageContent}>
-              <ThreeDModelViewer
-                modelUrl={threeDAsset.file_url || ''}
-                posterUrl={product.image}
-                title={threeDAsset.title || product.name}
-                autoRotate={true}
-                showControls={true}
-                isFullscreen={false}
-                onToggleFullscreen={handleOpenActiveFullscreen}
-                scaleFont={scaleFont}
-              />
-            </View>
-          ) : activeTab === 'video' && videoAssets[selectedVideoIndex] ? (
+          {activeTab === 'video' && videoAssets[selectedVideoIndex] ? (
             <View style={styles.stageContent}>
               <InlineVideoCard
                 url={videoAssets[selectedVideoIndex].file_url || ''}

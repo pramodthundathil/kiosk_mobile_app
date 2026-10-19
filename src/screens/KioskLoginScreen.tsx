@@ -27,6 +27,7 @@ import { kioskColors, kioskShadows, minTouchTarget } from '../theme/kioskTheme';
 import { useKioskResponsive } from '../hooks/useKioskResponsive';
 import { getDeviceMacAddress } from '../utils/deviceInfo';
 import { loginKioskDevice, getSavedServerUrl, DEFAULT_SERVER_URL } from '../services/api';
+import { ExcelLogoSvg, SinceLogoSvg } from '../components/SvgLogos';
 
 
 interface KioskLoginScreenProps {
@@ -133,15 +134,14 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
             <View style={styles.landscapeRow}>
               {/* Left Column: Branding Logo & Terminal Registration */}
               <View style={styles.landscapeLeftCol}>
-                <Image
-                  source={require('../../assets/sincepng (1).png')}
-                  style={{ width: scaleSpacing(90), height: scaleSpacing(86), marginBottom: scaleSpacing(8) }}
-                  resizeMode="contain"
+                <SinceLogoSvg
+                  width={scaleSpacing(90)}
+                  height={scaleSpacing(86)}
+                  style={{ marginBottom: scaleSpacing(8) }}
                 />
-                <Image
-                  source={require('../../assets/excel logo_blue.png')}
-                  style={styles.landscapeLogoImg}
-                  resizeMode="contain"
+                <ExcelLogoSvg
+                  width={scaleSpacing(250)}
+                  height={scaleSpacing(70)}
                 />
                 <View style={styles.taglineWrapper}>
                   <Image
@@ -316,15 +316,14 @@ export const KioskLoginScreen: React.FC<KioskLoginScreenProps> = ({ onLoginSucce
             <View style={styles.portraitCol}>
               {/* Header Branding with Transparent Official Logo */}
               <View style={styles.brandHeader}>
-                <Image
-                  source={require('../../assets/sincepng (1).png')}
-                  style={{ width: scaleSpacing(80), height: scaleSpacing(76), marginBottom: scaleSpacing(6) }}
-                  resizeMode="contain"
+                <SinceLogoSvg
+                  width={scaleSpacing(80)}
+                  height={scaleSpacing(76)}
+                  style={{ marginBottom: scaleSpacing(6) }}
                 />
-                <Image
-                  source={require('../../assets/excel logo_blue.png')}
-                  style={styles.logoImg}
-                  resizeMode="contain"
+                <ExcelLogoSvg
+                  width={scaleSpacing(260)}
+                  height={scaleSpacing(70)}
                 />
 
                 <View style={styles.taglineWrapper}>

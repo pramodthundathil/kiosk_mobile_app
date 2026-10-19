@@ -48,7 +48,12 @@ export interface ThreeDModelViewerProps {
   scaleFont?: (size: number, min?: number) => number;
 }
 
-export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
+export const ThreeDModelViewer: React.FC<ThreeDModelViewerProps> = () => {
+  // 3D elements and viewers hidden across all screens as requested
+  return null;
+};
+
+export const LegacyThreeDModelViewer: React.FC<ThreeDModelViewerProps> = ({
   modelUrl,
   style,
   posterUrl,

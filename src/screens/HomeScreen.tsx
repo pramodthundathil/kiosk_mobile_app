@@ -208,6 +208,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout, isScreensaverA
       <MediaLibraryScreen
         metrics={responsiveMetrics}
         onBack={handleBackToCatalog}
+        allProducts={products}
         onOpenProductDetail={(productId) => {
           const prod = products.find((p) => p.id === productId);
           if (prod) {

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { kioskColors } from '../theme/kioskTheme';
-import { KioskResponsiveMetrics, MediaLibraryAsset, MediaLibraryCategory } from '../types/kiosk';
+import { KioskResponsiveMetrics, MediaLibraryAsset, MediaLibraryCategory, KioskProduct } from '../types/kiosk';
 import { KioskBackButton } from '../components/KioskBackButton';
 import { ThreeDModelViewer } from '../components/ThreeDModelViewer';
 import { InAppPdfViewer } from '../components/InAppPdfViewer';
@@ -33,6 +33,8 @@ import {
   fetchMediaLibraryItems,
   getCachedMediaLibrary,
   saveCachedMediaLibrary,
+  extractMediaAssetsFromProducts,
+  getCachedCatalogProducts,
 } from '../services/api';
 import { syncService } from '../services/syncService';
 import { analyticsService } from '../services/analyticsService';
@@ -41,20 +43,22 @@ interface MediaLibraryScreenProps {
   metrics: KioskResponsiveMetrics;
   onBack: () => void;
   onOpenProductDetail?: (productId: string) => void;
+  allProducts?: KioskProduct[];
 }
 
-// Only Images, 3D Images, and Brochures as requested
+// Only Images and Brochures (3D disabled across kiosk screens)
 const DEFAULT_CATEGORIES: MediaLibraryCategory[] = [
   { id: 'IMAGE', name: 'Images', icon: 'image', count: 0 },
-  { id: 'THREE_D', name: '3D Images', icon: 'box', count: 0 },
   { id: 'PDF_BROCHURE', name: 'Brochures', icon: 'file-text', count: 0 },
 ];
 
-const ALLOWED_CATEGORY_IDS = new Set(['IMAGE', 'THREE_D', 'PDF_BROCHURE']);
+const ALLOWED_CATEGORY_IDS = new Set(['IMAGE', 'PDF_BROCHURE']);
 
 export const MediaLibraryScreen: React.FC<MediaLibraryScreenProps> = ({
   metrics,
   onBack,
+  onOpenProductDetail,
+  allProducts,
 }) => {
   const { width: screenWidth, isLandscape, scaleFont, scaleSpacing, is4K } = metrics;
 
@@ -104,11 +108,52 @@ export const MediaLibraryScreen: React.FC<MediaLibraryScreenProps> = ({
   // Load from local storage initially for instant zero-latency offline UX
   const loadFromLocalStorage = useCallback(async () => {
     try {
+      // 1. Try resolving assets from allProducts or cached catalog products first for immediate rendering
+      let localProducts = allProducts;
+      if (!localProducts || localProducts.length === 0) {
+        try {
+          localProducts = await getCachedCatalogProducts();
+        } catch {
+          localProducts = [];
+        }
+      }
+
+      if (localProducts && localProducts.length > 0) {
+        const productAssets = extractMediaAssetsFromProducts(localProducts);
+        const filtered = productAssets.filter((i) => {
+          if (selectedCategory === 'PDF_BROCHURE') {
+            return i.asset_type === 'PDF_BROCHURE' || i.asset_type === 'TECH_SHEET';
+          }
+          return i.asset_type === selectedCategory;
+        });
+
+        if (filtered.length > 0) {
+          setItems(filtered);
+          setTotalCount(filtered.length);
+          setIsLoadingInitial(false);
+        }
+
+        const totalImgs = productAssets.filter((i) => i.asset_type === 'IMAGE').length;
+        const totalPdfs = productAssets.filter(
+          (i) => i.asset_type === 'PDF_BROCHURE' || i.asset_type === 'TECH_SHEET'
+        ).length;
+
+        setCategories([
+          { id: 'IMAGE', name: 'Images', icon: 'image', count: totalImgs },
+          { id: 'PDF_BROCHURE', name: 'Brochures', icon: 'file-text', count: totalPdfs },
+        ]);
+        return;
+      }
+
+      // 2. Fallback to cached media library
       const cached = await getCachedMediaLibrary();
       if (cached && cached.results && cached.results.length > 0) {
-        const filteredCached = cached.results.filter(
-          (i) => i.asset_type === selectedCategory
-        );
+        const filteredCached = cached.results.filter((i) => {
+          if (selectedCategory === 'PDF_BROCHURE') {
+            return i.asset_type === 'PDF_BROCHURE' || i.asset_type === 'TECH_SHEET';
+          }
+          return i.asset_type === selectedCategory;
+        });
         if (filteredCached.length > 0) {
           setItems(filteredCached);
           setTotalCount(filteredCached.length);
@@ -125,7 +170,7 @@ export const MediaLibraryScreen: React.FC<MediaLibraryScreenProps> = ({
     } catch (e) {
       console.warn('[MediaLibraryScreen] Local storage read error:', e);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, allProducts]);
 
   // Fetch items from backend API
   const fetchItems = useCallback(
@@ -143,8 +188,9 @@ export const MediaLibraryScreen: React.FC<MediaLibraryScreenProps> = ({
       try {
         const response = await fetchMediaLibraryItems({
           page: targetPage,
-          pageSize: 16,
+          pageSize: 24,
           assetType: targetCat,
+          allProducts,
         });
 
         if (response) {
@@ -175,12 +221,32 @@ export const MediaLibraryScreen: React.FC<MediaLibraryScreenProps> = ({
           }
         }
       } catch (error) {
-        console.warn('[MediaLibraryScreen] Backend fetch notice, reading local cache:', error);
-        const cached = await getCachedMediaLibrary();
-        if (cached && cached.results) {
-          const filtered = cached.results.filter((i) => i.asset_type === targetCat);
+        console.warn('[MediaLibraryScreen] Backend fetch notice, reading local products/cache:', error);
+        let fallbackProducts = allProducts;
+        if (!fallbackProducts || fallbackProducts.length === 0) {
+          try {
+            fallbackProducts = await getCachedCatalogProducts();
+          } catch {
+            fallbackProducts = [];
+          }
+        }
+        if (fallbackProducts && fallbackProducts.length > 0) {
+          const fallbackAssets = extractMediaAssetsFromProducts(fallbackProducts);
+          const filtered = fallbackAssets.filter((i) => {
+            if (targetCat === 'PDF_BROCHURE') {
+              return i.asset_type === 'PDF_BROCHURE' || i.asset_type === 'TECH_SHEET';
+            }
+            return i.asset_type === targetCat;
+          });
           setItems(filtered);
           setTotalCount(filtered.length);
+        } else {
+          const cached = await getCachedMediaLibrary();
+          if (cached && cached.results) {
+            const filtered = cached.results.filter((i) => i.asset_type === targetCat);
+            setItems(filtered);
+            setTotalCount(filtered.length);
+          }
         }
       } finally {
         setIsLoadingInitial(false);
@@ -188,7 +254,7 @@ export const MediaLibraryScreen: React.FC<MediaLibraryScreenProps> = ({
         setIsRefreshing(false);
       }
     },
-    [selectedCategory]
+    [selectedCategory, allProducts]
   );
 
   // Initial load
@@ -494,9 +560,20 @@ export const MediaLibraryScreen: React.FC<MediaLibraryScreenProps> = ({
                 </TouchableOpacity>
 
                 <View style={styles.viewerTitleInfo}>
-                  <Text numberOfLines={1} style={[styles.viewerMainTitle, { fontSize: scaleFont(15) }]}>
-                    {viewerItem.product_name || viewerItem.title}
-                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={viewerItem.product_id && onOpenProductDetail ? 0.7 : 1}
+                    disabled={!viewerItem.product_id || !onOpenProductDetail}
+                    onPress={() => {
+                      if (viewerItem.product_id && onOpenProductDetail) {
+                        setViewerItem(null);
+                        onOpenProductDetail(viewerItem.product_id);
+                      }
+                    }}
+                  >
+                    <Text numberOfLines={1} style={[styles.viewerMainTitle, { fontSize: scaleFont(15) }]}>
+                      {viewerItem.product_name || viewerItem.title}
+                    </Text>
+                  </TouchableOpacity>
                   {viewerItem.product_name && viewerItem.title !== viewerItem.product_name ? (
                     <Text numberOfLines={1} style={[styles.viewerSubTitle, { fontSize: scaleFont(11.5) }]}>
                       {viewerItem.title}

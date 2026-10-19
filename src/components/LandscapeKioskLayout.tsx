@@ -34,6 +34,7 @@ import { WhiteboardModal } from './WhiteboardModal';
 import { KioskBackButton } from './KioskBackButton';
 import { MediaModal } from './MediaModal';
 import { KioskScrollContainer } from './KioskScrollContainer';
+import { ExcelLogoSvg, SinceLogoSvg } from './SvgLogos';
 import { useInactivityTimer } from './InactivityTracker';
 import { useAppVersion } from '../hooks/useAppVersion';
 import { getColorCombo } from '../constants/colorCombos';
@@ -429,23 +430,22 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
       {/* ── MAIN VIEW: Header + Content + Footer ── */}
       <View style={styles.rightPanel}>
 
-        {/* TOP HEADER WITH EARTH BACKGROUND IMAGE */}
-        <ImageBackground
-          source={require('../../assets/portrait_earth_header.png')}
+        {/* TOP HEADER WITH GRADIENT BLUE BACKGROUND */}
+        <LinearGradient
+          colors={['#0A4482', '#0D60AE', '#217FD9']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0.8 }}
           style={styles.topHeader}
-          imageStyle={styles.topHeaderBgImage}
-          resizeMode="cover"
         >
           <View style={styles.logoSection}>
-            <Image
-              source={require('../../assets/sincepng (1).png')}
-              style={{ width: scaleSpacing(38), height: scaleSpacing(36), marginRight: scaleSpacing(10) }}
-              resizeMode="contain"
+            <SinceLogoSvg
+              width={scaleSpacing(38)}
+              height={scaleSpacing(36)}
+              style={{ marginRight: scaleSpacing(10) }}
             />
-            <Image
-              source={require('../../assets/NewLogo (1).png')}
-              style={styles.logoImg}
-              resizeMode="contain"
+            <ExcelLogoSvg
+              width={scaleSpacing(142)}
+              height={scaleSpacing(38)}
             />
           </View>
 
@@ -490,7 +490,7 @@ export const LandscapeKioskLayout: React.FC<LandscapeKioskLayoutProps> = ({
             </AnimatedButton>
 
           </View>
-        </ImageBackground>
+        </LinearGradient>
 
         {/* MAIN CONTENT AREA */}
         <Animated.View
@@ -1286,7 +1286,6 @@ const styles = StyleSheet.create({
 
   // ── TOP HEADER ──
   topHeader: {
-    backgroundColor: '#020D22',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1294,9 +1293,11 @@ const styles = StyleSheet.create({
     height: 52,
     overflow: 'hidden',
     zIndex: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
   },
